@@ -486,6 +486,16 @@ export class NeoaiPlugin extends Plugin {
           await stepsRepo.update({ filterByTk: open.id, values });
           openSteps.delete(key);
         } else {
+          // After a process restart the open-step map is empty — a resumed
+          // human gate's completion must HEAL its original 'waiting' row
+          // instead of duplicating it.
+          const stale = await stepsRepo.findOne({
+            filter: { run_id: runId, node_id: evt.nodeId, status: 'waiting' },
+          });
+          if (stale) {
+            await stepsRepo.update({ filterByTk: stale.get('id'), values });
+            return;
+          }
           seq += 1;
           await stepsRepo.create({
             values: {

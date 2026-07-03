@@ -1638,6 +1638,13 @@ var NeoaiPlugin = class extends import_server.Plugin {
           await stepsRepo.update({ filterByTk: open.id, values });
           openSteps.delete(key);
         } else {
+          const stale = await stepsRepo.findOne({
+            filter: { run_id: runId, node_id: evt.nodeId, status: "waiting" }
+          });
+          if (stale) {
+            await stepsRepo.update({ filterByTk: stale.get("id"), values });
+            return;
+          }
           seq += 1;
           await stepsRepo.create({
             values: {
