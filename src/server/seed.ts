@@ -25,7 +25,7 @@ const SYNTH_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          kind: { type: 'string', description: 'transport|vegetation|zufahrt|sonstig' },
+          kind: { type: 'string', description: 'bplan|transport|vegetation|zufahrt|sonstig' },
           severity: { type: 'string', description: 'info|warn|block' },
           title: { type: 'string' },
           detail: { type: 'string' },
