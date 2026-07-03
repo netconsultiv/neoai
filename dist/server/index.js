@@ -24,7 +24,7 @@ var require_package = __commonJS({
   "package.json"(exports2, module2) {
     module2.exports = {
       name: "@neomodul/neoai",
-      version: "0.1.0",
+      version: "0.1.1",
       displayName: "NeoAI",
       description: "NeoAI for NeoBase: central AI workflow management \u2014 tree-structured multi-step workflows (LLM, image, HTTP, data and approval nodes) with a visual editor, run monitor, cost tracking and a function registry other @neomodul plugins dispatch through. Gemini-first via @nocobase/plugin-ai; legacy code paths stay as fallback.",
       license: "UNLICENSED",
@@ -345,6 +345,40 @@ function checkBudget(opts) {
   return { ok: true };
 }
 
+// src/server/lib/mock.ts
+var MOCK_LABEL = "\u26A0\uFE0E MOCK (NEOAI_SANDBOX) \u2014 no real model call";
+function mockFromSchema(schema, propName = "") {
+  if (!schema || typeof schema !== "object") return `MOCK ${propName}`.trim();
+  if (Array.isArray(schema.enum) && schema.enum.length) return schema.enum[0];
+  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+  switch (type) {
+    case "object": {
+      const out = {};
+      for (const [k, sub] of Object.entries(schema.properties ?? {})) out[k] = mockFromSchema(sub, k);
+      return out;
+    }
+    case "array":
+      return [mockFromSchema(schema.items, propName)];
+    case "number":
+    case "integer":
+      return 1;
+    case "boolean":
+      return true;
+    case "string":
+    default:
+      return `MOCK ${propName || "value"}`;
+  }
+}
+function mockLlmText(prompt) {
+  const head = String(prompt ?? "").replace(/\s+/g, " ").slice(0, 160);
+  return `${MOCK_LABEL}
+Echo of prompt head: "${head}"`;
+}
+function mockUsage(prompt) {
+  return { inputTokens: Math.max(1, Math.ceil(String(prompt ?? "").length / 4)), outputTokens: 64 };
+}
+var MOCK_IMAGE_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADgQF/e5IkGQAAAABJRU5ErkJggg==";
+
 // src/server/lib/providers.ts
 var GEMINI_TIMEOUT_MS = 6e4;
 var GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -492,6 +526,16 @@ async function llmInvoke(app, opts) {
   }
   const key = await resolveGeminiKey(app);
   if (!key) {
+    if (isSandbox()) {
+      app.logger?.info?.("[neoai] llm MOCK (sandbox, no key/plugin-ai)");
+      return {
+        text: mockLlmText(opts.prompt),
+        json: opts.jsonSchema ? mockFromSchema(opts.jsonSchema) : void 0,
+        usage: mockUsage(opts.prompt),
+        model: "mock",
+        via: "mock"
+      };
+    }
     throw new Error(
       "no LLM available: plugin-ai has no usable llmService and no Gemini key is configured (GEMINI_API_KEY / neoai_settings.gemini_api_key)"
     );
@@ -500,7 +544,13 @@ async function llmInvoke(app, opts) {
 }
 async function imageInvoke(app, opts) {
   const key = await resolveGeminiKey(app);
-  if (!key) throw new Error("no Gemini key configured for image node");
+  if (!key) {
+    if (isSandbox()) {
+      app.logger?.info?.("[neoai] image MOCK (sandbox, no key)");
+      return { imageDataUrl: MOCK_IMAGE_DATA_URL, usage: { inputTokens: 0, outputTokens: 0 }, model: "mock" };
+    }
+    throw new Error("no Gemini key configured for image node");
+  }
   const model = opts.model || "gemini-2.5-flash-image";
   const parts = [{ text: opts.prompt }];
   if (opts.imageDataUrl) {

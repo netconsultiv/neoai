@@ -17,6 +17,9 @@
 // → konfigurator_plugin_settings.ai_photo_api_key (read-only courtesy fallback,
 // it is the same shared key on staging).
 
+import { isSandbox } from './env';
+import { MOCK_IMAGE_DATA_URL, mockFromSchema, mockLlmText, mockUsage } from './mock';
+
 export const GEMINI_TIMEOUT_MS = 60_000;
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -228,6 +231,18 @@ export async function llmInvoke(
   }
   const key = await resolveGeminiKey(app);
   if (!key) {
+    // Sandbox-only mock (NEOAI_SANDBOX=1): keeps E2E walkable without a key or
+    // spend; NEVER fires on staging/prod (flag unset ⇒ hard error, as before).
+    if (isSandbox()) {
+      app.logger?.info?.('[neoai] llm MOCK (sandbox, no key/plugin-ai)');
+      return {
+        text: mockLlmText(opts.prompt),
+        json: opts.jsonSchema ? mockFromSchema(opts.jsonSchema) : undefined,
+        usage: mockUsage(opts.prompt),
+        model: 'mock',
+        via: 'mock',
+      };
+    }
     throw new Error(
       'no LLM available: plugin-ai has no usable llmService and no Gemini key is configured (GEMINI_API_KEY / neoai_settings.gemini_api_key)',
     );
@@ -240,7 +255,13 @@ export async function imageInvoke(
   opts: { model?: string; prompt: string; imageDataUrl?: string },
 ): Promise<ImageResult> {
   const key = await resolveGeminiKey(app);
-  if (!key) throw new Error('no Gemini key configured for image node');
+  if (!key) {
+    if (isSandbox()) {
+      app.logger?.info?.('[neoai] image MOCK (sandbox, no key)');
+      return { imageDataUrl: MOCK_IMAGE_DATA_URL, usage: { inputTokens: 0, outputTokens: 0 }, model: 'mock' };
+    }
+    throw new Error('no Gemini key configured for image node');
+  }
   const model = opts.model || 'gemini-2.5-flash-image';
   const parts: any[] = [{ text: opts.prompt }];
   if (opts.imageDataUrl) {
