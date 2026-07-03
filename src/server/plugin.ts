@@ -26,16 +26,32 @@ import { isAdminCtx, isSandbox } from './lib/env';
 import { DEFAULT_IMAGE_PRICE_USD, DEFAULT_PRICES, checkBudget } from './lib/cost';
 import { execLeafFactory } from './lib/nodes';
 import { Runner, RunOutcome, StepEvent, WorkflowDef, validateDefinition } from './lib/runner';
+import { isDue, parseSchedule } from './lib/schedule';
 import { truncateJson } from './lib/template';
 import { ensureSeedWorkflows } from './seed';
+
+/** Count budget-relevant nodes for the confirm-gate estimate. */
+function countModelNodes(def: WorkflowDef): { llm: number; image: number } {
+  const out = { llm: 0, image: 0 };
+  const walk = (nodes: any[]) => {
+    for (const n of nodes ?? []) {
+      if (n.type === 'llm') out.llm += 1;
+      if (n.type === 'image') out.image += 1;
+      for (const b of n.branches ?? []) walk(b ?? []);
+    }
+  };
+  walk(def?.nodes ?? []);
+  return out;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const pkg = require('../../package.json');
 
-type RunHandle = { cancelled: boolean };
+type RunHandle = { cancelled: boolean; workflowId?: number };
 
 export class NeoaiPlugin extends Plugin {
   private running = new Map<number, RunHandle>();
+  private schedulerTimer: any = null;
 
   async install() {
     await this.setup();
@@ -199,6 +215,20 @@ export class NeoaiPlugin extends Plugin {
           ctx.body = { global: await this.spentTodayUsd(), byWorkflow: await this.spentTodayByWorkflow() };
           await next();
         },
+
+        // HTTP surface of the in-process function dispatch — used by the
+        // console's Functions panel and by E2E; host plugins call the service
+        // method directly instead.
+        runFunction: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const res = await this.runFunction(String(p.functionKey ?? ''), p.input ?? {}, {
+            triggeredBy: String(ctx.state?.currentUser?.nickname ?? 'admin'),
+            wait: p.wait === true,
+          });
+          ctx.body = res ?? { legacy: true, reason: 'no workflow bound (or function disabled) — caller must use its legacy code path' };
+          await next();
+        },
       },
     });
 
@@ -218,7 +248,50 @@ export class NeoaiPlugin extends Plugin {
       } catch (err) {
         this.app.logger.warn(`[neoai] restart sweep failed (non-fatal): ${err}`);
       }
+      this.startScheduler();
     });
+    this.app.on('beforeStop', () => {
+      if (this.schedulerTimer) clearInterval(this.schedulerTimer);
+      this.schedulerTimer = null;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Time triggers (scoping Q21 "Beides") — dependency-free ~30s tick.
+
+  private startScheduler() {
+    if (this.schedulerTimer) return;
+    this.schedulerTimer = setInterval(() => {
+      this.schedulerTick().catch((err) => this.app.logger.warn(`[neoai] scheduler tick failed: ${err}`));
+    }, 30_000);
+    this.app.logger.info('[neoai] scheduler started (30s tick)');
+  }
+
+  private async schedulerTick() {
+    const repo = this.db.getRepository('neoai_workflows');
+    if (!repo) return;
+    const rows = await repo.find({ filter: { enabled: true }, limit: 200 });
+    const now = new Date();
+    for (const wf of rows) {
+      const spec = parseSchedule(wf.get('schedule'));
+      if (!spec) continue;
+      const wfId = Number(wf.get('id'));
+      // Overlap guard: skip while a run of this workflow is still in flight.
+      if ([...this.running.values()].some((h) => h.workflowId === wfId)) continue;
+      const lastRaw = wf.get('last_scheduled_at');
+      const last = lastRaw ? new Date(lastRaw) : null;
+      if (!isDue(spec, last, now)) continue;
+      // Stamp BEFORE starting so a slow run can't double-fire on the next tick.
+      await repo.update({ filterByTk: wfId, values: { last_scheduled_at: now } });
+      const res = await this.startRun({
+        workflowId: wfId,
+        input: wf.get('schedule_input') ?? {},
+        trigger: 'schedule',
+        triggeredBy: 'scheduler',
+        confirmed: true, // configuring a schedule IS the admin's standing consent
+      });
+      this.app.logger.info(`[neoai] schedule fired for workflow ${wfId}: ${JSON.stringify(res)}`);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -377,7 +450,22 @@ export class NeoaiPlugin extends Plugin {
     if (errors.length) return { error: `invalid definition: ${errors.join('; ')}` };
 
     if (wf.get('require_confirm') === true && opts.confirmed !== true) {
-      return { needsConfirm: true, workflowId };
+      // Confirm gate with an honest estimate: model-call counts + today's spend
+      // vs budgets (we don't fake a €-prediction — token use depends on inputs).
+      const counts = countModelNodes(def);
+      const settings = await this.settingsRow();
+      return {
+        needsConfirm: true,
+        workflowId,
+        estimate: {
+          llmCalls: counts.llm,
+          imageCalls: counts.image,
+          spentTodayUsd: await this.spentTodayUsd(),
+          workflowSpentTodayUsd: await this.spentTodayUsd(workflowId),
+          globalDailyBudgetUsd: Number(settings?.get?.('daily_budget_usd')) || 0,
+          workflowDailyBudgetUsd: Number(wf.get('daily_budget_usd')) || 0,
+        },
+      };
     }
 
     const run = await this.db.getRepository('neoai_runs').create({
@@ -393,7 +481,7 @@ export class NeoaiPlugin extends Plugin {
       },
     });
     const runId = Number(run.get('id'));
-    const handle: RunHandle = { cancelled: false };
+    const handle: RunHandle = { cancelled: false, workflowId };
     this.running.set(runId, handle);
 
     setImmediate(() => {
@@ -446,6 +534,7 @@ export class NeoaiPlugin extends Plugin {
     let totalIn = 0;
     let totalOut = 0;
     let totalCost = 0;
+    let spendCache: { at: number; global: number; wf: number } | null = null;
     // start-row correlation: last open step row per path|nodeId
     const openSteps = new Map<string, { id: number; startedAt: number }>();
 
@@ -522,9 +611,17 @@ export class NeoaiPlugin extends Plugin {
       defaultModel: String(settings?.get?.('default_model') || 'gemini-2.5-flash'),
       defaultService: String(settings?.get?.('default_llm_service') || ''),
       guardModelCall: async () => {
+        // One DB scan feeds BOTH budget checks; cached 5s so multi-LLM
+        // workflows don't re-scan runs on every node.
+        const now = Date.now();
+        if (!spendCache || now - spendCache.at > 5000) {
+          const byWf = await this.spentTodayByWorkflow();
+          const global = Object.values(byWf).reduce((s, v) => s + v, 0);
+          spendCache = { at: now, global, wf: byWf[String(workflowId)] ?? 0 };
+        }
         const check = checkBudget({
-          spentTodayUsd: (await this.spentTodayUsd()) + totalCost,
-          workflowSpentTodayUsd: (await this.spentTodayUsd(workflowId)) + totalCost,
+          spentTodayUsd: spendCache.global + totalCost,
+          workflowSpentTodayUsd: spendCache.wf + totalCost,
           globalDailyBudgetUsd: Number(settings?.get?.('daily_budget_usd')) || 0,
           workflowDailyBudgetUsd: Number(wf.get('daily_budget_usd')) || 0,
         });

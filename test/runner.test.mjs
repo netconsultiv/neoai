@@ -194,6 +194,76 @@ test('validateDefinition catches structural errors', () => {
   assert.ok(errs.some((e) => e.includes('condition')));
 });
 
+test('gate inside a loop suspends and resumes mid-iteration', async () => {
+  const seen = [];
+  const { rt } = makeRuntime({
+    execLeaf: async (node, scope) => {
+      if (node.type === 'collect') {
+        seen.push(scope.item);
+        return { output: scope.item };
+      }
+      if (node.type === 'gate') return { suspend: true, output: { message: `approve item ${scope.item}` } };
+      if (node.type === 'output') return { output: { items: seen.slice() } };
+      return { output: {} };
+    },
+  });
+  const def = {
+    nodes: [
+      {
+        id: 'l',
+        type: 'loop',
+        config: { items: '{{input.list}}' },
+        branches: [[{ id: 'c1', type: 'collect' }, { id: 'g1', type: 'gate' }]],
+      },
+      { id: 'o', type: 'output', config: {} },
+    ],
+  };
+  const runner = new Runner(rt);
+  // iteration 0: collect 'a', then suspend at the gate
+  let out = await runner.run(def, { list: ['a', 'b'] });
+  assert.equal(out.status, 'waiting');
+  assert.deepEqual(seen, ['a']);
+  // resume → iteration 1: collect 'b', suspend again
+  out = await runner.resume(def, { list: ['a', 'b'] }, JSON.parse(JSON.stringify(out.state)), { approved: true });
+  assert.equal(out.status, 'waiting');
+  assert.deepEqual(seen, ['a', 'b']);
+  // final resume → loop done, output reached
+  out = await runner.resume(def, { list: ['a', 'b'] }, JSON.parse(JSON.stringify(out.state)), { approved: true });
+  assert.equal(out.status, 'succeeded');
+  assert.deepEqual(out.output.items, ['a', 'b']);
+});
+
+test('gate inside a condition branch resumes into the branch remainder', async () => {
+  const { rt } = makeRuntime();
+  const def = {
+    nodes: [
+      {
+        id: 'c',
+        type: 'condition',
+        config: { left: '{{input.flag}}', op: 'truthy' },
+        branches: [
+          [
+            { id: 'g', type: 'gate' },
+            { id: 'after', type: 'val', config: { value: 'branch-tail' } },
+          ],
+          [],
+        ],
+      },
+      { id: 'o', type: 'output', config: { map: { tail: '{{nodes.after}}', gateComment: '{{nodes.g.comment}}' } } },
+    ],
+  };
+  const runner = new Runner(rt);
+  const first = await runner.run(def, { flag: true });
+  assert.equal(first.status, 'waiting');
+  const resumed = await runner.resume(def, { flag: true }, JSON.parse(JSON.stringify(first.state)), {
+    approved: true,
+    comment: 'go on',
+  });
+  assert.equal(resumed.status, 'succeeded');
+  assert.equal(resumed.output.tail, 'branch-tail');
+  assert.equal(resumed.output.gateComment, 'go on');
+});
+
 test('output with end stops early', async () => {
   const { rt } = makeRuntime();
   const def = {

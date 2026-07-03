@@ -13,11 +13,13 @@ import { NEOHOME_GREEN, NEOHOME_THEME, ensureInterFont } from '../theme';
 import { NEOMODUL_FAVICON_SRC } from '../logo';
 import { WorkflowsPanel } from './WorkflowsPanel';
 import { RunsPanel } from './RunsPanel';
+import { FunctionsPanel } from './FunctionsPanel';
 import { SettingsPanel } from './SettingsPanel';
 
 const TABS: Array<{ key: string; label: string; icon: string }> = [
   { key: 'workflows', label: 'AI Workflows', icon: 'PartitionOutlined' },
   { key: 'runs', label: 'Runs', icon: 'PlayCircleOutlined' },
+  { key: 'functions', label: 'Functions', icon: 'ApiOutlined' },
   { key: 'settings', label: 'Settings', icon: 'SettingOutlined' },
 ];
 
@@ -107,6 +109,7 @@ export function NeoaiConsolePage() {
         <main style={{ flex: 1, overflow: 'auto', minWidth: 0, background: '#fff' }}>
           {active === 'workflows' ? <WorkflowsPanel /> : null}
           {active === 'runs' ? <RunsPanel /> : null}
+          {active === 'functions' ? <FunctionsPanel /> : null}
           {active === 'settings' ? <SettingsPanel /> : null}
         </main>
       </div>

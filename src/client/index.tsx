@@ -15,11 +15,13 @@ export class NeoaiClientPlugin extends Plugin {
     this.app.router.add('admin.neoai', { path: 'neoai', Component: NeoaiConsolePage });
     this.app.router.add('admin.neoaiWorkflows', { path: 'neoai/workflows', Component: NeoaiConsolePage });
     this.app.router.add('admin.neoaiRuns', { path: 'neoai/runs', Component: NeoaiConsolePage });
+    this.app.router.add('admin.neoaiFunctions', { path: 'neoai/functions', Component: NeoaiConsolePage });
     this.app.router.add('admin.neoaiSettings', { path: 'neoai/settings', Component: NeoaiConsolePage });
     // Standalone aliases.
     this.app.router.add('neoai', { path: '/neoai', Component: NeoaiConsolePage });
     this.app.router.add('neoai-workflows', { path: '/neoai/workflows', Component: NeoaiConsolePage });
     this.app.router.add('neoai-runs', { path: '/neoai/runs', Component: NeoaiConsolePage });
+    this.app.router.add('neoai-functions', { path: '/neoai/functions', Component: NeoaiConsolePage });
     this.app.router.add('neoai-settings', { path: '/neoai/settings', Component: NeoaiConsolePage });
   }
 }

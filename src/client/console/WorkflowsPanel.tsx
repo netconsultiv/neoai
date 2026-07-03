@@ -561,7 +561,7 @@ function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => voi
 
 // --- draft test run ---------------------------------------------------------------
 
-function TestRunBox({ workflowId }: { workflowId: number }) {
+function TestRunBox({ workflowId, currentVersion }: { workflowId: number; currentVersion: number }) {
   const api = useAPIClient();
   const [inputText, setInputText] = useState('{\n  "address": "Am Hochbehälter, 91166 Georgensgmünd"\n}');
   const [runId, setRunId] = useState<number | null>(null);
@@ -579,7 +579,7 @@ function TestRunBox({ workflowId }: { workflowId: number }) {
     2000,
     !!runId && active,
   );
-  const start = async () => {
+  const start = async (draft: boolean) => {
     let input: any = {};
     try {
       input = inputText.trim() ? JSON.parse(inputText) : {};
@@ -588,7 +588,22 @@ function TestRunBox({ workflowId }: { workflowId: number }) {
       return;
     }
     try {
-      const res = await neoaiAction(api, 'run', { workflowId, input, draft: true, confirmed: true, trigger: 'test' });
+      let res = await neoaiAction(api, 'run', { workflowId, input, draft, confirmed: draft, trigger: draft ? 'test' : 'manual' });
+      if (res.needsConfirm) {
+        // Honest confirm gate (Q15): model-call counts + today's spend vs budgets.
+        const e = res.estimate ?? {};
+        const lines = [
+          `This workflow makes ${e.llmCalls ?? '?'} LLM call(s) and ${e.imageCalls ?? 0} image call(s) per run.`,
+          `Spent today: $${(e.spentTodayUsd ?? 0).toFixed(2)} global` +
+            (e.globalDailyBudgetUsd ? ` (budget $${e.globalDailyBudgetUsd})` : ' (no global budget)') +
+            `, $${(e.workflowSpentTodayUsd ?? 0).toFixed(2)} this workflow` +
+            (e.workflowDailyBudgetUsd ? ` (budget $${e.workflowDailyBudgetUsd})` : ''),
+          '',
+          'Run it?',
+        ];
+        if (!window.confirm(lines.join('\n'))) return;
+        res = await neoaiAction(api, 'run', { workflowId, input, draft, confirmed: true, trigger: 'manual' });
+      }
       if (res.error) {
         message.error(res.error);
         return;
@@ -601,7 +616,7 @@ function TestRunBox({ workflowId }: { workflowId: number }) {
   };
   return (
     <div>
-      <Field label="Test input (JSON)">
+      <Field label="Input (JSON)">
         <Input.TextArea
           rows={4}
           value={inputText}
@@ -609,9 +624,12 @@ function TestRunBox({ workflowId }: { workflowId: number }) {
           style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
         />
       </Field>
-      <Space>
-        <Button type="primary" onClick={start}>
+      <Space wrap>
+        <Button type="primary" onClick={() => start(true)}>
           Run draft test
+        </Button>
+        <Button disabled={!currentVersion} title={currentVersion ? '' : 'Publish first'} onClick={() => start(false)}>
+          Run published v{currentVersion || '—'}
         </Button>
         {runId ? <span style={{ fontSize: 12, color: '#8a8f8a' }}>run #{runId}</span> : null}
         {data.run ? <StatusTag status={data.run.status} /> : null}
@@ -663,6 +681,21 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
     setSelectedId(null);
   }
 
+  const [versions, setVersions] = useState<any[]>([]);
+  const loadVersions = async () => {
+    try {
+      const { rows } = await listResource(api, 'neoai_workflow_versions', {
+        filter: JSON.stringify({ workflow_id: wf.id }),
+        sort: '-version',
+        pageSize: 10,
+      });
+      setVersions(rows);
+    } catch {
+      /* non-fatal */
+    }
+  };
+  usePoll(loadVersions, 3_600_000, true);
+
   const saveDraft = async () => {
     try {
       await updateResource(api, 'neoai_workflows', wf.id, {
@@ -671,6 +704,8 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
         require_confirm: wf.require_confirm === true,
         daily_budget_usd: Number(wf.daily_budget_usd) || 0,
         description: wf.description ?? '',
+        schedule: wf.schedule ?? '',
+        schedule_input: wf.schedule_input ?? null,
       });
       setDirty(false);
       message.success('Draft saved');
@@ -688,6 +723,7 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
       if (res.ok) {
         message.success(`Published as version ${res.version}`);
         setWf({ ...wf, current_version: res.version });
+        loadVersions();
       } else {
         message.error(`Not publishable: ${(res.errors ?? []).join(' · ')}`);
       }
@@ -744,9 +780,49 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
               <Field label="Daily budget (USD, 0 = unlimited)">
                 <InputNumber min={0} step={0.5} value={Number(wf.daily_budget_usd) || 0} onChange={(v) => (setWf({ ...wf, daily_budget_usd: v ?? 0 }), setDirty(true))} />
               </Field>
+              <Field label='Schedule — "every 15m" · "every 2h" · "daily 07:00" (empty = off; runs published version)'>
+                <Input
+                  value={wf.schedule ?? ''}
+                  placeholder="off"
+                  onChange={(e) => (setWf({ ...wf, schedule: e.target.value }), setDirty(true))}
+                />
+              </Field>
+              <Field label="Schedule input (JSON passed to scheduled runs)">
+                <JsonArea value={wf.schedule_input} onChange={(v) => (setWf({ ...wf, schedule_input: v ?? null }), setDirty(true))} rows={3} />
+              </Field>
               <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>TEST RUN (draft)</div>
-              <TestRunBox workflowId={wf.id} />
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>RUN</div>
+              <TestRunBox workflowId={wf.id} currentVersion={Number(wf.current_version) || 0} />
+              <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>VERSIONS</div>
+              {versions.length === 0 ? (
+                <div style={{ fontSize: 12.5, color: '#8a8f8a' }}>No published versions yet.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {versions.map((v) => (
+                    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5 }}>
+                      <Tag color={Number(v.version) === Number(wf.current_version) ? 'green' : 'default'} style={{ marginRight: 0 }}>
+                        v{v.version}
+                      </Tag>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#5c605c' }}>
+                        {fmtTime(v.createdAt)} · {v.published_by || '—'}
+                        {v.notes ? ` · ${v.notes}` : ''}
+                      </span>
+                      <Button
+                        size="small"
+                        onClick={() => {
+                          defRef.current = JSON.parse(JSON.stringify(v.definition ?? { nodes: [] }));
+                          setSelectedId(null);
+                          rerender();
+                          message.info(`Version ${v.version} loaded into the draft — save & publish to make it current`);
+                        }}
+                      >
+                        Load as draft
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -808,10 +884,16 @@ export function WorkflowsPanel() {
       title: 'Name',
       dataIndex: 'name',
       render: (v: string, r: any) => (
-        <a style={{ fontWeight: 600 }} onClick={() => setEditing(r)}>
+        <a style={{ fontWeight: 600, color: NEOHOME_GREEN }} onClick={() => setEditing(r)}>
           {v}
         </a>
       ),
+    },
+    {
+      title: 'Schedule',
+      dataIndex: 'schedule',
+      width: 110,
+      render: (v: string) => (v ? <Tag color="green">{v}</Tag> : '—'),
     },
     { title: 'Key', dataIndex: 'key', render: (v: string) => <code style={{ fontSize: 12 }}>{v}</code> },
     {

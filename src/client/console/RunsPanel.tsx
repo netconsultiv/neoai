@@ -20,6 +20,7 @@ import {
   runDuration,
   usePoll,
 } from './shared';
+import { NEOHOME_GREEN } from '../theme';
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'rejected']);
 
@@ -187,7 +188,7 @@ export function RunsPanel() {
       dataIndex: 'id',
       width: 80,
       render: (v: number) => (
-        <a style={{ fontWeight: 600 }} onClick={() => setOpenRun(v)}>
+        <a style={{ fontWeight: 600, color: NEOHOME_GREEN }} onClick={() => setOpenRun(v)}>
           #{v}
         </a>
       ),

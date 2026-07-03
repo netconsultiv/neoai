@@ -24,7 +24,7 @@ var require_package = __commonJS({
   "package.json"(exports2, module2) {
     module2.exports = {
       name: "@neomodul/neoai",
-      version: "0.1.1",
+      version: "0.1.2",
       displayName: "NeoAI",
       description: "NeoAI for NeoBase: central AI workflow management \u2014 tree-structured multi-step workflows (LLM, image, HTTP, data and approval nodes) with a visual editor, run monitor, cost tracking and a function registry other @neomodul plugins dispatch through. Gemini-first via @nocobase/plugin-ai; legacy code paths stay as fallback.",
       license: "UNLICENSED",
@@ -137,7 +137,11 @@ var NEOAI_COLLECTIONS = [
       bool("require_confirm", "Require confirm before run", false),
       dbl("daily_budget_usd", "Daily budget (USD, 0 = unlimited)", 0),
       int("current_version", "Current version", 0),
-      json("definition_draft", "Draft definition")
+      json("definition_draft", "Draft definition"),
+      // Time trigger (scoping Q21 "Beides"): "every 15m" | "every 2h" | "daily 07:00".
+      str("schedule", "Schedule (empty = off)"),
+      json("schedule_input", "Schedule input"),
+      dt("last_scheduled_at", "Last scheduled run")
     ]
   },
   {
@@ -256,6 +260,9 @@ var NEOAI_COLLECTIONS = [
   }
 ];
 var NEOAI_EXTRA_FIELDS = [
+  { collection: "neoai_workflows", field: str("schedule", "Schedule (empty = off)") },
+  { collection: "neoai_workflows", field: json("schedule_input", "Schedule input") },
+  { collection: "neoai_workflows", field: dt("last_scheduled_at", "Last scheduled run") },
   {
     collection: "neoai_workflows",
     field: {
@@ -671,11 +678,23 @@ function truncateJson(value, maxChars = 8e3) {
 
 // src/server/lib/nodes.ts
 var HTTP_TIMEOUT_MS = 45e3;
+var PRIVATE_HOST_RE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|fd[0-9a-f]{2}:)/i;
+function isPrivateHost(url) {
+  try {
+    const host = new URL(url).hostname;
+    return PRIVATE_HOST_RE.test(host) || host.endsWith(".internal") || host.endsWith(".local");
+  } catch {
+    return true;
+  }
+}
 async function execHttp(node, scope) {
   const cfg = resolveTemplates(node.config ?? {}, scope);
   const method = String(cfg.method ?? "GET").toUpperCase();
   const url = String(cfg.url ?? "");
   if (!/^https?:\/\//i.test(url)) throw new Error(`http node "${node.id}": invalid url`);
+  if (cfg.allowPrivate !== true && isPrivateHost(url)) {
+    throw new Error(`http node "${node.id}": private/internal target blocked (set allowPrivate:true to permit)`);
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(Number(cfg.timeoutMs) || HTTP_TIMEOUT_MS, 6e4));
   try {
@@ -1077,6 +1096,40 @@ var Runner = class _Runner {
   }
 };
 
+// src/server/lib/schedule.ts
+var EVERY_RE = /^every\s+(\d+)\s*(m|min|minutes?|h|hours?)$/i;
+var DAILY_RE = /^daily\s+(\d{1,2}):(\d{2})$/i;
+function parseSchedule(text2) {
+  const s = String(text2 ?? "").trim();
+  if (!s) return null;
+  const every = s.match(EVERY_RE);
+  if (every) {
+    const n = parseInt(every[1], 10);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    const unit = every[2].toLowerCase().startsWith("h") ? 36e5 : 6e4;
+    const ms = n * unit;
+    return ms >= 6e4 ? { kind: "every", ms } : null;
+  }
+  const daily = s.match(DAILY_RE);
+  if (daily) {
+    const hour = parseInt(daily[1], 10);
+    const minute = parseInt(daily[2], 10);
+    if (hour > 23 || minute > 59) return null;
+    return { kind: "daily", hour, minute };
+  }
+  return null;
+}
+function isDue(spec, lastRunAt, now) {
+  if (spec.kind === "every") {
+    if (!lastRunAt) return true;
+    return now.getTime() - lastRunAt.getTime() >= spec.ms;
+  }
+  const todayAt = new Date(now);
+  todayAt.setHours(spec.hour, spec.minute, 0, 0);
+  if (now < todayAt) return false;
+  return !lastRunAt || lastRunAt < todayAt;
+}
+
 // src/server/seed.ts
 var OVERPASS_VEGETATION = `[out:json][timeout:25];(node["natural"="tree"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["natural"="wood"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["landuse"="forest"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["natural"="water"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}}););out tags center 100;`;
 var OVERPASS_TRANSPORT = `[out:json][timeout:25];(way["highway"]["maxwidth"](around:400,{{nodes.geo.lat}},{{nodes.geo.lon}});way["highway"]["maxheight"](around:400,{{nodes.geo.lat}},{{nodes.geo.lon}});way["highway"]["maxweight"](around:400,{{nodes.geo.lat}},{{nodes.geo.lon}});way["highway"~"^(primary|secondary|tertiary|residential|unclassified|service|track)$"](around:200,{{nodes.geo.lat}},{{nodes.geo.lon}}););out tags center 120;`;
@@ -1242,11 +1295,24 @@ async function ensureSeedWorkflows(plugin) {
 }
 
 // src/server/plugin.ts
+function countModelNodes(def) {
+  const out = { llm: 0, image: 0 };
+  const walk = (nodes) => {
+    for (const n of nodes ?? []) {
+      if (n.type === "llm") out.llm += 1;
+      if (n.type === "image") out.image += 1;
+      for (const b of n.branches ?? []) walk(b ?? []);
+    }
+  };
+  walk(def?.nodes ?? []);
+  return out;
+}
 var pkg = require_package();
 var NeoaiPlugin = class extends import_server.Plugin {
   constructor() {
     super(...arguments);
     this.running = /* @__PURE__ */ new Map();
+    this.schedulerTimer = null;
   }
   async install() {
     await this.setup();
@@ -1392,6 +1458,19 @@ var NeoaiPlugin = class extends import_server.Plugin {
           requireAdmin(ctx);
           ctx.body = { global: await this.spentTodayUsd(), byWorkflow: await this.spentTodayByWorkflow() };
           await next();
+        },
+        // HTTP surface of the in-process function dispatch — used by the
+        // console's Functions panel and by E2E; host plugins call the service
+        // method directly instead.
+        runFunction: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const res = await this.runFunction(String(p.functionKey ?? ""), p.input ?? {}, {
+            triggeredBy: String(ctx.state?.currentUser?.nickname ?? "admin"),
+            wait: p.wait === true
+          });
+          ctx.body = res ?? { legacy: true, reason: "no workflow bound (or function disabled) \u2014 caller must use its legacy code path" };
+          await next();
         }
       }
     });
@@ -1410,7 +1489,46 @@ var NeoaiPlugin = class extends import_server.Plugin {
       } catch (err) {
         this.app.logger.warn(`[neoai] restart sweep failed (non-fatal): ${err}`);
       }
+      this.startScheduler();
     });
+    this.app.on("beforeStop", () => {
+      if (this.schedulerTimer) clearInterval(this.schedulerTimer);
+      this.schedulerTimer = null;
+    });
+  }
+  // ---------------------------------------------------------------------------
+  // Time triggers (scoping Q21 "Beides") — dependency-free ~30s tick.
+  startScheduler() {
+    if (this.schedulerTimer) return;
+    this.schedulerTimer = setInterval(() => {
+      this.schedulerTick().catch((err) => this.app.logger.warn(`[neoai] scheduler tick failed: ${err}`));
+    }, 3e4);
+    this.app.logger.info("[neoai] scheduler started (30s tick)");
+  }
+  async schedulerTick() {
+    const repo = this.db.getRepository("neoai_workflows");
+    if (!repo) return;
+    const rows = await repo.find({ filter: { enabled: true }, limit: 200 });
+    const now = /* @__PURE__ */ new Date();
+    for (const wf of rows) {
+      const spec = parseSchedule(wf.get("schedule"));
+      if (!spec) continue;
+      const wfId = Number(wf.get("id"));
+      if ([...this.running.values()].some((h) => h.workflowId === wfId)) continue;
+      const lastRaw = wf.get("last_scheduled_at");
+      const last = lastRaw ? new Date(lastRaw) : null;
+      if (!isDue(spec, last, now)) continue;
+      await repo.update({ filterByTk: wfId, values: { last_scheduled_at: now } });
+      const res = await this.startRun({
+        workflowId: wfId,
+        input: wf.get("schedule_input") ?? {},
+        trigger: "schedule",
+        triggeredBy: "scheduler",
+        confirmed: true
+        // configuring a schedule IS the admin's standing consent
+      });
+      this.app.logger.info(`[neoai] schedule fired for workflow ${wfId}: ${JSON.stringify(res)}`);
+    }
   }
   // ---------------------------------------------------------------------------
   // In-process service for host plugins (function registry + dispatch)
@@ -1546,7 +1664,20 @@ var NeoaiPlugin = class extends import_server.Plugin {
     const errors = validateDefinition(def);
     if (errors.length) return { error: `invalid definition: ${errors.join("; ")}` };
     if (wf.get("require_confirm") === true && opts.confirmed !== true) {
-      return { needsConfirm: true, workflowId };
+      const counts = countModelNodes(def);
+      const settings = await this.settingsRow();
+      return {
+        needsConfirm: true,
+        workflowId,
+        estimate: {
+          llmCalls: counts.llm,
+          imageCalls: counts.image,
+          spentTodayUsd: await this.spentTodayUsd(),
+          workflowSpentTodayUsd: await this.spentTodayUsd(workflowId),
+          globalDailyBudgetUsd: Number(settings?.get?.("daily_budget_usd")) || 0,
+          workflowDailyBudgetUsd: Number(wf.get("daily_budget_usd")) || 0
+        }
+      };
     }
     const run = await this.db.getRepository("neoai_runs").create({
       values: {
@@ -1561,7 +1692,7 @@ var NeoaiPlugin = class extends import_server.Plugin {
       }
     });
     const runId = Number(run.get("id"));
-    const handle = { cancelled: false };
+    const handle = { cancelled: false, workflowId };
     this.running.set(runId, handle);
     setImmediate(() => {
       this.executeRun(runId, def, opts.input, handle, wf).catch((err) => {
@@ -1600,6 +1731,7 @@ var NeoaiPlugin = class extends import_server.Plugin {
     let totalIn = 0;
     let totalOut = 0;
     let totalCost = 0;
+    let spendCache = null;
     const openSteps = /* @__PURE__ */ new Map();
     const onStep = async (evt) => {
       try {
@@ -1670,9 +1802,15 @@ var NeoaiPlugin = class extends import_server.Plugin {
       defaultModel: String(settings?.get?.("default_model") || "gemini-2.5-flash"),
       defaultService: String(settings?.get?.("default_llm_service") || ""),
       guardModelCall: async () => {
+        const now = Date.now();
+        if (!spendCache || now - spendCache.at > 5e3) {
+          const byWf = await this.spentTodayByWorkflow();
+          const global = Object.values(byWf).reduce((s, v) => s + v, 0);
+          spendCache = { at: now, global, wf: byWf[String(workflowId)] ?? 0 };
+        }
         const check = checkBudget({
-          spentTodayUsd: await this.spentTodayUsd() + totalCost,
-          workflowSpentTodayUsd: await this.spentTodayUsd(workflowId) + totalCost,
+          spentTodayUsd: spendCache.global + totalCost,
+          workflowSpentTodayUsd: spendCache.wf + totalCost,
           globalDailyBudgetUsd: Number(settings?.get?.("daily_budget_usd")) || 0,
           workflowDailyBudgetUsd: Number(wf.get("daily_budget_usd")) || 0
         });

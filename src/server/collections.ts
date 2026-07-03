@@ -89,6 +89,10 @@ export const NEOAI_COLLECTIONS: any[] = [
       dbl('daily_budget_usd', 'Daily budget (USD, 0 = unlimited)', 0),
       int('current_version', 'Current version', 0),
       json('definition_draft', 'Draft definition'),
+      // Time trigger (scoping Q21 "Beides"): "every 15m" | "every 2h" | "daily 07:00".
+      str('schedule', 'Schedule (empty = off)'),
+      json('schedule_input', 'Schedule input'),
+      dt('last_scheduled_at', 'Last scheduled run'),
     ],
   },
   {
@@ -207,8 +211,13 @@ export const NEOAI_COLLECTIONS: any[] = [
   },
 ];
 
-// Reverse relations — ensured AFTER all collections exist.
+// Reverse relations + post-P0 field additions — ensured AFTER all collections
+// exist (collection `fields` only apply on FIRST creation; already-provisioned
+// databases heal through these).
 export const NEOAI_EXTRA_FIELDS: Array<{ collection: string; field: any }> = [
+  { collection: 'neoai_workflows', field: str('schedule', 'Schedule (empty = off)') },
+  { collection: 'neoai_workflows', field: json('schedule_input', 'Schedule input') },
+  { collection: 'neoai_workflows', field: dt('last_scheduled_at', 'Last scheduled run') },
   {
     collection: 'neoai_workflows',
     field: {

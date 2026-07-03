@@ -25,11 +25,29 @@ export type LeafDeps = {
 
 const HTTP_TIMEOUT_MS = 45_000;
 
+// Private/loopback/link-local targets are blocked unless the node explicitly
+// opts in (allowPrivate:true) — admin-only authoring reduces the SSRF risk,
+// but workflows run with the SERVER's network reach, so default-deny is right.
+const PRIVATE_HOST_RE =
+  /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|fd[0-9a-f]{2}:)/i;
+
+export function isPrivateHost(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return PRIVATE_HOST_RE.test(host) || host.endsWith('.internal') || host.endsWith('.local');
+  } catch {
+    return true;
+  }
+}
+
 async function execHttp(node: NodeDef, scope: Scope): Promise<LeafResult> {
   const cfg = resolveTemplates(node.config ?? {}, scope);
   const method = String(cfg.method ?? 'GET').toUpperCase();
   const url = String(cfg.url ?? '');
   if (!/^https?:\/\//i.test(url)) throw new Error(`http node "${node.id}": invalid url`);
+  if (cfg.allowPrivate !== true && isPrivateHost(url)) {
+    throw new Error(`http node "${node.id}": private/internal target blocked (set allowPrivate:true to permit)`);
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(Number(cfg.timeoutMs) || HTTP_TIMEOUT_MS, 60_000));
   try {
