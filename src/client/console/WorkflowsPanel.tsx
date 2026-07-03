@@ -746,7 +746,7 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
   };
   usePoll(loadVersions, 3_600_000, true);
 
-  const saveDraft = async () => {
+  const saveDraft = async (silent = false) => {
     try {
       await updateResource(api, 'neoai_workflows', wf.id, {
         definition_draft: defRef.current,
@@ -758,7 +758,7 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
         schedule_input: wf.schedule_input ?? null,
       });
       setDirty(false);
-      message.success('Draft saved');
+      if (!silent) message.success('Draft saved');
       return true;
     } catch (err: any) {
       message.error(`Save failed: ${err?.message ?? err}`);
@@ -767,7 +767,7 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
   };
 
   const publish = async () => {
-    if (dirty && !(await saveDraft())) return;
+    if (dirty && !(await saveDraft(true))) return;
     try {
       const res = await neoaiAction(api, 'publishWorkflow', { workflowId: wf.id });
       if (res.ok) {

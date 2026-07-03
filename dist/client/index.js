@@ -743,7 +743,7 @@ function WorkflowEditor(props) {
     }
   };
   usePoll(loadVersions, 36e5, true);
-  const saveDraft = async () => {
+  const saveDraft = async (silent = false) => {
     var _a2, _b2, _c, _d;
     try {
       await updateResource(api, "neoai_workflows", wf.id, {
@@ -756,7 +756,7 @@ function WorkflowEditor(props) {
         schedule_input: (_c = wf.schedule_input) != null ? _c : null
       });
       setDirty(false);
-      import_antd2.message.success("Draft saved");
+      if (!silent) import_antd2.message.success("Draft saved");
       return true;
     } catch (err) {
       import_antd2.message.error(`Save failed: ${(_d = err == null ? void 0 : err.message) != null ? _d : err}`);
@@ -765,7 +765,7 @@ function WorkflowEditor(props) {
   };
   const publish = async () => {
     var _a2, _b2;
-    if (dirty && !await saveDraft()) return;
+    if (dirty && !await saveDraft(true)) return;
     try {
       const res = await neoaiAction(api, "publishWorkflow", { workflowId: wf.id });
       if (res.ok) {
@@ -1007,10 +1007,22 @@ function RunDetail({ runId, onClose }) {
     )), /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: "1 1 320px", minWidth: 280 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "INPUT"), /* @__PURE__ */ import_react3.default.createElement(JsonBox, { value: run == null ? void 0 : run.input, maxHeight: 260 })), /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: "1 1 320px", minWidth: 280 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, (run == null ? void 0 : run.status) === "failed" ? "ERROR" : "OUTPUT"), (run == null ? void 0 : run.status) === "failed" ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { color: "#b02a2a", fontSize: 13 } }, run == null ? void 0 : run.error) : /* @__PURE__ */ import_react3.default.createElement(JsonBox, { value: run == null ? void 0 : run.output, maxHeight: 260 }))))
   );
 }
+var STATUS_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "running", label: "Running" },
+  { value: "waiting", label: "Waiting" },
+  { value: "queued", label: "Queued" },
+  { value: "succeeded", label: "Succeeded" },
+  { value: "failed", label: "Failed" },
+  { value: "cancelled", label: "Cancelled" },
+  { value: "rejected", label: "Rejected" }
+];
 function RunsPanel() {
   const api = (0, import_client2.useAPIClient)();
   const [rows, setRows] = (0, import_react3.useState)([]);
   const [openRun, setOpenRun] = (0, import_react3.useState)(null);
+  const [statusFilter, setStatusFilter] = (0, import_react3.useState)("all");
+  const [search, setSearch] = (0, import_react3.useState)("");
   usePoll(
     async () => {
       try {
@@ -1022,6 +1034,15 @@ function RunsPanel() {
     3e3,
     openRun == null
   );
+  const filteredRows = (0, import_react3.useMemo)(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      var _a, _b;
+      if (statusFilter !== "all" && r.status !== statusFilter) return false;
+      if (q && !String((_b = (_a = r.workflow) == null ? void 0 : _a.name) != null ? _b : "").toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [rows, statusFilter, search]);
   const columns = [
     {
       title: "Run",
@@ -1045,7 +1066,26 @@ function RunsPanel() {
     { title: "Tokens", key: "tok", width: 130, render: (_, r) => fmtTokens(r.input_tokens, r.output_tokens) },
     { title: "Cost", dataIndex: "cost_usd", width: 90, render: (v) => fmtCost(v) }
   ];
-  return /* @__PURE__ */ import_react3.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 14 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, flex: 1 } }, "Runs"), /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "auto-refreshing every 3 s")), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Table, { rowKey: "id", size: "middle", dataSource: rows, columns, pagination: { pageSize: 25 } }), openRun != null ? /* @__PURE__ */ import_react3.default.createElement(RunDetail, { runId: openRun, onClose: () => setOpenRun(null) }) : null);
+  return /* @__PURE__ */ import_react3.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Runs"), /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Input.Search,
+    {
+      allowClear: true,
+      placeholder: "Filter by workflow name",
+      value: search,
+      onChange: (e) => setSearch(e.target.value),
+      style: { width: 220 }
+    }
+  ), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Select, { value: statusFilter, onChange: setStatusFilter, options: STATUS_OPTIONS, style: { width: 150 } }), /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "auto-refreshing every 3 s")), /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Table,
+    {
+      rowKey: "id",
+      size: "middle",
+      dataSource: filteredRows,
+      columns,
+      pagination: { pageSize: 25 },
+      locale: { emptyText: rows.length ? "No runs match this filter" : "No runs yet" }
+    }
+  ), openRun != null ? /* @__PURE__ */ import_react3.default.createElement(RunDetail, { runId: openRun, onClose: () => setOpenRun(null) }) : null);
 }
 
 // src/client/console/FunctionsPanel.tsx
@@ -1181,6 +1221,9 @@ var import_client4 = require("@nocobase/client");
 function Field2({ label, children, hint }) {
   return /* @__PURE__ */ import_react5.default.createElement("div", { style: { marginBottom: 14, maxWidth: 560 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children, hint ? /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginTop: 4 } }, hint) : null);
 }
+function Section({ title, children }) {
+  return /* @__PURE__ */ import_react5.default.createElement("div", { style: { border: "1px solid #ececea", borderRadius: 10, padding: "16px 18px", marginBottom: 16, maxWidth: 620 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "#191a19", marginBottom: 14 } }, title), children);
+}
 function SettingsPanel() {
   var _a;
   const api = (0, import_client4.useAPIClient)();
@@ -1233,7 +1276,7 @@ function SettingsPanel() {
       import_antd5.message.error(`Save failed: ${(_c = err == null ? void 0 : err.message) != null ? _c : err}`);
     }
   };
-  return /* @__PURE__ */ import_react5.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, marginBottom: 14 } }, "Settings"), /* @__PURE__ */ import_react5.default.createElement(
+  return /* @__PURE__ */ import_react5.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, marginBottom: 16 } }, "Settings"), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Mode" }, /* @__PURE__ */ import_react5.default.createElement(
     Field2,
     {
       label: "Force mock mode",
@@ -1241,7 +1284,14 @@ function SettingsPanel() {
     },
     /* @__PURE__ */ import_react5.default.createElement(import_antd5.Switch, { checked: s.force_mock === true, onChange: (v) => setS({ ...s, force_mock: v }) }),
     s.force_mock === true ? /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "orange", style: { marginLeft: 10 } }, "mock mode active") : null
-  ), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Default plugin-ai LLM service", hint: "Name of an llmService configured under Settings \u2192 AI. Empty = plugin-ai default / raw Gemini fallback." }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input, { value: s.default_llm_service, onChange: (e) => setS({ ...s, default_llm_service: e.target.value }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Default model" }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input, { value: s.default_model, placeholder: "gemini-2.5-flash", onChange: (e) => setS({ ...s, default_model: e.target.value }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Global daily budget (USD, 0 = unlimited)", hint: "Blocks further model calls once today's estimated spend across ALL workflows exceeds this." }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.InputNumber, { min: 0, step: 0.5, value: Number(s.daily_budget_usd) || 0, onChange: (v) => setS({ ...s, daily_budget_usd: v != null ? v : 0 }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Estimated price per generated image (USD)" }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.InputNumber, { min: 0, step: 0.01, value: Number(s.image_price_usd) || 0.04, onChange: (v) => setS({ ...s, image_price_usd: v != null ? v : 0.04 }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Price table override (JSON, USD per 1M tokens)", hint: 'Example: { "gemini-2.5-flash": { "in": 0.3, "out": 2.5 } }' }, /* @__PURE__ */ import_react5.default.createElement(
+  )), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Model & provider" }, /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Default plugin-ai LLM service", hint: "Name of an llmService configured under Settings \u2192 AI. Empty = plugin-ai default / raw Gemini fallback." }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input, { value: s.default_llm_service, onChange: (e) => setS({ ...s, default_llm_service: e.target.value }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Default model" }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input, { value: s.default_model, placeholder: "gemini-2.5-flash", onChange: (e) => setS({ ...s, default_model: e.target.value }) })), /* @__PURE__ */ import_react5.default.createElement(
+    Field2,
+    {
+      label: "Gemini API key (raw-path fallback + image nodes)",
+      hint: s.geminiKeyFromEnv ? "GEMINI_API_KEY env var is set and wins \u2014 this field is a fallback." : s.geminiKeyConfigured ? "A key is configured. Leave empty to keep it; enter a new value to replace." : "No key configured yet."
+    },
+    /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input.Password, { value: key, placeholder: s.geminiKeyConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (configured)" : "AIza\u2026", onChange: (e) => setKey(e.target.value) })
+  )), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Cost management" }, /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Global daily budget (USD, 0 = unlimited)", hint: "Blocks further model calls once today's estimated spend across ALL workflows exceeds this." }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.InputNumber, { min: 0, step: 0.5, value: Number(s.daily_budget_usd) || 0, onChange: (v) => setS({ ...s, daily_budget_usd: v != null ? v : 0 }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Estimated price per generated image (USD)" }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.InputNumber, { min: 0, step: 0.01, value: Number(s.image_price_usd) || 0.04, onChange: (v) => setS({ ...s, image_price_usd: v != null ? v : 0.04 }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Price table override (JSON, USD per 1M tokens)", hint: 'Example: { "gemini-2.5-flash": { "in": 0.3, "out": 2.5 } }' }, /* @__PURE__ */ import_react5.default.createElement(
     import_antd5.Input.TextArea,
     {
       rows: 5,
@@ -1249,14 +1299,7 @@ function SettingsPanel() {
       onChange: (e) => setPricesText(e.target.value),
       style: { fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12 }
     }
-  )), /* @__PURE__ */ import_react5.default.createElement(
-    Field2,
-    {
-      label: "Gemini API key (raw-path fallback + image nodes)",
-      hint: s.geminiKeyFromEnv ? "GEMINI_API_KEY env var is set and wins \u2014 this field is a fallback." : s.geminiKeyConfigured ? "A key is configured. Leave empty to keep it; enter a new value to replace." : "No key configured yet."
-    },
-    /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input.Password, { value: key, placeholder: s.geminiKeyConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (configured)" : "AIza\u2026", onChange: (e) => setKey(e.target.value) })
-  ), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Button, { type: "primary", onClick: save }, "Save settings"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "22px 0 16px" } }), /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "PLUGIN HEALTH"), ping ? /* @__PURE__ */ import_react5.default.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 10 } }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "green" }, ping.plugin, " v", ping.version), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: ping.pluginAi ? "green" : "orange" }, ping.pluginAi ? "plugin-ai available" : "plugin-ai NOT available (raw Gemini fallback)"), ping.sandbox ? /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "orange" }, "sandbox") : null, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, null, ((_a = ping.collections) != null ? _a : []).length, " collections")) : null, spend ? /* @__PURE__ */ import_react5.default.createElement("div", { style: { maxWidth: 560 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginBottom: 4 } }, "Spend today (estimated)"), /* @__PURE__ */ import_react5.default.createElement(JsonBox, { value: spend, maxHeight: 140 })) : null);
+  ))), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Button, { type: "primary", onClick: save }, "Save settings"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "24px 0 16px", maxWidth: 620 } }), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Plugin health" }, ping ? /* @__PURE__ */ import_react5.default.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: spend ? 14 : 0 } }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "green" }, ping.plugin, " v", ping.version), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: ping.pluginAi ? "green" : "orange" }, ping.pluginAi ? "plugin-ai available" : "plugin-ai NOT available (raw Gemini fallback)"), ping.sandbox ? /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "orange" }, "sandbox") : null, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, null, ((_a = ping.collections) != null ? _a : []).length, " collections")) : null, spend ? /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginBottom: 4 } }, "Spend today (estimated)"), /* @__PURE__ */ import_react5.default.createElement(JsonBox, { value: spend, maxHeight: 140 })) : null));
 }
 
 // src/client/console/NeoaiConsole.tsx

@@ -4,8 +4,8 @@
 // run detail with the step trace, live while running, approve/reject for
 // waiting human gates, cancel for running runs.
 
-import React, { useState } from 'react';
-import { Button, Input, Popover, Space, Table, message } from 'antd';
+import React, { useMemo, useState } from 'react';
+import { Button, Input, Popover, Select, Space, Table, message } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import {
   ConsoleDrawer,
@@ -164,10 +164,23 @@ function RunDetail({ runId, onClose }: { runId: number; onClose: () => void }) {
   );
 }
 
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All statuses' },
+  { value: 'running', label: 'Running' },
+  { value: 'waiting', label: 'Waiting' },
+  { value: 'queued', label: 'Queued' },
+  { value: 'succeeded', label: 'Succeeded' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'cancelled', label: 'Cancelled' },
+  { value: 'rejected', label: 'Rejected' },
+];
+
 export function RunsPanel() {
   const api = useAPIClient();
   const [rows, setRows] = useState<any[]>([]);
   const [openRun, setOpenRun] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [search, setSearch] = useState('');
 
   usePoll(
     async () => {
@@ -181,6 +194,15 @@ export function RunsPanel() {
     3000,
     openRun == null,
   );
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+      if (q && !String(r.workflow?.name ?? '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [rows, statusFilter, search]);
 
   const columns = [
     {
@@ -214,11 +236,27 @@ export function RunsPanel() {
 
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, flex: 1 }}>Runs</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>Runs</div>
+        <div style={{ flex: 1 }} />
+        <Input.Search
+          allowClear
+          placeholder="Filter by workflow name"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ width: 220 }}
+        />
+        <Select value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} style={{ width: 150 }} />
         <span style={{ fontSize: 12, color: '#8a8f8a' }}>auto-refreshing every 3 s</span>
       </div>
-      <Table rowKey="id" size="middle" dataSource={rows} columns={columns as any} pagination={{ pageSize: 25 }} />
+      <Table
+        rowKey="id"
+        size="middle"
+        dataSource={filteredRows}
+        columns={columns as any}
+        pagination={{ pageSize: 25 }}
+        locale={{ emptyText: rows.length ? 'No runs match this filter' : 'No runs yet' }}
+      />
       {openRun != null ? <RunDetail runId={openRun} onClose={() => setOpenRun(null)} /> : null}
     </div>
   );
