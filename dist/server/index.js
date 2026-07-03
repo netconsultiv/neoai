@@ -24,7 +24,7 @@ var require_package = __commonJS({
   "package.json"(exports2, module2) {
     module2.exports = {
       name: "@neomodul/neoai",
-      version: "0.1.4",
+      version: "0.1.5",
       displayName: "NeoAI",
       description: "NeoAI for NeoBase: central AI workflow management \u2014 tree-structured multi-step workflows (LLM, image, HTTP, data and approval nodes) with a visual editor, run monitor, cost tracking and a function registry other @neomodul plugins dispatch through. Gemini-first via @nocobase/plugin-ai; legacy code paths stay as fallback.",
       license: "UNLICENSED",
@@ -251,6 +251,9 @@ var NEOAI_COLLECTIONS = [
       // Write-only by convention: actions never echo the key back (only a
       // boolean "configured" flag) — konfigurator ai_photo_api_key pattern.
       str("gemini_api_key", "Gemini API key (fallback when plugin-ai has no service)"),
+      // Admin-switchable: all llm/image nodes return labelled mocks (no spend),
+      // even when a real key/service exists. For staging test rounds.
+      bool("force_mock", "Force mock mode (no real model calls)", false),
       str("default_llm_service", "Default plugin-ai LLM service name"),
       str("default_model", "Default model"),
       dbl("daily_budget_usd", "Global daily budget (USD, 0 = unlimited)", 0),
@@ -260,6 +263,7 @@ var NEOAI_COLLECTIONS = [
   }
 ];
 var NEOAI_EXTRA_FIELDS = [
+  { collection: "neoai_settings", field: bool("force_mock", "Force mock mode (no real model calls)", false) },
   { collection: "neoai_workflows", field: str("schedule", "Schedule (empty = off)") },
   { collection: "neoai_workflows", field: json("schedule_input", "Schedule input") },
   { collection: "neoai_workflows", field: dt("last_scheduled_at", "Last scheduled run") },
@@ -389,6 +393,14 @@ var MOCK_IMAGE_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAA
 // src/server/lib/providers.ts
 var GEMINI_TIMEOUT_MS = 6e4;
 var GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+async function isForceMock(app) {
+  try {
+    const s = await app.db.getRepository("neoai_settings")?.findOne();
+    return s?.get?.("force_mock") === true;
+  } catch {
+    return false;
+  }
+}
 async function resolveGeminiKey(app) {
   const envKey = String(process.env.GEMINI_API_KEY ?? "").trim();
   if (envKey) return envKey;
@@ -520,6 +532,16 @@ async function invokeGeminiText(app, opts, key) {
   };
 }
 async function llmInvoke(app, opts) {
+  if (await isForceMock(app)) {
+    app.logger?.info?.("[neoai] llm MOCK (force_mock setting)");
+    return {
+      text: mockLlmText(opts.prompt),
+      json: opts.jsonSchema ? mockFromSchema(opts.jsonSchema) : void 0,
+      usage: mockUsage(opts.prompt),
+      model: "mock",
+      via: "mock"
+    };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
   try {
@@ -550,6 +572,10 @@ async function llmInvoke(app, opts) {
   return invokeGeminiText(app, opts, key);
 }
 async function imageInvoke(app, opts) {
+  if (await isForceMock(app)) {
+    app.logger?.info?.("[neoai] image MOCK (force_mock setting)");
+    return { imageDataUrl: MOCK_IMAGE_DATA_URL, usage: { inputTokens: 0, outputTokens: 0 }, model: "mock" };
+  }
   const key = await resolveGeminiKey(app);
   if (!key) {
     if (isSandbox()) {
@@ -1332,11 +1358,13 @@ var NeoaiPlugin = class extends import_server.Plugin {
         ping: async (ctx, next) => {
           requireAdmin(ctx);
           const names = NEOAI_COLLECTIONS.map((c) => c.name);
+          const settingsRow = await this.settingsRow();
           ctx.body = {
             ok: true,
             plugin: pkg.name,
             version: pkg.version,
             sandbox: isSandbox(),
+            forceMock: settingsRow?.get?.("force_mock") === true,
             collections: names.filter((n) => !!this.db.getCollection(n)),
             pluginAi: !!this.app.pm?.get?.("ai")?.aiManager
           };
@@ -1445,7 +1473,7 @@ var NeoaiPlugin = class extends import_server.Plugin {
           const repo = this.db.getRepository("neoai_settings");
           const row = await this.settingsRow();
           const values = {};
-          for (const k of ["default_llm_service", "default_model", "daily_budget_usd", "image_price_usd", "prices"]) {
+          for (const k of ["default_llm_service", "default_model", "daily_budget_usd", "image_price_usd", "prices", "force_mock"]) {
             if (p[k] !== void 0) values[k] = p[k];
           }
           if (typeof p.gemini_api_key === "string") values.gemini_api_key = p.gemini_api_key.trim();

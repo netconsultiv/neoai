@@ -37,6 +37,22 @@ export type ImageResult = {
   model: string;
 };
 
+/**
+ * Admin-switchable mock mode (neoai_settings.force_mock): every llm/image node
+ * returns the labelled deterministic mock even when a real key/service exists.
+ * Owner ask (2026-07-04): keep testing with mocks on staging (where the shared
+ * Gemini key IS configured) without spending — toggle in NeoAI → Settings, no
+ * restart needed. Independent from NEOAI_SANDBOX (env, sandbox-only).
+ */
+export async function isForceMock(app: any): Promise<boolean> {
+  try {
+    const s = await app.db.getRepository('neoai_settings')?.findOne();
+    return s?.get?.('force_mock') === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function resolveGeminiKey(app: any): Promise<string> {
   const envKey = String(process.env.GEMINI_API_KEY ?? '').trim();
   if (envKey) return envKey;
@@ -218,6 +234,16 @@ export async function llmInvoke(
   app: any,
   opts: { service?: string; model?: string; system?: string; prompt: string; jsonSchema?: any; temperature?: number; maxTokens?: number },
 ): Promise<LlmResult> {
+  if (await isForceMock(app)) {
+    app.logger?.info?.('[neoai] llm MOCK (force_mock setting)');
+    return {
+      text: mockLlmText(opts.prompt),
+      json: opts.jsonSchema ? mockFromSchema(opts.jsonSchema) : undefined,
+      usage: mockUsage(opts.prompt),
+      model: 'mock',
+      via: 'mock',
+    };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
   try {
@@ -254,6 +280,10 @@ export async function imageInvoke(
   app: any,
   opts: { model?: string; prompt: string; imageDataUrl?: string },
 ): Promise<ImageResult> {
+  if (await isForceMock(app)) {
+    app.logger?.info?.('[neoai] image MOCK (force_mock setting)');
+    return { imageDataUrl: MOCK_IMAGE_DATA_URL, usage: { inputTokens: 0, outputTokens: 0 }, model: 'mock' };
+  }
   const key = await resolveGeminiKey(app);
   if (!key) {
     if (isSandbox()) {

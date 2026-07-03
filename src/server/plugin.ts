@@ -79,11 +79,13 @@ export class NeoaiPlugin extends Plugin {
         ping: async (ctx: any, next: any) => {
           requireAdmin(ctx);
           const names = NEOAI_COLLECTIONS.map((c) => c.name);
+          const settingsRow = await this.settingsRow();
           ctx.body = {
             ok: true,
             plugin: pkg.name,
             version: pkg.version,
             sandbox: isSandbox(),
+            forceMock: settingsRow?.get?.('force_mock') === true,
             collections: names.filter((n) => !!this.db.getCollection(n)),
             pluginAi: !!(this.app.pm?.get?.('ai') as any)?.aiManager,
           };
@@ -199,7 +201,7 @@ export class NeoaiPlugin extends Plugin {
           const repo = this.db.getRepository('neoai_settings');
           const row = await this.settingsRow();
           const values: any = {};
-          for (const k of ['default_llm_service', 'default_model', 'daily_budget_usd', 'image_price_usd', 'prices']) {
+          for (const k of ['default_llm_service', 'default_model', 'daily_budget_usd', 'image_price_usd', 'prices', 'force_mock']) {
             if (p[k] !== undefined) values[k] = p[k];
           }
           // Key is write-only: set when a non-empty string arrives, clear on ''.

@@ -202,6 +202,9 @@ export const NEOAI_COLLECTIONS: any[] = [
       // Write-only by convention: actions never echo the key back (only a
       // boolean "configured" flag) — konfigurator ai_photo_api_key pattern.
       str('gemini_api_key', 'Gemini API key (fallback when plugin-ai has no service)'),
+      // Admin-switchable: all llm/image nodes return labelled mocks (no spend),
+      // even when a real key/service exists. For staging test rounds.
+      bool('force_mock', 'Force mock mode (no real model calls)', false),
       str('default_llm_service', 'Default plugin-ai LLM service name'),
       str('default_model', 'Default model'),
       dbl('daily_budget_usd', 'Global daily budget (USD, 0 = unlimited)', 0),
@@ -215,6 +218,7 @@ export const NEOAI_COLLECTIONS: any[] = [
 // exist (collection `fields` only apply on FIRST creation; already-provisioned
 // databases heal through these).
 export const NEOAI_EXTRA_FIELDS: Array<{ collection: string; field: any }> = [
+  { collection: 'neoai_settings', field: bool('force_mock', 'Force mock mode (no real model calls)', false) },
   { collection: 'neoai_workflows', field: str('schedule', 'Schedule (empty = off)') },
   { collection: 'neoai_workflows', field: json('schedule_input', 'Schedule input') },
   { collection: 'neoai_workflows', field: dt('last_scheduled_at', 'Last scheduled run') },

@@ -5,7 +5,7 @@
 // a plugin health card (ping).
 
 import React, { useState } from 'react';
-import { Button, Input, InputNumber, Tag, message } from 'antd';
+import { Button, Input, InputNumber, Switch, Tag, message } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import { JsonBox, neoaiAction, usePoll } from './shared';
 
@@ -59,6 +59,7 @@ export function SettingsPanel() {
     }
     try {
       await neoaiAction(api, 'saveSettings', {
+        force_mock: s.force_mock === true,
         default_llm_service: s.default_llm_service ?? '',
         default_model: s.default_model ?? 'gemini-2.5-flash',
         daily_budget_usd: Number(s.daily_budget_usd) || 0,
@@ -77,6 +78,13 @@ export function SettingsPanel() {
     <div style={{ padding: 20 }}>
       <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 14 }}>Settings</div>
 
+      <Field
+        label="Force mock mode"
+        hint="ON: every LLM/image node returns a labelled deterministic mock — zero spend, even though a real key is configured. For test rounds; turn OFF for real model calls."
+      >
+        <Switch checked={s.force_mock === true} onChange={(v) => setS({ ...s, force_mock: v })} />
+        {s.force_mock === true ? <Tag color="orange" style={{ marginLeft: 10 }}>mock mode active</Tag> : null}
+      </Field>
       <Field label="Default plugin-ai LLM service" hint="Name of an llmService configured under Settings → AI. Empty = plugin-ai default / raw Gemini fallback.">
         <Input value={s.default_llm_service} onChange={(e) => setS({ ...s, default_llm_service: e.target.value })} />
       </Field>
