@@ -6,7 +6,7 @@
 // draft/publish lifecycle and an inline draft test-run with live step trace.
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Button, Dropdown, Input, InputNumber, Select, Switch, Table, Checkbox, message, Space, Tag } from 'antd';
+import { Button, Dropdown, Input, InputNumber, Select, Switch, Table, Checkbox, message, Modal, Space, Tag } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import {
   ConsoleDrawer,
@@ -230,7 +230,10 @@ function NodeCard(props: {
         <Tag color={TYPE_COLORS[node.type] ?? 'default'} style={{ marginRight: 0 }}>
           {label}
         </Tag>
-        <span style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span
+          title={node.title || node.id}
+          style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
           {node.title || node.id}
         </span>
         <span style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
@@ -256,6 +259,7 @@ function NodeList(props: {
   onSelect: (id: string) => void;
   onChange: () => void;
   def: WorkflowDef;
+  emptyHint?: string;
 }) {
   const { nodes, def } = props;
   const insert = (index: number, type: string) => {
@@ -280,6 +284,18 @@ function NodeList(props: {
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {nodes.length === 0 && props.emptyHint ? (
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '6px 0 14px',
+            fontSize: 13,
+            color: '#8a8f8a',
+          }}
+        >
+          {props.emptyHint}
+        </div>
+      ) : null}
       {nodes.map((node, i) => (
         <React.Fragment key={node.id}>
           <AddSlot onAdd={(t) => insert(i, t)} />
@@ -296,8 +312,8 @@ function NodeList(props: {
                   <div
                     key={bi}
                     style={{
-                      flex: '1 0 200px',
-                      minWidth: 200,
+                      flex: '1 0 260px',
+                      minWidth: 260,
                       border: '1px dashed #d8dbd7',
                       borderRadius: 8,
                       padding: '6px 6px 4px',
@@ -559,11 +575,54 @@ function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => voi
   );
 }
 
+// --- run confirm dialog (replaces window.confirm — native dialogs block the
+// renderer entirely, which is both bad UX and breaks any automated driving of
+// the page) ---------------------------------------------------------------
+
+function confirmRun(estimate: any): Promise<boolean> {
+  const e = estimate ?? {};
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (v: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(v);
+    };
+    Modal.confirm({
+      title: 'Run this workflow?',
+      icon: null,
+      width: 440,
+      okText: 'Run',
+      cancelText: 'Cancel',
+      onOk: () => finish(true),
+      onCancel: () => finish(false),
+      content: (
+        <div style={{ fontSize: 13.5, lineHeight: 1.6 }}>
+          <p style={{ margin: '0 0 10px' }}>
+            Makes <b>{e.llmCalls ?? '?'}</b> LLM call{e.llmCalls === 1 ? '' : 's'} and <b>{e.imageCalls ?? 0}</b> image call
+            {e.imageCalls === 1 ? '' : 's'} per run.
+          </p>
+          <div style={{ background: '#fafaf8', border: '1px solid #ececea', borderRadius: 8, padding: '8px 12px' }}>
+            <div>
+              Spent today (global): <b>${(e.spentTodayUsd ?? 0).toFixed(2)}</b>
+              {e.globalDailyBudgetUsd ? ` / $${e.globalDailyBudgetUsd} budget` : ' (no budget set)'}
+            </div>
+            <div>
+              Spent today (this workflow): <b>${(e.workflowSpentTodayUsd ?? 0).toFixed(2)}</b>
+              {e.workflowDailyBudgetUsd ? ` / $${e.workflowDailyBudgetUsd} budget` : ' (no budget set)'}
+            </div>
+          </div>
+        </div>
+      ),
+    });
+  });
+}
+
 // --- draft test run ---------------------------------------------------------------
 
-function TestRunBox({ workflowId, currentVersion }: { workflowId: number; currentVersion: number }) {
+function TestRunBox({ workflowId, currentVersion, exampleInput }: { workflowId: number; currentVersion: number; exampleInput?: any }) {
   const api = useAPIClient();
-  const [inputText, setInputText] = useState('{\n  "address": "Am Hochbehälter, 91166 Georgensgmünd"\n}');
+  const [inputText, setInputText] = useState(() => JSON.stringify(exampleInput ?? {}, null, 2));
   const [runId, setRunId] = useState<number | null>(null);
   const [data, setData] = useState<{ run?: any; steps?: any[] }>({});
   const active = !!runId && !['succeeded', 'failed', 'cancelled', 'rejected'].includes(String(data.run?.status ?? ''));
@@ -591,17 +650,8 @@ function TestRunBox({ workflowId, currentVersion }: { workflowId: number; curren
       let res = await neoaiAction(api, 'run', { workflowId, input, draft, confirmed: draft, trigger: draft ? 'test' : 'manual' });
       if (res.needsConfirm) {
         // Honest confirm gate (Q15): model-call counts + today's spend vs budgets.
-        const e = res.estimate ?? {};
-        const lines = [
-          `This workflow makes ${e.llmCalls ?? '?'} LLM call(s) and ${e.imageCalls ?? 0} image call(s) per run.`,
-          `Spent today: $${(e.spentTodayUsd ?? 0).toFixed(2)} global` +
-            (e.globalDailyBudgetUsd ? ` (budget $${e.globalDailyBudgetUsd})` : ' (no global budget)') +
-            `, $${(e.workflowSpentTodayUsd ?? 0).toFixed(2)} this workflow` +
-            (e.workflowDailyBudgetUsd ? ` (budget $${e.workflowDailyBudgetUsd})` : ''),
-          '',
-          'Run it?',
-        ];
-        if (!window.confirm(lines.join('\n'))) return;
+        const ok = await confirmRun(res.estimate);
+        if (!ok) return;
         res = await neoaiAction(api, 'run', { workflowId, input, draft, confirmed: true, trigger: 'manual' });
       }
       if (res.error) {
@@ -756,7 +806,14 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
         <div style={{ flex: 1, padding: 18, minWidth: 0 }}>
           <div style={{ maxWidth: 860 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', margin: '0 0 6px' }}>WORKFLOW TREE</div>
-            <NodeList nodes={defRef.current.nodes} selectedId={selectedId} onSelect={setSelectedId} onChange={rerender} def={defRef.current} />
+            <NodeList
+              nodes={defRef.current.nodes}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onChange={rerender}
+              def={defRef.current}
+              emptyHint="Empty workflow — click + below to add the first step."
+            />
           </div>
         </div>
         <div style={{ width: 400, borderLeft: '1px solid #ececea', background: '#fff', padding: 16, overflow: 'auto' }}>
@@ -856,7 +913,10 @@ export function WorkflowsPanel() {
 
   const create = async () => {
     const name = newName.trim();
-    if (!name) return;
+    if (!name) {
+      message.error('Enter a workflow name');
+      return;
+    }
     const key = name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')

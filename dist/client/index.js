@@ -451,7 +451,14 @@ function NodeCard(props) {
         boxShadow: selected ? "0 1px 6px rgba(0,153,0,.15)" : "none"
       }
     },
-    /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Tag, { color: (_c = TYPE_COLORS[node.type]) != null ? _c : "default", style: { marginRight: 0 } }, label), /* @__PURE__ */ import_react2.default.createElement("span", { style: { fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, node.title || node.id), /* @__PURE__ */ import_react2.default.createElement("span", { style: { display: "flex", gap: 4 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", onClick: () => props.onMove(-1), title: "Move up" }, "\u2191"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", onClick: () => props.onMove(1), title: "Move down" }, "\u2193"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", danger: true, onClick: props.onDelete, title: "Delete" }, "\u2715"))),
+    /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Tag, { color: (_c = TYPE_COLORS[node.type]) != null ? _c : "default", style: { marginRight: 0 } }, label), /* @__PURE__ */ import_react2.default.createElement(
+      "span",
+      {
+        title: node.title || node.id,
+        style: { fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
+      },
+      node.title || node.id
+    ), /* @__PURE__ */ import_react2.default.createElement("span", { style: { display: "flex", gap: 4 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", onClick: () => props.onMove(-1), title: "Move up" }, "\u2191"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", onClick: () => props.onMove(1), title: "Move down" }, "\u2193"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", danger: true, onClick: props.onDelete, title: "Delete" }, "\u2715"))),
     props.children
   );
 }
@@ -477,7 +484,18 @@ function NodeList(props) {
     if (node.type === "loop") return "BODY (per item)";
     return `BRANCH ${i + 1}`;
   };
-  return /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, nodes.map((node, i) => /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, { key: node.id }, /* @__PURE__ */ import_react2.default.createElement(AddSlot, { onAdd: (t) => insert(i, t) }), /* @__PURE__ */ import_react2.default.createElement(
+  return /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, nodes.length === 0 && props.emptyHint ? /* @__PURE__ */ import_react2.default.createElement(
+    "div",
+    {
+      style: {
+        textAlign: "center",
+        padding: "6px 0 14px",
+        fontSize: 13,
+        color: "#8a8f8a"
+      }
+    },
+    props.emptyHint
+  ) : null, nodes.map((node, i) => /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, { key: node.id }, /* @__PURE__ */ import_react2.default.createElement(AddSlot, { onAdd: (t) => insert(i, t) }), /* @__PURE__ */ import_react2.default.createElement(
     NodeCard,
     {
       node,
@@ -491,8 +509,8 @@ function NodeList(props) {
       {
         key: bi,
         style: {
-          flex: "1 0 200px",
-          minWidth: 200,
+          flex: "1 0 260px",
+          minWidth: 260,
           border: "1px dashed #d8dbd7",
           borderRadius: 8,
           padding: "6px 6px 4px",
@@ -618,10 +636,32 @@ function NodeConfigForm({ node, onChange }) {
   }
   return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, common, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Node id" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: node.id, disabled: true })), body);
 }
-function TestRunBox({ workflowId, currentVersion }) {
+function confirmRun(estimate) {
+  const e = estimate != null ? estimate : {};
+  return new Promise((resolve) => {
+    var _a, _b, _c, _d;
+    let settled = false;
+    const finish = (v) => {
+      if (settled) return;
+      settled = true;
+      resolve(v);
+    };
+    import_antd2.Modal.confirm({
+      title: "Run this workflow?",
+      icon: null,
+      width: 440,
+      okText: "Run",
+      cancelText: "Cancel",
+      onOk: () => finish(true),
+      onCancel: () => finish(false),
+      content: /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 13.5, lineHeight: 1.6 } }, /* @__PURE__ */ import_react2.default.createElement("p", { style: { margin: "0 0 10px" } }, "Makes ", /* @__PURE__ */ import_react2.default.createElement("b", null, (_a = e.llmCalls) != null ? _a : "?"), " LLM call", e.llmCalls === 1 ? "" : "s", " and ", /* @__PURE__ */ import_react2.default.createElement("b", null, (_b = e.imageCalls) != null ? _b : 0), " image call", e.imageCalls === 1 ? "" : "s", " per run."), /* @__PURE__ */ import_react2.default.createElement("div", { style: { background: "#fafaf8", border: "1px solid #ececea", borderRadius: 8, padding: "8px 12px" } }, /* @__PURE__ */ import_react2.default.createElement("div", null, "Spent today (global): ", /* @__PURE__ */ import_react2.default.createElement("b", null, "$", ((_c = e.spentTodayUsd) != null ? _c : 0).toFixed(2)), e.globalDailyBudgetUsd ? ` / $${e.globalDailyBudgetUsd} budget` : " (no budget set)"), /* @__PURE__ */ import_react2.default.createElement("div", null, "Spent today (this workflow): ", /* @__PURE__ */ import_react2.default.createElement("b", null, "$", ((_d = e.workflowSpentTodayUsd) != null ? _d : 0).toFixed(2)), e.workflowDailyBudgetUsd ? ` / $${e.workflowDailyBudgetUsd} budget` : " (no budget set)")))
+    });
+  });
+}
+function TestRunBox({ workflowId, currentVersion, exampleInput }) {
   var _a, _b, _c, _d, _e, _f;
   const api = (0, import_client.useAPIClient)();
-  const [inputText, setInputText] = (0, import_react2.useState)('{\n  "address": "Am Hochbeh\xE4lter, 91166 Georgensgm\xFCnd"\n}');
+  const [inputText, setInputText] = (0, import_react2.useState)(() => JSON.stringify(exampleInput != null ? exampleInput : {}, null, 2));
   const [runId, setRunId] = (0, import_react2.useState)(null);
   const [data, setData] = (0, import_react2.useState)({});
   const active = !!runId && !["succeeded", "failed", "cancelled", "rejected"].includes(String((_b = (_a = data.run) == null ? void 0 : _a.status) != null ? _b : ""));
@@ -637,7 +677,7 @@ function TestRunBox({ workflowId, currentVersion }) {
     !!runId && active
   );
   const start = async (draft) => {
-    var _a2, _b2, _c2, _d2, _e2, _f2;
+    var _a2;
     let input = {};
     try {
       input = inputText.trim() ? JSON.parse(inputText) : {};
@@ -648,14 +688,8 @@ function TestRunBox({ workflowId, currentVersion }) {
     try {
       let res = await neoaiAction(api, "run", { workflowId, input, draft, confirmed: draft, trigger: draft ? "test" : "manual" });
       if (res.needsConfirm) {
-        const e = (_a2 = res.estimate) != null ? _a2 : {};
-        const lines = [
-          `This workflow makes ${(_b2 = e.llmCalls) != null ? _b2 : "?"} LLM call(s) and ${(_c2 = e.imageCalls) != null ? _c2 : 0} image call(s) per run.`,
-          `Spent today: $${((_d2 = e.spentTodayUsd) != null ? _d2 : 0).toFixed(2)} global` + (e.globalDailyBudgetUsd ? ` (budget $${e.globalDailyBudgetUsd})` : " (no global budget)") + `, $${((_e2 = e.workflowSpentTodayUsd) != null ? _e2 : 0).toFixed(2)} this workflow` + (e.workflowDailyBudgetUsd ? ` (budget $${e.workflowDailyBudgetUsd})` : ""),
-          "",
-          "Run it?"
-        ];
-        if (!window.confirm(lines.join("\n"))) return;
+        const ok = await confirmRun(res.estimate);
+        if (!ok) return;
         res = await neoaiAction(api, "run", { workflowId, input, draft, confirmed: true, trigger: "manual" });
       }
       if (res.error) {
@@ -665,7 +699,7 @@ function TestRunBox({ workflowId, currentVersion }) {
       setRunId(res.runId);
       setData({});
     } catch (err) {
-      import_antd2.message.error(String((_f2 = err == null ? void 0 : err.message) != null ? _f2 : err));
+      import_antd2.message.error(String((_a2 = err == null ? void 0 : err.message) != null ? _a2 : err));
     }
   };
   return /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Input (JSON)" }, /* @__PURE__ */ import_react2.default.createElement(
@@ -753,7 +787,17 @@ function WorkflowEditor(props) {
       extra: /* @__PURE__ */ import_react2.default.createElement(import_antd2.Space, null, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { onClick: saveDraft, disabled: !dirty }, "Save draft"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { type: "primary", onClick: publish }, "Publish")),
       onClose: () => props.onClose(true)
     },
-    /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", minHeight: "100%", alignItems: "stretch" } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { flex: 1, padding: 18, minWidth: 0 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { maxWidth: 860 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "WORKFLOW TREE"), /* @__PURE__ */ import_react2.default.createElement(NodeList, { nodes: defRef.current.nodes, selectedId, onSelect: setSelectedId, onChange: rerender, def: defRef.current }))), /* @__PURE__ */ import_react2.default.createElement("div", { style: { width: 400, borderLeft: "1px solid #ececea", background: "#fff", padding: 16, overflow: "auto" } }, selected ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "NODE SETTINGS"), /* @__PURE__ */ import_react2.default.createElement(NodeConfigForm, { node: selected, onChange: rerender })) : /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "WORKFLOW SETTINGS"), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Name" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: wf.name, onChange: (e) => (setWf({ ...wf, name: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Description" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input.TextArea, { rows: 3, value: wf.description, onChange: (e) => (setWf({ ...wf, description: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Require confirmation before each run" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Switch, { checked: wf.require_confirm === true, onChange: (v) => (setWf({ ...wf, require_confirm: v }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Daily budget (USD, 0 = unlimited)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.InputNumber, { min: 0, step: 0.5, value: Number(wf.daily_budget_usd) || 0, onChange: (v) => (setWf({ ...wf, daily_budget_usd: v != null ? v : 0 }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: 'Schedule \u2014 "every 15m" \xB7 "every 2h" \xB7 "daily 07:00" (empty = off; runs published version)' }, /* @__PURE__ */ import_react2.default.createElement(
+    /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", minHeight: "100%", alignItems: "stretch" } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { flex: 1, padding: 18, minWidth: 0 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { maxWidth: 860 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "WORKFLOW TREE"), /* @__PURE__ */ import_react2.default.createElement(
+      NodeList,
+      {
+        nodes: defRef.current.nodes,
+        selectedId,
+        onSelect: setSelectedId,
+        onChange: rerender,
+        def: defRef.current,
+        emptyHint: "Empty workflow \u2014 click + below to add the first step."
+      }
+    ))), /* @__PURE__ */ import_react2.default.createElement("div", { style: { width: 400, borderLeft: "1px solid #ececea", background: "#fff", padding: 16, overflow: "auto" } }, selected ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "NODE SETTINGS"), /* @__PURE__ */ import_react2.default.createElement(NodeConfigForm, { node: selected, onChange: rerender })) : /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "WORKFLOW SETTINGS"), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Name" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: wf.name, onChange: (e) => (setWf({ ...wf, name: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Description" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input.TextArea, { rows: 3, value: wf.description, onChange: (e) => (setWf({ ...wf, description: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Require confirmation before each run" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Switch, { checked: wf.require_confirm === true, onChange: (v) => (setWf({ ...wf, require_confirm: v }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Daily budget (USD, 0 = unlimited)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.InputNumber, { min: 0, step: 0.5, value: Number(wf.daily_budget_usd) || 0, onChange: (v) => (setWf({ ...wf, daily_budget_usd: v != null ? v : 0 }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: 'Schedule \u2014 "every 15m" \xB7 "every 2h" \xB7 "daily 07:00" (empty = off; runs published version)' }, /* @__PURE__ */ import_react2.default.createElement(
       import_antd2.Input,
       {
         value: (_b = wf.schedule) != null ? _b : "",
@@ -799,7 +843,10 @@ function WorkflowsPanel() {
   const create = async () => {
     var _a;
     const name = newName.trim();
-    if (!name) return;
+    if (!name) {
+      import_antd2.message.error("Enter a workflow name");
+      return;
+    }
     const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     try {
       await createResource(api, "neoai_workflows", {
