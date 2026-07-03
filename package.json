@@ -1,0 +1,28 @@
+{
+  "name": "@neomodul/neoai",
+  "version": "0.1.0",
+  "displayName": "NeoAI",
+  "description": "NeoAI for NeoBase: central AI workflow management — tree-structured multi-step workflows (LLM, image, HTTP, data and approval nodes) with a visual editor, run monitor, cost tracking and a function registry other @neomodul plugins dispatch through. Gemini-first via @nocobase/plugin-ai; legacy code paths stay as fallback.",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "dist/server/index.js",
+  "homepage": "https://github.com/netconsultiv/neoai",
+  "scripts": {
+    "build": "node build-server.js && node build-client.js",
+    "test": "node --experimental-strip-types --test test/*.test.mjs"
+  },
+  "peerDependencies": {
+    "@nocobase/client": "2.x",
+    "@nocobase/server": "2.x"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.5"
+  },
+  "keywords": [
+    "nocobase",
+    "neomodul",
+    "ai",
+    "workflows",
+    "gemini"
+  ]
+}

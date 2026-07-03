@@ -1,0 +1,883 @@
+// src/client/console/WorkflowsPanel.tsx
+// -----------------------------------------------------------------------------
+// AI Workflows: list + the visual TREE editor (owner decision: tree structure
+// is enough). The editor renders the definition as nested node cards with
+// branch columns (condition/parallel/loop), a config side panel per node, a
+// draft/publish lifecycle and an inline draft test-run with live step trace.
+
+import React, { useMemo, useRef, useState } from 'react';
+import { Button, Dropdown, Input, InputNumber, Select, Switch, Table, Checkbox, message, Space, Tag } from 'antd';
+import { useAPIClient } from '@nocobase/client';
+import {
+  ConsoleDrawer,
+  JsonBox,
+  StatusTag,
+  createResource,
+  fmtCost,
+  fmtDuration,
+  fmtTime,
+  listResource,
+  neoaiAction,
+  updateResource,
+  usePoll,
+} from './shared';
+import { NEOHOME_GREEN } from '../theme';
+
+type NodeDef = { id: string; type: string; title?: string; config?: any; branches?: NodeDef[][] };
+type WorkflowDef = { nodes: NodeDef[] };
+
+const NODE_TYPES: Array<{ type: string; label: string; hint: string }> = [
+  { type: 'llm', label: 'LLM', hint: 'Gemini text call (prompt + optional JSON schema)' },
+  { type: 'image', label: 'Image', hint: 'Gemini image generation (raw REST path)' },
+  { type: 'http', label: 'HTTP', hint: 'Call an external API' },
+  { type: 'data', label: 'Data', hint: 'Read/write a NocoBase collection' },
+  { type: 'transform', label: 'Transform', hint: 'Map values between nodes' },
+  { type: 'condition', label: 'Condition', hint: 'True/false branches' },
+  { type: 'parallel', label: 'Parallel', hint: 'Run branches concurrently' },
+  { type: 'loop', label: 'Loop', hint: 'Iterate over an array' },
+  { type: 'human_gate', label: 'Approval', hint: 'Pause until an admin approves' },
+  { type: 'subworkflow', label: 'Sub-workflow', hint: 'Run another published workflow' },
+  { type: 'output', label: 'Output', hint: 'Set the run result' },
+];
+
+const TYPE_COLORS: Record<string, string> = {
+  llm: 'green',
+  image: 'cyan',
+  http: 'blue',
+  data: 'geekblue',
+  transform: 'default',
+  condition: 'orange',
+  parallel: 'purple',
+  loop: 'magenta',
+  human_gate: 'gold',
+  subworkflow: 'lime',
+  output: 'default',
+};
+
+function defaultConfig(type: string): any {
+  switch (type) {
+    case 'llm':
+      return { prompt: '', temperature: 0.2 };
+    case 'image':
+      return { prompt: '' };
+    case 'http':
+      return { method: 'GET', url: 'https://', responseType: 'json' };
+    case 'data':
+      return { collection: '', op: 'list', filter: {}, limit: 20 };
+    case 'transform':
+      return { map: {} };
+    case 'condition':
+      return { left: '', op: 'notEmpty', right: '' };
+    case 'loop':
+      return { items: '' };
+    case 'human_gate':
+      return { message: 'Approval required' };
+    case 'subworkflow':
+      return { workflowKey: '', input: {} };
+    case 'output':
+      return { map: {} };
+    default:
+      return {};
+  }
+}
+
+function collectIds(nodes: NodeDef[], out: Set<string>) {
+  for (const n of nodes ?? []) {
+    out.add(n.id);
+    for (const b of n.branches ?? []) collectIds(b ?? [], out);
+  }
+}
+
+function makeNode(type: string, def: WorkflowDef): NodeDef {
+  const ids = new Set<string>();
+  collectIds(def.nodes ?? [], ids);
+  let i = 1;
+  while (ids.has(`${type}_${i}`)) i += 1;
+  const node: NodeDef = { id: `${type}_${i}`, type, title: '', config: defaultConfig(type) };
+  if (type === 'condition') node.branches = [[], []];
+  if (type === 'parallel') node.branches = [[], []];
+  if (type === 'loop') node.branches = [[]];
+  return node;
+}
+
+/** Find the list containing a node id (for delete/move). */
+function findList(nodes: NodeDef[], id: string): { list: NodeDef[]; index: number } | null {
+  for (let i = 0; i < (nodes ?? []).length; i++) {
+    if (nodes[i].id === id) return { list: nodes, index: i };
+    for (const b of nodes[i].branches ?? []) {
+      const hit = findList(b ?? [], id);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+function findNode(nodes: NodeDef[], id: string): NodeDef | null {
+  const hit = findList(nodes, id);
+  return hit ? hit.list[hit.index] : null;
+}
+
+// --- small editor building blocks ---------------------------------------------
+
+function JsonArea(props: { value: any; onChange: (v: any) => void; rows?: number; placeholder?: string }) {
+  const [text, setText] = useState(() => (props.value == null ? '' : JSON.stringify(props.value, null, 2)));
+  const [bad, setBad] = useState(false);
+  // Re-sync when the bound value changes identity from outside (node switch).
+  const lastValue = useRef(props.value);
+  if (lastValue.current !== props.value) {
+    lastValue.current = props.value;
+    const s = props.value == null ? '' : JSON.stringify(props.value, null, 2);
+    if (s !== text) {
+      setText(s);
+      setBad(false);
+    }
+  }
+  return (
+    <Input.TextArea
+      value={text}
+      rows={props.rows ?? 4}
+      placeholder={props.placeholder ?? '{ }'}
+      status={bad ? 'error' : undefined}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={() => {
+        const t = text.trim();
+        if (!t) {
+          setBad(false);
+          props.onChange(undefined);
+          return;
+        }
+        try {
+          props.onChange(JSON.parse(t));
+          setBad(false);
+        } catch {
+          setBad(true);
+        }
+      }}
+      style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
+    />
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: '#8a8f8a', marginBottom: 4 }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// --- node tree rendering --------------------------------------------------------
+
+function AddSlot({ onAdd }: { onAdd: (type: string) => void }) {
+  return (
+    <Dropdown
+      menu={{
+        items: NODE_TYPES.map((t) => ({ key: t.type, label: `${t.label} — ${t.hint}` })),
+        onClick: ({ key }) => onAdd(String(key)),
+      }}
+      trigger={['click']}
+    >
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0', cursor: 'pointer' }} title="Add node">
+        <span
+          style={{
+            fontSize: 12,
+            lineHeight: '18px',
+            width: 22,
+            height: 22,
+            textAlign: 'center',
+            borderRadius: 11,
+            border: '1px dashed #bfc4bf',
+            color: '#8a8f8a',
+            background: '#fff',
+          }}
+        >
+          +
+        </span>
+      </div>
+    </Dropdown>
+  );
+}
+
+function NodeCard(props: {
+  node: NodeDef;
+  selected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onMove: (dir: -1 | 1) => void;
+  children?: React.ReactNode;
+}) {
+  const { node, selected } = props;
+  const label = NODE_TYPES.find((t) => t.type === node.type)?.label ?? node.type;
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation();
+        props.onSelect();
+      }}
+      style={{
+        border: `1.5px solid ${selected ? NEOHOME_GREEN : '#e2e4e1'}`,
+        borderRadius: 10,
+        background: '#fff',
+        padding: '8px 10px',
+        cursor: 'pointer',
+        boxShadow: selected ? '0 1px 6px rgba(0,153,0,.15)' : 'none',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Tag color={TYPE_COLORS[node.type] ?? 'default'} style={{ marginRight: 0 }}>
+          {label}
+        </Tag>
+        <span style={{ fontWeight: 600, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {node.title || node.id}
+        </span>
+        <span style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
+          <Button size="small" type="text" onClick={() => props.onMove(-1)} title="Move up">
+            ↑
+          </Button>
+          <Button size="small" type="text" onClick={() => props.onMove(1)} title="Move down">
+            ↓
+          </Button>
+          <Button size="small" type="text" danger onClick={props.onDelete} title="Delete">
+            ✕
+          </Button>
+        </span>
+      </div>
+      {props.children}
+    </div>
+  );
+}
+
+function NodeList(props: {
+  nodes: NodeDef[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  onChange: () => void;
+  def: WorkflowDef;
+}) {
+  const { nodes, def } = props;
+  const insert = (index: number, type: string) => {
+    nodes.splice(index, 0, makeNode(type, def));
+    props.onChange();
+  };
+  const del = (index: number) => {
+    nodes.splice(index, 1);
+    props.onChange();
+  };
+  const move = (index: number, dir: -1 | 1) => {
+    const j = index + dir;
+    if (j < 0 || j >= nodes.length) return;
+    const [n] = nodes.splice(index, 1);
+    nodes.splice(j, 0, n);
+    props.onChange();
+  };
+  const branchLabel = (node: NodeDef, i: number) => {
+    if (node.type === 'condition') return i === 0 ? 'TRUE' : 'FALSE';
+    if (node.type === 'loop') return 'BODY (per item)';
+    return `BRANCH ${i + 1}`;
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {nodes.map((node, i) => (
+        <React.Fragment key={node.id}>
+          <AddSlot onAdd={(t) => insert(i, t)} />
+          <NodeCard
+            node={node}
+            selected={props.selectedId === node.id}
+            onSelect={() => props.onSelect(node.id)}
+            onDelete={() => del(i)}
+            onMove={(dir) => move(i, dir)}
+          >
+            {node.branches && node.branches.length > 0 ? (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'stretch', overflowX: 'auto' }}>
+                {node.branches.map((branch, bi) => (
+                  <div
+                    key={bi}
+                    style={{
+                      flex: '1 0 200px',
+                      minWidth: 200,
+                      border: '1px dashed #d8dbd7',
+                      borderRadius: 8,
+                      padding: '6px 6px 4px',
+                      background: '#fafbf9',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', color: '#8a8f8a', flex: 1 }}>
+                        {branchLabel(node, bi)}
+                      </span>
+                      {node.type === 'parallel' && node.branches!.length > 1 ? (
+                        <Button
+                          size="small"
+                          type="text"
+                          danger
+                          style={{ fontSize: 11 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            node.branches!.splice(bi, 1);
+                            props.onChange();
+                          }}
+                        >
+                          remove
+                        </Button>
+                      ) : null}
+                    </div>
+                    <NodeList nodes={branch} selectedId={props.selectedId} onSelect={props.onSelect} onChange={props.onChange} def={def} />
+                  </div>
+                ))}
+                {node.type === 'parallel' ? (
+                  <Button
+                    size="small"
+                    style={{ alignSelf: 'flex-start' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      node.branches!.push([]);
+                      props.onChange();
+                    }}
+                  >
+                    + branch
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </NodeCard>
+        </React.Fragment>
+      ))}
+      <AddSlot onAdd={(t) => insert(nodes.length, t)} />
+    </div>
+  );
+}
+
+// --- per-type config forms -------------------------------------------------------
+
+function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => void }) {
+  const cfg = node.config ?? (node.config = {});
+  const set = (k: string, v: any) => {
+    cfg[k] = v;
+    onChange();
+  };
+  const common = (
+    <Field label="Title">
+      <Input value={node.title} placeholder={node.id} onChange={(e) => ((node.title = e.target.value), onChange())} />
+    </Field>
+  );
+  const retries = (
+    <Field label="Retries on failure">
+      <InputNumber min={0} max={5} value={cfg.retries ?? 0} onChange={(v) => set('retries', v ?? 0)} />
+    </Field>
+  );
+  let body: React.ReactNode = null;
+  switch (node.type) {
+    case 'llm':
+      body = (
+        <>
+          <Field label="Model (empty = default)">
+            <Input value={cfg.model} placeholder="gemini-2.5-flash" onChange={(e) => set('model', e.target.value || undefined)} />
+          </Field>
+          <Field label="plugin-ai service (empty = default)">
+            <Input value={cfg.service} onChange={(e) => set('service', e.target.value || undefined)} />
+          </Field>
+          <Field label="System prompt">
+            <Input.TextArea rows={3} value={cfg.system} onChange={(e) => set('system', e.target.value || undefined)} />
+          </Field>
+          <Field label="Prompt (templates: {{input.x}}, {{nodes.<id>.y}})">
+            <Input.TextArea rows={6} value={cfg.prompt} onChange={(e) => set('prompt', e.target.value)} />
+          </Field>
+          <Field label="JSON schema (optional — forces JSON output)">
+            <JsonArea value={cfg.jsonSchema} onChange={(v) => set('jsonSchema', v)} rows={5} />
+          </Field>
+          <Field label="Temperature">
+            <InputNumber min={0} max={2} step={0.1} value={cfg.temperature ?? 0.2} onChange={(v) => set('temperature', v ?? 0.2)} />
+          </Field>
+          {retries}
+        </>
+      );
+      break;
+    case 'image':
+      body = (
+        <>
+          <Field label="Model">
+            <Input value={cfg.model} placeholder="gemini-2.5-flash-image" onChange={(e) => set('model', e.target.value || undefined)} />
+          </Field>
+          <Field label="Prompt">
+            <Input.TextArea rows={5} value={cfg.prompt} onChange={(e) => set('prompt', e.target.value)} />
+          </Field>
+          <Field label="Input image (template → data URL, optional)">
+            <Input value={cfg.image} placeholder="{{input.image}}" onChange={(e) => set('image', e.target.value || undefined)} />
+          </Field>
+          {retries}
+        </>
+      );
+      break;
+    case 'http':
+      body = (
+        <>
+          <Field label="Method">
+            <Select
+              value={cfg.method ?? 'GET'}
+              onChange={(v) => set('method', v)}
+              options={['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((m) => ({ value: m, label: m }))}
+              style={{ width: 120 }}
+            />
+          </Field>
+          <Field label="URL (templated)">
+            <Input value={cfg.url} onChange={(e) => set('url', e.target.value)} />
+          </Field>
+          <Field label="Headers (JSON)">
+            <JsonArea value={cfg.headers} onChange={(v) => set('headers', v)} rows={3} />
+          </Field>
+          <Field label="Body (string or JSON; templated)">
+            <Input.TextArea
+              rows={4}
+              value={typeof cfg.body === 'string' ? cfg.body : cfg.body ? JSON.stringify(cfg.body, null, 2) : ''}
+              onChange={(e) => set('body', e.target.value || undefined)}
+            />
+          </Field>
+          <Field label="Response type">
+            <Select
+              value={cfg.responseType ?? 'json'}
+              onChange={(v) => set('responseType', v)}
+              options={[
+                { value: 'json', label: 'JSON' },
+                { value: 'text', label: 'Text' },
+              ]}
+              style={{ width: 120 }}
+            />
+          </Field>
+          {retries}
+        </>
+      );
+      break;
+    case 'data':
+      body = (
+        <>
+          <Field label="Collection">
+            <Input value={cfg.collection} placeholder="konfigurator_plots" onChange={(e) => set('collection', e.target.value)} />
+          </Field>
+          <Field label="Operation">
+            <Select
+              value={cfg.op ?? 'list'}
+              onChange={(v) => set('op', v)}
+              options={['list', 'get', 'create', 'update'].map((o) => ({ value: o, label: o }))}
+              style={{ width: 140 }}
+            />
+          </Field>
+          <Field label="Filter (JSON, templated)">
+            <JsonArea value={cfg.filter} onChange={(v) => set('filter', v)} rows={3} />
+          </Field>
+          <Field label="Values (JSON, for create/update)">
+            <JsonArea value={cfg.values} onChange={(v) => set('values', v)} rows={3} />
+          </Field>
+          <Field label="Allow write">
+            <Checkbox checked={cfg.allowWrite === true} onChange={(e) => set('allowWrite', e.target.checked)}>
+              permit create/update (explicit opt-in)
+            </Checkbox>
+          </Field>
+        </>
+      );
+      break;
+    case 'transform':
+      body = (
+        <Field label="Map (JSON of templates)">
+          <JsonArea value={cfg.map} onChange={(v) => set('map', v ?? {})} rows={8} placeholder='{ "lat": "{{nodes.geo.body.0.lat}}" }' />
+        </Field>
+      );
+      break;
+    case 'condition':
+      body = (
+        <>
+          <Field label="Left (templated)">
+            <Input value={cfg.left} onChange={(e) => set('left', e.target.value)} />
+          </Field>
+          <Field label="Operator">
+            <Select
+              value={cfg.op ?? 'notEmpty'}
+              onChange={(v) => set('op', v)}
+              options={['truthy', 'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'empty', 'notEmpty'].map((o) => ({ value: o, label: o }))}
+              style={{ width: 160 }}
+            />
+          </Field>
+          <Field label="Right (templated)">
+            <Input value={cfg.right} onChange={(e) => set('right', e.target.value)} />
+          </Field>
+        </>
+      );
+      break;
+    case 'loop':
+      body = (
+        <Field label="Items (template → array; body sees {{item}} / {{index}})">
+          <Input value={cfg.items} placeholder="{{nodes.list.rows}}" onChange={(e) => set('items', e.target.value)} />
+        </Field>
+      );
+      break;
+    case 'human_gate':
+      body = (
+        <Field label="Message shown to the approver (templated)">
+          <Input.TextArea rows={3} value={cfg.message} onChange={(e) => set('message', e.target.value)} />
+        </Field>
+      );
+      break;
+    case 'subworkflow':
+      body = (
+        <>
+          <Field label="Workflow key">
+            <Input value={cfg.workflowKey} onChange={(e) => set('workflowKey', e.target.value)} />
+          </Field>
+          <Field label="Input (JSON of templates)">
+            <JsonArea value={cfg.input} onChange={(v) => set('input', v ?? {})} rows={4} />
+          </Field>
+        </>
+      );
+      break;
+    case 'output':
+      body = (
+        <>
+          <Field label="Result map (JSON of templates)">
+            <JsonArea value={cfg.map} onChange={(v) => set('map', v ?? {})} rows={6} />
+          </Field>
+          <Field label="End run here">
+            <Checkbox checked={cfg.end === true} onChange={(e) => set('end', e.target.checked)}>
+              stop the workflow after this node
+            </Checkbox>
+          </Field>
+        </>
+      );
+      break;
+    default:
+      body = null;
+  }
+  return (
+    <>
+      {common}
+      <Field label="Node id">
+        <Input value={node.id} disabled />
+      </Field>
+      {body}
+    </>
+  );
+}
+
+// --- draft test run ---------------------------------------------------------------
+
+function TestRunBox({ workflowId }: { workflowId: number }) {
+  const api = useAPIClient();
+  const [inputText, setInputText] = useState('{\n  "address": "Am Hochbehälter, 91166 Georgensgmünd"\n}');
+  const [runId, setRunId] = useState<number | null>(null);
+  const [data, setData] = useState<{ run?: any; steps?: any[] }>({});
+  const active = !!runId && !['succeeded', 'failed', 'cancelled', 'rejected'].includes(String(data.run?.status ?? ''));
+  usePoll(
+    async () => {
+      if (!runId) return;
+      try {
+        setData(await neoaiAction(api, 'runStatus', { runId }));
+      } catch {
+        /* keep last */
+      }
+    },
+    2000,
+    !!runId && active,
+  );
+  const start = async () => {
+    let input: any = {};
+    try {
+      input = inputText.trim() ? JSON.parse(inputText) : {};
+    } catch {
+      message.error('Test input is not valid JSON');
+      return;
+    }
+    try {
+      const res = await neoaiAction(api, 'run', { workflowId, input, draft: true, confirmed: true, trigger: 'test' });
+      if (res.error) {
+        message.error(res.error);
+        return;
+      }
+      setRunId(res.runId);
+      setData({});
+    } catch (err: any) {
+      message.error(String(err?.message ?? err));
+    }
+  };
+  return (
+    <div>
+      <Field label="Test input (JSON)">
+        <Input.TextArea
+          rows={4}
+          value={inputText}
+          onChange={(e) => setInputText(e.target.value)}
+          style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
+        />
+      </Field>
+      <Space>
+        <Button type="primary" onClick={start}>
+          Run draft test
+        </Button>
+        {runId ? <span style={{ fontSize: 12, color: '#8a8f8a' }}>run #{runId}</span> : null}
+        {data.run ? <StatusTag status={data.run.status} /> : null}
+      </Space>
+      {(data.steps ?? []).length > 0 ? (
+        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {(data.steps ?? []).map((s: any) => (
+            <div key={s.id} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 12.5 }}>
+              <StatusTag status={s.status} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.title || s.node_id}</span>
+              <span style={{ color: '#8a8f8a' }}>{fmtDuration(s.duration_ms)}</span>
+              <span style={{ color: '#8a8f8a' }}>{fmtCost(s.cost_usd)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {data.run?.status === 'succeeded' ? (
+        <div style={{ marginTop: 8 }}>
+          <JsonBox value={data.run.output} maxHeight={200} />
+        </div>
+      ) : null}
+      {data.run?.status === 'failed' ? (
+        <div style={{ marginTop: 8, color: '#b02a2a', fontSize: 12.5 }}>{data.run.error}</div>
+      ) : null}
+    </div>
+  );
+}
+
+// --- editor drawer ----------------------------------------------------------------
+
+function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }) {
+  const api = useAPIClient();
+  const [wf, setWf] = useState<any>(props.row);
+  const defRef = useRef<WorkflowDef>(
+    props.row.definition_draft && Array.isArray(props.row.definition_draft.nodes)
+      ? JSON.parse(JSON.stringify(props.row.definition_draft))
+      : { nodes: [] },
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [, setTick] = useState(0);
+  const rerender = () => {
+    setDirty(true);
+    setTick((n) => n + 1);
+  };
+  const selected = selectedId ? findNode(defRef.current.nodes, selectedId) : null;
+  if (selectedId && !selected && selectedId !== null) {
+    // node was deleted
+    setSelectedId(null);
+  }
+
+  const saveDraft = async () => {
+    try {
+      await updateResource(api, 'neoai_workflows', wf.id, {
+        definition_draft: defRef.current,
+        name: wf.name,
+        require_confirm: wf.require_confirm === true,
+        daily_budget_usd: Number(wf.daily_budget_usd) || 0,
+        description: wf.description ?? '',
+      });
+      setDirty(false);
+      message.success('Draft saved');
+      return true;
+    } catch (err: any) {
+      message.error(`Save failed: ${err?.message ?? err}`);
+      return false;
+    }
+  };
+
+  const publish = async () => {
+    if (dirty && !(await saveDraft())) return;
+    try {
+      const res = await neoaiAction(api, 'publishWorkflow', { workflowId: wf.id });
+      if (res.ok) {
+        message.success(`Published as version ${res.version}`);
+        setWf({ ...wf, current_version: res.version });
+      } else {
+        message.error(`Not publishable: ${(res.errors ?? []).join(' · ')}`);
+      }
+    } catch (err: any) {
+      message.error(`Publish failed: ${err?.message ?? err}`);
+    }
+  };
+
+  return (
+    <ConsoleDrawer
+      open
+      title={
+        <span>
+          {wf.name} <span style={{ color: '#8a8f8a', fontWeight: 400, fontSize: 13 }}>({wf.key} · v{wf.current_version ?? 0}{dirty ? ' · unsaved changes' : ''})</span>
+        </span>
+      }
+      extra={
+        <Space>
+          <Button onClick={saveDraft} disabled={!dirty}>
+            Save draft
+          </Button>
+          <Button type="primary" onClick={publish}>
+            Publish
+          </Button>
+        </Space>
+      }
+      onClose={() => props.onClose(true)}
+    >
+      <div style={{ display: 'flex', minHeight: '100%', alignItems: 'stretch' }}>
+        <div style={{ flex: 1, padding: 18, minWidth: 0 }}>
+          <div style={{ maxWidth: 860 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', margin: '0 0 6px' }}>WORKFLOW TREE</div>
+            <NodeList nodes={defRef.current.nodes} selectedId={selectedId} onSelect={setSelectedId} onChange={rerender} def={defRef.current} />
+          </div>
+        </div>
+        <div style={{ width: 400, borderLeft: '1px solid #ececea', background: '#fff', padding: 16, overflow: 'auto' }}>
+          {selected ? (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>NODE SETTINGS</div>
+              <NodeConfigForm node={selected} onChange={rerender} />
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>WORKFLOW SETTINGS</div>
+              <Field label="Name">
+                <Input value={wf.name} onChange={(e) => (setWf({ ...wf, name: e.target.value }), setDirty(true))} />
+              </Field>
+              <Field label="Description">
+                <Input.TextArea rows={3} value={wf.description} onChange={(e) => (setWf({ ...wf, description: e.target.value }), setDirty(true))} />
+              </Field>
+              <Field label="Require confirmation before each run">
+                <Switch checked={wf.require_confirm === true} onChange={(v) => (setWf({ ...wf, require_confirm: v }), setDirty(true))} />
+              </Field>
+              <Field label="Daily budget (USD, 0 = unlimited)">
+                <InputNumber min={0} step={0.5} value={Number(wf.daily_budget_usd) || 0} onChange={(v) => (setWf({ ...wf, daily_budget_usd: v ?? 0 }), setDirty(true))} />
+              </Field>
+              <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>TEST RUN (draft)</div>
+              <TestRunBox workflowId={wf.id} />
+            </>
+          )}
+        </div>
+      </div>
+    </ConsoleDrawer>
+  );
+}
+
+// --- list panel --------------------------------------------------------------------
+
+export function WorkflowsPanel() {
+  const api = useAPIClient();
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState<any | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const { rows } = await listResource(api, 'neoai_workflows', { sort: '-id', pageSize: 100 });
+      setRows(rows);
+    } catch (err: any) {
+      message.error(`Load failed: ${err?.message ?? err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  usePoll(load, 30_000, !editing);
+
+  const create = async () => {
+    const name = newName.trim();
+    if (!name) return;
+    const key = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    try {
+      await createResource(api, 'neoai_workflows', {
+        name,
+        key,
+        enabled: false,
+        require_confirm: true,
+        definition_draft: { nodes: [] },
+        current_version: 0,
+      });
+      setCreating(false);
+      setNewName('');
+      await load();
+      message.success(`Workflow "${name}" created (disabled draft)`);
+    } catch (err: any) {
+      message.error(`Create failed: ${err?.message ?? err}`);
+    }
+  };
+
+  const columns = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      render: (v: string, r: any) => (
+        <a style={{ fontWeight: 600 }} onClick={() => setEditing(r)}>
+          {v}
+        </a>
+      ),
+    },
+    { title: 'Key', dataIndex: 'key', render: (v: string) => <code style={{ fontSize: 12 }}>{v}</code> },
+    {
+      title: 'Enabled',
+      dataIndex: 'enabled',
+      width: 90,
+      render: (v: boolean, r: any) => (
+        <Switch
+          size="small"
+          checked={v === true}
+          onChange={async (val) => {
+            await updateResource(api, 'neoai_workflows', r.id, { enabled: val });
+            load();
+          }}
+        />
+      ),
+    },
+    { title: 'Version', dataIndex: 'current_version', width: 90, render: (v: number) => (v ? `v${v}` : <Tag>draft</Tag>) },
+    { title: 'Confirm', dataIndex: 'require_confirm', width: 90, render: (v: boolean) => (v ? 'yes' : 'no') },
+    {
+      title: 'Budget/day',
+      dataIndex: 'daily_budget_usd',
+      width: 110,
+      render: (v: number) => (Number(v) > 0 ? `$${Number(v)}` : '—'),
+    },
+    { title: 'Updated', dataIndex: 'updatedAt', width: 150, render: (v: string) => fmtTime(v) },
+  ];
+
+  return (
+    <div style={{ padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14, gap: 10 }}>
+        <div style={{ fontSize: 18, fontWeight: 800, flex: 1 }}>AI Workflows</div>
+        {creating ? (
+          <Space.Compact>
+            <Input
+              autoFocus
+              placeholder="Workflow name"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onPressEnter={create}
+              style={{ width: 260 }}
+            />
+            <Button type="primary" onClick={create}>
+              Create
+            </Button>
+            <Button onClick={() => setCreating(false)}>Cancel</Button>
+          </Space.Compact>
+        ) : (
+          <>
+            <Button onClick={load}>Refresh</Button>
+            <Button type="primary" onClick={() => setCreating(true)}>
+              New workflow
+            </Button>
+          </>
+        )}
+      </div>
+      <Table rowKey="id" size="middle" loading={loading} dataSource={rows} columns={columns as any} pagination={false} />
+      {editing ? (
+        <WorkflowEditor
+          row={editing}
+          onClose={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
