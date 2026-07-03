@@ -24,7 +24,7 @@ var require_package = __commonJS({
   "package.json"(exports2, module2) {
     module2.exports = {
       name: "@neomodul/neoai",
-      version: "0.1.2",
+      version: "0.1.3",
       displayName: "NeoAI",
       description: "NeoAI for NeoBase: central AI workflow management \u2014 tree-structured multi-step workflows (LLM, image, HTTP, data and approval nodes) with a visual editor, run monitor, cost tracking and a function registry other @neomodul plugins dispatch through. Gemini-first via @nocobase/plugin-ai; legacy code paths stay as fallback.",
       license: "UNLICENSED",
@@ -1474,6 +1474,7 @@ var NeoaiPlugin = class extends import_server.Plugin {
         }
       }
     });
+    this.registerAutomationBridge();
     this.app.on("afterStart", async () => {
       try {
         const repo = this.db.getRepository("neoai_runs");
@@ -1495,6 +1496,63 @@ var NeoaiPlugin = class extends import_server.Plugin {
       if (this.schedulerTimer) clearInterval(this.schedulerTimer);
       this.schedulerTimer = null;
     });
+  }
+  // ---------------------------------------------------------------------------
+  // Automation bridge (scoping Q21 "Beides" + Q2 automation hub): registers a
+  // "neoai-run" instruction on NocoBase's plugin-workflow so ANY automation
+  // (collection event, schedule, action) can invoke a published NeoAI workflow
+  // as a step. Registered as a plain InstructionInterface object — no import
+  // from plugin-workflow needed (its registerInstruction accepts instances).
+  // Best-effort: absence of plugin-workflow must never break load.
+  registerAutomationBridge() {
+    try {
+      const wf = this.app.pm?.get?.("workflow");
+      if (!wf?.registerInstruction) {
+        this.app.logger.info("[neoai] plugin-workflow not present \u2014 automation bridge skipped");
+        return;
+      }
+      const plugin = this;
+      wf.registerInstruction("neoai-run", {
+        run: async (node, _input, processor) => {
+          try {
+            const cfg = node.config ?? {};
+            const key = String(cfg.workflowKey ?? "").trim();
+            let input = {};
+            if (typeof cfg.inputJson === "string" && cfg.inputJson.trim()) {
+              try {
+                input = JSON.parse(cfg.inputJson);
+              } catch {
+                return { status: -1, result: { error: "neoai-run: inputJson is not valid JSON" } };
+              }
+            } else if (cfg.input && typeof cfg.input === "object") {
+              input = cfg.input;
+            }
+            if (cfg.includeContext !== false) {
+              input = { ...input, $trigger: processor?.execution?.context ?? null };
+            }
+            const started = await plugin.startRun({
+              workflowKey: key,
+              input,
+              trigger: "automation",
+              triggeredBy: `plugin-workflow:${processor?.execution?.workflow?.title ?? processor?.execution?.workflowId ?? "?"}`,
+              confirmed: true
+              // configuring the automation IS the admin's consent
+            });
+            if (!("runId" in started)) {
+              return { status: -1, result: { error: started.error ?? "needsConfirm unexpected here" } };
+            }
+            const done = await plugin.waitForRun(started.runId, 12e4);
+            if (done.status === "succeeded") return { status: 1, result: { runId: started.runId, output: done.output } };
+            return { status: -1, result: { runId: started.runId, error: done.error ?? `run ended ${done.status}` } };
+          } catch (err) {
+            return { status: -1, result: { error: String(err?.message ?? err) } };
+          }
+        }
+      });
+      this.app.logger.info('[neoai] automation bridge registered (plugin-workflow instruction "neoai-run")');
+    } catch (err) {
+      this.app.logger.warn(`[neoai] automation bridge registration failed (non-fatal): ${err}`);
+    }
   }
   // ---------------------------------------------------------------------------
   // Time triggers (scoping Q21 "Beides") — dependency-free ~30s tick.

@@ -232,6 +232,8 @@ export class NeoaiPlugin extends Plugin {
       },
     });
 
+    this.registerAutomationBridge();
+
     // Mark runs orphaned by a process restart. 'waiting' runs keep their state.
     this.app.on('afterStart', async () => {
       try {
@@ -254,6 +256,66 @@ export class NeoaiPlugin extends Plugin {
       if (this.schedulerTimer) clearInterval(this.schedulerTimer);
       this.schedulerTimer = null;
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Automation bridge (scoping Q21 "Beides" + Q2 automation hub): registers a
+  // "neoai-run" instruction on NocoBase's plugin-workflow so ANY automation
+  // (collection event, schedule, action) can invoke a published NeoAI workflow
+  // as a step. Registered as a plain InstructionInterface object — no import
+  // from plugin-workflow needed (its registerInstruction accepts instances).
+  // Best-effort: absence of plugin-workflow must never break load.
+
+  private registerAutomationBridge() {
+    try {
+      const wf: any = this.app.pm?.get?.('workflow');
+      if (!wf?.registerInstruction) {
+        this.app.logger.info('[neoai] plugin-workflow not present — automation bridge skipped');
+        return;
+      }
+      const plugin = this;
+      wf.registerInstruction('neoai-run', {
+        run: async (node: any, _input: any, processor: any) => {
+          // JOB_STATUS constants: PENDING=0, RESOLVED=1, FAILED=-1.
+          try {
+            const cfg = node.config ?? {};
+            const key = String(cfg.workflowKey ?? '').trim();
+            let input: any = {};
+            if (typeof cfg.inputJson === 'string' && cfg.inputJson.trim()) {
+              try {
+                input = JSON.parse(cfg.inputJson);
+              } catch {
+                return { status: -1, result: { error: 'neoai-run: inputJson is not valid JSON' } };
+              }
+            } else if (cfg.input && typeof cfg.input === 'object') {
+              input = cfg.input;
+            }
+            if (cfg.includeContext !== false) {
+              // Hand the triggering record/context through under a stable key.
+              input = { ...input, $trigger: processor?.execution?.context ?? null };
+            }
+            const started = await plugin.startRun({
+              workflowKey: key,
+              input,
+              trigger: 'automation',
+              triggeredBy: `plugin-workflow:${processor?.execution?.workflow?.title ?? processor?.execution?.workflowId ?? '?'}`,
+              confirmed: true, // configuring the automation IS the admin's consent
+            });
+            if (!('runId' in started)) {
+              return { status: -1, result: { error: (started as any).error ?? 'needsConfirm unexpected here' } };
+            }
+            const done = await plugin.waitForRun(started.runId, 120_000);
+            if (done.status === 'succeeded') return { status: 1, result: { runId: started.runId, output: done.output } };
+            return { status: -1, result: { runId: started.runId, error: done.error ?? `run ended ${done.status}` } };
+          } catch (err: any) {
+            return { status: -1, result: { error: String(err?.message ?? err) } };
+          }
+        },
+      });
+      this.app.logger.info('[neoai] automation bridge registered (plugin-workflow instruction "neoai-run")');
+    } catch (err) {
+      this.app.logger.warn(`[neoai] automation bridge registration failed (non-fatal): ${err}`);
+    }
   }
 
   // ---------------------------------------------------------------------------

@@ -1291,6 +1291,56 @@ function NeoaiConsolePage() {
 
 // src/client/index.tsx
 var NeoaiClientPlugin = class extends import_client6.Plugin {
+  /**
+   * Automation bridge UI: contribute the "neoai-run" node to NocoBase's
+   * plugin-workflow editor as a PLAIN instruction object (no import from
+   * plugin-workflow — its client registry accepts instances; a hard AMD dep
+   * would break this bundle whenever plugin-workflow is disabled). Load order
+   * between plugins isn't guaranteed, so retry once shortly after load.
+   */
+  registerAutomationBridgeUI(attempt = 0) {
+    var _a, _b;
+    try {
+      const wf = (_b = (_a = this.app.pm) == null ? void 0 : _a.get) == null ? void 0 : _b.call(_a, "workflow");
+      if (!(wf == null ? void 0 : wf.registerInstruction)) {
+        if (attempt < 3) setTimeout(() => this.registerAutomationBridgeUI(attempt + 1), 1500);
+        return;
+      }
+      wf.registerInstruction("neoai-run", {
+        title: "NeoAI workflow",
+        type: "neoai-run",
+        group: "extended",
+        description: "Run a published NeoAI workflow (tree of LLM/HTTP/data steps) and wait for its result.",
+        fieldset: {
+          workflowKey: {
+            type: "string",
+            title: "NeoAI workflow key",
+            required: true,
+            description: "Key from NeoAI \u2192 AI Workflows (the published version runs).",
+            "x-decorator": "FormItem",
+            "x-component": "Input"
+          },
+          inputJson: {
+            type: "string",
+            title: "Input (JSON)",
+            "x-decorator": "FormItem",
+            "x-component": "Input.TextArea",
+            "x-component-props": { rows: 4, placeholder: '{ "address": "\u2026" }' }
+          },
+          includeContext: {
+            type: "boolean",
+            title: "Pass trigger context to the workflow as {{input.$trigger}}",
+            default: true,
+            "x-decorator": "FormItem",
+            "x-component": "Checkbox"
+          }
+        }
+      });
+      console.info("[neoai] automation bridge UI registered");
+    } catch (err) {
+      console.warn("[neoai] automation bridge UI registration failed (non-fatal)", err);
+    }
+  }
   async load() {
     this.app.router.add("admin.neoai", { path: "neoai", Component: NeoaiConsolePage });
     this.app.router.add("admin.neoaiWorkflows", { path: "neoai/workflows", Component: NeoaiConsolePage });
@@ -1302,6 +1352,7 @@ var NeoaiClientPlugin = class extends import_client6.Plugin {
     this.app.router.add("neoai-runs", { path: "/neoai/runs", Component: NeoaiConsolePage });
     this.app.router.add("neoai-functions", { path: "/neoai/functions", Component: NeoaiConsolePage });
     this.app.router.add("neoai-settings", { path: "/neoai/settings", Component: NeoaiConsolePage });
+    this.registerAutomationBridgeUI();
   }
 };
 var client_default = NeoaiClientPlugin;
