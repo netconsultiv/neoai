@@ -1,19 +1,20 @@
 (function (factory) {
   if (typeof define === 'function' && define.amd) {
     // NocoBase / RequireJS path — register the module under its package name.
-    define("@neomodul/neoai", ["@nocobase/client","react","react-dom","antd","@formily/react","@formily/core","react-i18next"], factory);
+    define("@neomodul/neoai", ["@nocobase/client","react","react-dom","antd","@formily/react","@formily/core","react-i18next","@nocobase/plugin-workflow/client"], factory);
   } else if (typeof module === 'object' && module.exports) {
     // CommonJS fallback (Node, tests).
-    module.exports = factory(require("@nocobase/client"), require("react"), require("react-dom"), require("antd"), require("@formily/react"), require("@formily/core"), require("react-i18next"));
+    module.exports = factory(require("@nocobase/client"), require("react"), require("react-dom"), require("antd"), require("@formily/react"), require("@formily/core"), require("react-i18next"), require("@nocobase/plugin-workflow/client"));
   } else {
     // Bare browser global fallback.
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
     g["@neomodul/neoai"] = factory(
       g['@nocobase/client'], g.React, g.ReactDOM, g.antd,
-      g['@formily/react'], g['@formily/core'], g.reactI18next
+      g['@formily/react'], g['@formily/core'], g.reactI18next,
+      g['@nocobase/plugin-workflow/client']
     );
   }
-})(function (nocobaseClient, React, ReactDOM, antd, formilyReact, formilyCore, reactI18next) {
+})(function (nocobaseClient, React, ReactDOM, antd, formilyReact, formilyCore, reactI18next, pluginWorkflowClient) {
   var module = { exports: {} };
   var exports = module.exports;
   // Map the bundled code's require("...") calls onto the injected singletons.
@@ -26,6 +27,7 @@
       case "@formily/react": return formilyReact;
       case "@formily/core": return formilyCore;
       case "react-i18next": return reactI18next;
+      case "@nocobase/plugin-workflow/client": return pluginWorkflowClient;
       default:
         throw new Error("[@neomodul/neoai] unexpected require(\"" + id + '")');
     }
@@ -66,6 +68,7 @@ __export(client_exports, {
 });
 module.exports = __toCommonJS(client_exports);
 var import_client6 = require("@nocobase/client");
+var import_client7 = require("@nocobase/plugin-workflow/client");
 
 // src/client/console/NeoaiConsole.tsx
 var import_react6 = __toESM(require("react"));
@@ -1290,6 +1293,39 @@ function NeoaiConsolePage() {
 }
 
 // src/client/index.tsx
+var NeoaiRunInstruction = class extends import_client7.Instruction {
+  constructor() {
+    super(...arguments);
+    this.title = "NeoAI workflow";
+    this.type = "neoai-run";
+    this.group = "extended";
+    this.description = "Run a published NeoAI workflow (tree of LLM/HTTP/data steps) and wait for its result.";
+    this.fieldset = {
+      workflowKey: {
+        type: "string",
+        title: "NeoAI workflow key",
+        required: true,
+        description: "Key from NeoAI \u2192 AI Workflows (the published version runs).",
+        "x-decorator": "FormItem",
+        "x-component": "Input"
+      },
+      inputJson: {
+        type: "string",
+        title: "Input (JSON)",
+        "x-decorator": "FormItem",
+        "x-component": "Input.TextArea",
+        "x-component-props": { rows: 4, placeholder: '{ "address": "\u2026" }' }
+      },
+      includeContext: {
+        type: "boolean",
+        title: "Pass trigger context to the workflow as {{input.$trigger}}",
+        default: true,
+        "x-decorator": "FormItem",
+        "x-component": "Checkbox"
+      }
+    };
+  }
+};
 var NeoaiClientPlugin = class extends import_client6.Plugin {
   /**
    * Automation bridge UI: contribute the "neoai-run" node to NocoBase's
@@ -1306,36 +1342,7 @@ var NeoaiClientPlugin = class extends import_client6.Plugin {
         if (attempt < 3) setTimeout(() => this.registerAutomationBridgeUI(attempt + 1), 1500);
         return;
       }
-      wf.registerInstruction("neoai-run", {
-        title: "NeoAI workflow",
-        type: "neoai-run",
-        group: "extended",
-        description: "Run a published NeoAI workflow (tree of LLM/HTTP/data steps) and wait for its result.",
-        fieldset: {
-          workflowKey: {
-            type: "string",
-            title: "NeoAI workflow key",
-            required: true,
-            description: "Key from NeoAI \u2192 AI Workflows (the published version runs).",
-            "x-decorator": "FormItem",
-            "x-component": "Input"
-          },
-          inputJson: {
-            type: "string",
-            title: "Input (JSON)",
-            "x-decorator": "FormItem",
-            "x-component": "Input.TextArea",
-            "x-component-props": { rows: 4, placeholder: '{ "address": "\u2026" }' }
-          },
-          includeContext: {
-            type: "boolean",
-            title: "Pass trigger context to the workflow as {{input.$trigger}}",
-            default: true,
-            "x-decorator": "FormItem",
-            "x-component": "Checkbox"
-          }
-        }
-      });
+      wf.registerInstruction("neoai-run", NeoaiRunInstruction);
       console.info("[neoai] automation bridge UI registered");
     } catch (err) {
       console.warn("[neoai] automation bridge UI registration failed (non-fatal)", err);

@@ -7,7 +7,42 @@
 // LINK pointing here). Standalone chrome-less aliases for direct URLs.
 
 import { Plugin } from '@nocobase/client';
+// Hard client dep (8th AMD external) — see build-client.js note. The client
+// registry rejects plain objects ("invalid instruction type to register"), so
+// the node must be a real Instruction subclass, same as plugin-ai's LLM node.
+import { Instruction } from '@nocobase/plugin-workflow/client';
 import { NeoaiConsolePage } from './console/NeoaiConsole';
+
+class NeoaiRunInstruction extends Instruction {
+  title = 'NeoAI workflow';
+  type = 'neoai-run';
+  group = 'extended';
+  description = 'Run a published NeoAI workflow (tree of LLM/HTTP/data steps) and wait for its result.';
+  fieldset = {
+    workflowKey: {
+      type: 'string',
+      title: 'NeoAI workflow key',
+      required: true,
+      description: 'Key from NeoAI → AI Workflows (the published version runs).',
+      'x-decorator': 'FormItem',
+      'x-component': 'Input',
+    },
+    inputJson: {
+      type: 'string',
+      title: 'Input (JSON)',
+      'x-decorator': 'FormItem',
+      'x-component': 'Input.TextArea',
+      'x-component-props': { rows: 4, placeholder: '{ "address": "…" }' },
+    },
+    includeContext: {
+      type: 'boolean',
+      title: 'Pass trigger context to the workflow as {{input.$trigger}}',
+      default: true,
+      'x-decorator': 'FormItem',
+      'x-component': 'Checkbox',
+    },
+  };
+}
 
 export class NeoaiClientPlugin extends Plugin {
   /**
@@ -24,36 +59,7 @@ export class NeoaiClientPlugin extends Plugin {
         if (attempt < 3) setTimeout(() => this.registerAutomationBridgeUI(attempt + 1), 1500);
         return;
       }
-      wf.registerInstruction('neoai-run', {
-        title: 'NeoAI workflow',
-        type: 'neoai-run',
-        group: 'extended',
-        description: 'Run a published NeoAI workflow (tree of LLM/HTTP/data steps) and wait for its result.',
-        fieldset: {
-          workflowKey: {
-            type: 'string',
-            title: 'NeoAI workflow key',
-            required: true,
-            description: 'Key from NeoAI → AI Workflows (the published version runs).',
-            'x-decorator': 'FormItem',
-            'x-component': 'Input',
-          },
-          inputJson: {
-            type: 'string',
-            title: 'Input (JSON)',
-            'x-decorator': 'FormItem',
-            'x-component': 'Input.TextArea',
-            'x-component-props': { rows: 4, placeholder: '{ "address": "…" }' },
-          },
-          includeContext: {
-            type: 'boolean',
-            title: 'Pass trigger context to the workflow as {{input.$trigger}}',
-            default: true,
-            'x-decorator': 'FormItem',
-            'x-component': 'Checkbox',
-          },
-        },
-      });
+      wf.registerInstruction('neoai-run', NeoaiRunInstruction);
       // eslint-disable-next-line no-console
       console.info('[neoai] automation bridge UI registered');
     } catch (err) {

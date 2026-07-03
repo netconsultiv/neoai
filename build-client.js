@@ -24,6 +24,10 @@ const EXTERNALS = [
   '@formily/react',
   '@formily/core',
   'react-i18next',
+  // Automation bridge: the Instruction base class for the "neoai-run" node.
+  // Hard AMD dep — acceptable because plugin-workflow ships enabled in every
+  // NocoBase deployment we target (it IS the automation hub, scoping Q2).
+  '@nocobase/plugin-workflow/client',
 ];
 
 const ARG_NAMES = [
@@ -34,6 +38,7 @@ const ARG_NAMES = [
   'formilyReact',
   'formilyCore',
   'reactI18next',
+  'pluginWorkflowClient',
 ];
 
 async function main() {
@@ -73,7 +78,8 @@ async function main() {
     var g = typeof globalThis !== 'undefined' ? globalThis : this;
     g[${JSON.stringify(PKG_NAME)}] = factory(
       g['@nocobase/client'], g.React, g.ReactDOM, g.antd,
-      g['@formily/react'], g['@formily/core'], g.reactI18next
+      g['@formily/react'], g['@formily/core'], g.reactI18next,
+      g['@nocobase/plugin-workflow/client']
     );
   }
 })(function (${argList}) {
