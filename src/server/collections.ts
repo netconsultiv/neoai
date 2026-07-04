@@ -240,6 +240,41 @@ export const NEOAI_COLLECTIONS: any[] = [
       dt('confirmed_at', 'Confirmed at'),
     ],
   },
+  {
+    // Encrypted secrets vault (item 13). value_encrypted stores
+    // "iv:authTag:ciphertext" (all base64) via src/server/lib/secrets.ts —
+    // AES-256-GCM, key derived from APP_KEY. The `secretsList` action NEVER
+    // returns this field (not even the encrypted form) — only {id, name,
+    // configured}. Real encryption-at-rest, not masking (owner's explicit call).
+    name: 'neoai_secrets',
+    title: 'NeoAI Secrets',
+    titleField: 'name',
+    fields: [
+      str('name', 'Name', { unique: true }),
+      text('value_encrypted', 'Encrypted value (iv:authTag:ciphertext, base64)'),
+    ],
+  },
+  {
+    // Registered MCP server connections (item 11) — a reusable, named
+    // picker instead of freehand per-node URLs (owner's explicit call).
+    name: 'neoai_mcp_servers',
+    title: 'NeoAI MCP Servers',
+    titleField: 'name',
+    fields: [
+      str('name', 'Name', { unique: true }),
+      str('url', 'URL'),
+      str('auth_header', 'Auth header name (e.g. "Authorization")'),
+      {
+        name: 'auth_secret',
+        type: 'belongsTo',
+        interface: 'm2o',
+        target: 'neoai_secrets',
+        foreignKey: 'auth_secret_id',
+        uiSchema: { title: 'Auth secret', 'x-component': 'AssociationField' },
+      },
+      text('description', 'Description'),
+    ],
+  },
 ];
 
 // Reverse relations + post-P0 field additions — ensured AFTER all collections

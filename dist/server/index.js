@@ -1,6 +1,8 @@
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
@@ -17,6 +19,14 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // package.json
@@ -288,6 +298,41 @@ var NEOAI_COLLECTIONS = [
       str("updated_by", "Updated by"),
       dt("confirmed_at", "Confirmed at")
     ]
+  },
+  {
+    // Encrypted secrets vault (item 13). value_encrypted stores
+    // "iv:authTag:ciphertext" (all base64) via src/server/lib/secrets.ts —
+    // AES-256-GCM, key derived from APP_KEY. The `secretsList` action NEVER
+    // returns this field (not even the encrypted form) — only {id, name,
+    // configured}. Real encryption-at-rest, not masking (owner's explicit call).
+    name: "neoai_secrets",
+    title: "NeoAI Secrets",
+    titleField: "name",
+    fields: [
+      str("name", "Name", { unique: true }),
+      text("value_encrypted", "Encrypted value (iv:authTag:ciphertext, base64)")
+    ]
+  },
+  {
+    // Registered MCP server connections (item 11) — a reusable, named
+    // picker instead of freehand per-node URLs (owner's explicit call).
+    name: "neoai_mcp_servers",
+    title: "NeoAI MCP Servers",
+    titleField: "name",
+    fields: [
+      str("name", "Name", { unique: true }),
+      str("url", "URL"),
+      str("auth_header", 'Auth header name (e.g. "Authorization")'),
+      {
+        name: "auth_secret",
+        type: "belongsTo",
+        interface: "m2o",
+        target: "neoai_secrets",
+        foreignKey: "auth_secret_id",
+        uiSchema: { title: "Auth secret", "x-component": "AssociationField" }
+      },
+      text("description", "Description")
+    ]
   }
 ];
 var NEOAI_EXTRA_FIELDS = [
@@ -402,6 +447,68 @@ function checkBudget(opts) {
     return { ok: false, reason: `function daily budget exhausted (${(opts.functionSpentTodayUsd ?? 0).toFixed(2)} / ${f} USD)` };
   }
   return { ok: true };
+}
+
+// src/server/lib/net.ts
+var PRIVATE_HOST_RE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|fd[0-9a-f]{2}:)/i;
+function isPrivateHost(url) {
+  try {
+    const host = new URL(url).hostname;
+    return PRIVATE_HOST_RE.test(host) || host.endsWith(".internal") || host.endsWith(".local");
+  } catch {
+    return true;
+  }
+}
+
+// src/server/lib/mcp.ts
+var MCP_TIMEOUT_MS = 45e3;
+var rpcIdCounter = 0;
+async function callMcpTool(serverUrl, toolName, args = {}, authHeader, authValue, opts = {}) {
+  if (!/^https?:\/\//i.test(String(serverUrl ?? ""))) {
+    throw new Error(`mcp: invalid server url "${serverUrl}"`);
+  }
+  if (opts.allowPrivate !== true && isPrivateHost(serverUrl)) {
+    throw new Error(`mcp: private/internal target blocked (set allowPrivate:true to permit)`);
+  }
+  if (!toolName) throw new Error("mcp: toolName is required");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Math.min(opts.timeoutMs || MCP_TIMEOUT_MS, 6e4));
+  try {
+    rpcIdCounter += 1;
+    const body = {
+      jsonrpc: "2.0",
+      id: rpcIdCounter,
+      method: "tools/call",
+      params: { name: toolName, arguments: args ?? {} }
+    };
+    const headers = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream"
+    };
+    if (authHeader && authValue) headers[authHeader] = authValue;
+    const res = await fetch(serverUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    const text2 = await res.text();
+    if (!res.ok) {
+      throw new Error(`mcp: ${toolName} \u2192 HTTP ${res.status} ${String(text2).slice(0, 200)}`);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(text2);
+    } catch {
+      throw new Error(`mcp: ${toolName} \u2192 non-JSON response: ${String(text2).slice(0, 200)}`);
+    }
+    if (parsed?.error) {
+      throw new Error(`mcp: ${toolName} \u2192 ${parsed.error.message ?? JSON.stringify(parsed.error)}`);
+    }
+    return { result: parsed?.result, isError: parsed?.result?.isError === true };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // src/server/lib/mock.ts
@@ -752,15 +859,6 @@ function truncateJson(value, maxChars = 8e3) {
 
 // src/server/lib/nodes.ts
 var HTTP_TIMEOUT_MS = 45e3;
-var PRIVATE_HOST_RE = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|fd[0-9a-f]{2}:)/i;
-function isPrivateHost(url) {
-  try {
-    const host = new URL(url).hostname;
-    return PRIVATE_HOST_RE.test(host) || host.endsWith(".internal") || host.endsWith(".local");
-  } catch {
-    return true;
-  }
-}
 async function execHttp(node, scope) {
   const cfg = resolveTemplates(node.config ?? {}, scope);
   const method = String(cfg.method ?? "GET").toUpperCase();
@@ -878,6 +976,26 @@ function execTransform(node, scope) {
   const map = node.config?.map ?? node.config ?? {};
   return { output: resolveTemplates(map, scope) };
 }
+async function execMcpTool(node, scope, deps) {
+  const cfg = resolveTemplates(node.config ?? {}, scope);
+  const serverId = cfg.serverId ?? cfg.server_id;
+  if (!serverId) throw new Error(`mcp_tool node "${node.id}": serverId is required`);
+  const toolName = String(cfg.toolName ?? "");
+  if (!toolName) throw new Error(`mcp_tool node "${node.id}": toolName is required`);
+  const repo = deps.app.db.getRepository("neoai_mcp_servers");
+  if (!repo) throw new Error(`mcp_tool node "${node.id}": neoai_mcp_servers collection unavailable`);
+  const serverRow = await repo.findOne({ filterByTk: Number(serverId), appends: ["auth_secret"] });
+  if (!serverRow) throw new Error(`mcp_tool node "${node.id}": MCP server ${serverId} not found`);
+  const serverUrl = String(serverRow.get("url") ?? "");
+  const authHeader = String(serverRow.get("auth_header") ?? "") || void 0;
+  let authValue;
+  const secretRow = serverRow.get("auth_secret");
+  const secretName = secretRow?.name ?? secretRow?.get?.("name");
+  if (secretName) authValue = deps.secrets?.[String(secretName)];
+  const args = cfg.args && typeof cfg.args === "object" ? cfg.args : {};
+  const res = await callMcpTool(serverUrl, toolName, args, authHeader, authValue, { allowPrivate: cfg.allowPrivate === true });
+  return { output: res };
+}
 function execHumanGate(node, scope) {
   const message = String(resolveTemplates(node.config?.message ?? "Approval required", scope) ?? "");
   return { suspend: true, output: { message } };
@@ -899,6 +1017,8 @@ function execLeafFactory(deps) {
         return execData(node, scope, deps);
       case "transform":
         return execTransform(node, scope);
+      case "mcp_tool":
+        return execMcpTool(node, scope, deps);
       case "human_gate":
         return execHumanGate(node, scope);
       case "output":
@@ -1214,6 +1334,42 @@ function isDue(spec, lastRunAt, now) {
   todayAt.setHours(spec.hour, spec.minute, 0, 0);
   if (now < todayAt) return false;
   return !lastRunAt || lastRunAt < todayAt;
+}
+
+// src/server/lib/secrets.ts
+var import_node_crypto = __toESM(require("node:crypto"));
+var ALGO = "aes-256-gcm";
+var SALT = "neoai-secrets-vault";
+var IV_LEN = 12;
+var cachedKey = null;
+function deriveKey(env = process.env) {
+  const appKey = String(env.APP_KEY ?? "").trim();
+  if (!appKey) throw new Error("secrets: APP_KEY is not set \u2014 cannot encrypt/decrypt");
+  if (cachedKey && cachedKey.source === appKey) return cachedKey.key;
+  const key = import_node_crypto.default.scryptSync(appKey, SALT, 32);
+  cachedKey = { source: appKey, key };
+  return key;
+}
+function encryptSecret(plain, env = process.env) {
+  const key = deriveKey(env);
+  const iv = import_node_crypto.default.randomBytes(IV_LEN);
+  const cipher = import_node_crypto.default.createCipheriv(ALGO, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(String(plain ?? ""), "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return [iv.toString("base64"), authTag.toString("base64"), ciphertext.toString("base64")].join(":");
+}
+function decryptSecret(stored, env = process.env) {
+  const key = deriveKey(env);
+  const parts = String(stored ?? "").split(":");
+  if (parts.length !== 3) throw new Error("secrets: malformed stored value");
+  const [ivB64, tagB64, dataB64] = parts;
+  const iv = Buffer.from(ivB64, "base64");
+  const authTag = Buffer.from(tagB64, "base64");
+  const ciphertext = Buffer.from(dataB64, "base64");
+  const decipher = import_node_crypto.default.createDecipheriv(ALGO, key, iv);
+  decipher.setAuthTag(authTag);
+  const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return plain.toString("utf8");
 }
 
 // src/server/seed.ts
@@ -1623,6 +1779,53 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
             editedStructured: p.editedStructured
           });
           await next();
+        },
+        // Encrypted secrets vault (item 13) — list NEVER decrypts (not even
+        // the encrypted blob leaves the server; only {id, name, configured}).
+        secretsList: async (ctx, next) => {
+          requireAdmin(ctx);
+          const repo = this.db.getRepository("neoai_secrets");
+          const rows = repo ? await repo.find({ sort: ["name"], limit: 500 }) : [];
+          ctx.body = {
+            rows: rows.map((r) => ({
+              id: r.get("id"),
+              name: r.get("name"),
+              configured: !!r.get("value_encrypted")
+            }))
+          };
+          await next();
+        },
+        secretsSave: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const name = String(p.name ?? "").trim();
+          if (!name) ctx.throw(400, "name is required");
+          if (typeof p.value !== "string" || !p.value) ctx.throw(400, "value is required");
+          let encrypted;
+          try {
+            encrypted = encryptSecret(p.value);
+          } catch (err) {
+            ctx.throw(500, `encryption failed: ${err?.message ?? err}`);
+            return;
+          }
+          const repo = this.db.getRepository("neoai_secrets");
+          const existing = await repo.findOne({ filter: { name } });
+          if (existing) {
+            await repo.update({ filterByTk: existing.get("id"), values: { value_encrypted: encrypted } });
+          } else {
+            await repo.create({ values: { name, value_encrypted: encrypted } });
+          }
+          ctx.body = { ok: true };
+          await next();
+        },
+        secretsDelete: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const id = Number(p.id);
+          if (!id) ctx.throw(400, "id is required");
+          await this.db.getRepository("neoai_secrets").destroy({ filterByTk: id });
+          ctx.body = { ok: true };
+          await next();
         }
       }
     });
@@ -1899,6 +2102,31 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       return null;
     }
   }
+  // Item 13: decrypt every configured secret ONCE per run (not per node/per
+  // MCP call), into an in-memory name→value map. A secret that fails to
+  // decrypt (e.g. after an APP_KEY rotation) is OMITTED with a log line —
+  // never crashes the run just because one stale secret can't be read.
+  async decryptAllSecrets() {
+    const out = {};
+    try {
+      const repo = this.db.getRepository("neoai_secrets");
+      if (!repo) return out;
+      const rows = await repo.find({ limit: 500 });
+      for (const row of rows) {
+        const name = String(row.get("name") ?? "");
+        const encrypted = row.get("value_encrypted");
+        if (!name || !encrypted) continue;
+        try {
+          out[name] = decryptSecret(String(encrypted));
+        } catch (err) {
+          this.app.logger.warn(`[neoai] secret "${name}" failed to decrypt (omitted from run scope): ${err}`);
+        }
+      }
+    } catch (err) {
+      this.app.logger.warn(`[neoai] decryptAllSecrets failed (non-fatal, run proceeds with no secrets): ${err}`);
+    }
+    return out;
+  }
   dayStart() {
     const d = /* @__PURE__ */ new Date();
     d.setHours(0, 0, 0, 0);
@@ -2138,6 +2366,7 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     const workflowId = Number(wf.get("id"));
     const fnRow = functionKey ? await this.db.getRepository("neoai_functions")?.findOne({ filter: { key: functionKey } }) : null;
     const functionDailyBudgetUsd = Number(fnRow?.get?.("daily_budget_usd")) || 0;
+    const secrets = await this.decryptAllSecrets();
     let seq = 0;
     let totalIn = 0;
     let totalOut = 0;
@@ -2212,6 +2441,7 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       imagePriceUsd: Number(settings?.get?.("image_price_usd")) || DEFAULT_IMAGE_PRICE_USD,
       defaultModel: String(settings?.get?.("default_model") || "gemini-2.5-flash"),
       defaultService: String(settings?.get?.("default_llm_service") || ""),
+      secrets,
       guardModelCall: async () => {
         const now = Date.now();
         if (!spendCache || now - spendCache.at > 5e3) {
@@ -2237,7 +2467,10 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       }
     });
     const runner = new Runner({
-      execLeaf: (node, scope) => execLeaf(node, scope),
+      // {{secrets.name}} resolves through the existing getPath(scope, ...)
+      // mechanism with zero changes to template.ts — secrets are merged into
+      // the scope right here, the one place every leaf's scope passes through.
+      execLeaf: (node, scope) => execLeaf(node, { ...scope, secrets }),
       onStep,
       isCancelled: () => handle.cancelled,
       loadWorkflow: async (key) => {

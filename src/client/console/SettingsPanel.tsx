@@ -5,7 +5,7 @@
 // a plugin health card (ping).
 
 import React, { useState } from 'react';
-import { Button, Input, InputNumber, Switch, Tag, message } from 'antd';
+import { Button, Input, InputNumber, Modal, Switch, Table, Tag, message, Space } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import { JsonBox, neoaiAction, usePoll } from './shared';
 
@@ -41,6 +41,102 @@ function Sparkline({ data }: { data: Array<{ label: string; value: number }> }) 
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * Encrypted secrets vault (item 13) — sub-section, not a new top-level tab.
+ * The list only ever shows name + "configured"; values are write-only
+ * (Input.Password), matching the gemini_api_key precedent but with real
+ * AES-256-GCM encryption underneath (src/server/lib/secrets.ts) instead of
+ * masking-only.
+ */
+function SecretsSection() {
+  const api = useAPIClient();
+  const [rows, setRows] = useState<any[]>([]);
+  const [name, setName] = useState('');
+  const [value, setValue] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    try {
+      const res = await neoaiAction(api, 'secretsList', {});
+      setRows(res.rows ?? []);
+    } catch (err: any) {
+      message.error(`Load failed: ${err?.message ?? err}`);
+    }
+  };
+  usePoll(load, 3_600_000, true);
+
+  const save = async () => {
+    if (!name.trim() || !value) {
+      message.error('Name and value are required');
+      return;
+    }
+    setBusy(true);
+    try {
+      await neoaiAction(api, 'secretsSave', { name: name.trim(), value });
+      setName('');
+      setValue('');
+      message.success('Secret saved');
+      await load();
+    } catch (err: any) {
+      message.error(`Save failed: ${err?.message ?? err}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = (row: any) => {
+    Modal.confirm({
+      title: `Delete secret "${row.name}"?`,
+      content: 'Any MCP server or workflow referencing this secret will lose its auth value.',
+      okText: 'Delete',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await neoaiAction(api, 'secretsDelete', { id: row.id });
+        message.success('Secret deleted');
+        await load();
+      },
+    });
+  };
+
+  return (
+    <Section title="Secrets vault">
+      <p style={{ fontSize: 12.5, color: '#8a8f8a', margin: '0 0 12px', maxWidth: 560 }}>
+        Encrypted at rest (AES-256-GCM, key derived from APP_KEY) — used via <code>{'{{secrets.name}}'}</code> in workflow
+        templates, and by MCP servers as an auth-header value. Values are write-only: this list never shows a decrypted or
+        even encrypted value, only whether one is configured.
+      </p>
+      <Table
+        rowKey="id"
+        size="small"
+        dataSource={rows}
+        pagination={false}
+        style={{ marginBottom: 14 }}
+        columns={[
+          { title: 'Name', dataIndex: 'name', render: (v: string) => <code>{v}</code> },
+          { title: 'Status', dataIndex: 'configured', width: 120, render: (v: boolean) => <Tag color={v ? 'green' : 'default'}>{v ? 'configured' : 'empty'}</Tag> },
+          {
+            title: '',
+            key: 'act',
+            width: 90,
+            render: (_: any, r: any) => (
+              <Button size="small" danger onClick={() => remove(r)}>
+                Delete
+              </Button>
+            ),
+          },
+        ]}
+      />
+      <Space.Compact style={{ width: '100%', maxWidth: 560 }}>
+        <Input placeholder="name (e.g. jira_api_key)" value={name} onChange={(e) => setName(e.target.value)} style={{ width: '35%' }} />
+        <Input.Password placeholder="value" value={value} onChange={(e) => setValue(e.target.value)} style={{ width: '45%' }} />
+        <Button type="primary" loading={busy} onClick={save} style={{ width: '20%' }}>
+          Save
+        </Button>
+      </Space.Compact>
+    </Section>
   );
 }
 
@@ -158,6 +254,9 @@ export function SettingsPanel() {
       <Button type="primary" onClick={save}>
         Save settings
       </Button>
+
+      <div style={{ borderTop: '1px solid #ececea', margin: '24px 0 16px', maxWidth: 620 }} />
+      <SecretsSection />
 
       <div style={{ borderTop: '1px solid #ececea', margin: '24px 0 16px', maxWidth: 620 }} />
       <Section title="Plugin health">

@@ -67,13 +67,13 @@ __export(client_exports, {
   default: () => client_default
 });
 module.exports = __toCommonJS(client_exports);
-var import_client8 = require("@nocobase/client");
-var import_client9 = require("@nocobase/plugin-workflow/client");
+var import_client9 = require("@nocobase/client");
+var import_client10 = require("@nocobase/plugin-workflow/client");
 
 // src/client/console/NeoaiConsole.tsx
-var import_react9 = __toESM(require("react"));
-var import_antd9 = require("antd");
-var import_client7 = require("@nocobase/client");
+var import_react10 = __toESM(require("react"));
+var import_antd10 = require("antd");
+var import_client8 = require("@nocobase/client");
 
 // src/client/theme.ts
 var NEOHOME_GREEN = "#009900";
@@ -364,6 +364,7 @@ var NODE_TYPES = [
   { type: "http", label: "HTTP", hint: "Call an external API" },
   { type: "data", label: "Data", hint: "Read/write a NocoBase collection" },
   { type: "transform", label: "Transform", hint: "Map values between nodes" },
+  { type: "mcp_tool", label: "MCP Tool", hint: "Call a tool on a registered MCP server" },
   { type: "condition", label: "Condition", hint: "True/false branches" },
   { type: "parallel", label: "Parallel", hint: "Run branches concurrently" },
   { type: "loop", label: "Loop", hint: "Iterate over an array" },
@@ -377,6 +378,7 @@ var TYPE_COLORS = {
   http: "blue",
   data: "geekblue",
   transform: "default",
+  mcp_tool: "volcano",
   condition: "orange",
   parallel: "purple",
   loop: "magenta",
@@ -396,6 +398,8 @@ function defaultConfig(type) {
       return { collection: "", op: "list", filter: {}, limit: 20 };
     case "transform":
       return { map: {} };
+    case "mcp_tool":
+      return { serverId: void 0, toolName: "", args: {} };
     case "condition":
       return { left: "", op: "notEmpty", right: "" };
     case "loop":
@@ -659,12 +663,42 @@ function NodeList(props) {
   ))), /* @__PURE__ */ import_react3.default.createElement(AddSlot, { onAdd: (t) => insert(nodes.length, t) }));
 }
 function NodeConfigForm({ node, onChange }) {
-  var _a, _b, _c, _d, _e, _f, _g;
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+  const api = (0, import_client.useAPIClient)();
   const cfg = (_a = node.config) != null ? _a : node.config = {};
   const set = (k, v) => {
     cfg[k] = v;
     onChange();
   };
+  const [mcpServers, setMcpServers] = (0, import_react3.useState)([]);
+  (0, import_react3.useEffect)(() => {
+    if (node.type !== "mcp_tool") return;
+    let cancelled = false;
+    listResource(api, "neoai_mcp_servers", { sort: "name", pageSize: 100 }).then((res) => {
+      var _a2;
+      if (!cancelled) setMcpServers((_a2 = res.rows) != null ? _a2 : []);
+    }).catch(() => {
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.type]);
+  const [collections, setCollections] = (0, import_react3.useState)([]);
+  (0, import_react3.useEffect)(() => {
+    if (node.type !== "data") return;
+    let cancelled = false;
+    listResource(api, "collections", { pageSize: 500 }).then((res) => {
+      var _a2;
+      if (!cancelled) setCollections(((_a2 = res.rows) != null ? _a2 : []).filter((c) => {
+        var _a3;
+        return !String((_a3 = c.name) != null ? _a3 : "").startsWith("neoai_");
+      }));
+    }).catch(() => {
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.type]);
   const common = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Title" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: node.title, placeholder: node.id, onChange: (e) => (node.title = e.target.value, onChange()) }));
   const retries = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Retries on failure" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.InputNumber, { min: 0, max: 5, value: (_b = cfg.retries) != null ? _b : 0, onChange: (v) => set("retries", v != null ? v : 0) }));
   let body = null;
@@ -704,16 +738,56 @@ function NodeConfigForm({ node, onChange }) {
         }
       )), retries);
       break;
-    case "data":
-      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Collection" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.collection, placeholder: "konfigurator_plots", onChange: (e) => set("collection", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Operation" }, /* @__PURE__ */ import_react3.default.createElement(
+    case "data": {
+      const selectedCollection = collections.find((c) => c.name === cfg.collection);
+      const fieldNames = ((_f = selectedCollection == null ? void 0 : selectedCollection.fields) != null ? _f : []).map((f) => f == null ? void 0 : f.name).filter((n) => typeof n === "string" && n && n !== "id");
+      const insertField = (fieldName) => {
+        const current = cfg.filter && typeof cfg.filter === "object" ? cfg.filter : {};
+        set("filter", { ...current, [fieldName]: "" });
+      };
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Collection" }, /* @__PURE__ */ import_react3.default.createElement(
         import_antd3.Select,
         {
-          value: (_f = cfg.op) != null ? _f : "list",
+          showSearch: true,
+          value: cfg.collection || void 0,
+          placeholder: "Select a collection\u2026",
+          options: collections.map((c) => ({ value: c.name, label: c.title ? `${c.title} (${c.name})` : c.name })),
+          filterOption: (input, option) => {
+            var _a2;
+            return String((_a2 = option == null ? void 0 : option.label) != null ? _a2 : "").toLowerCase().includes(input.toLowerCase());
+          },
+          onChange: (v) => set("collection", v),
+          style: { width: "100%" },
+          notFoundContent: "No collections found"
+        }
+      )), cfg.collection && fieldNames.length ? /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Available fields (click to insert into Filter)" }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6 } }, fieldNames.map((f) => /* @__PURE__ */ import_react3.default.createElement(import_antd3.Tag, { key: f, style: { cursor: "pointer" }, onClick: () => insertField(f) }, f)))) : null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Operation" }, /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Select,
+        {
+          value: (_g = cfg.op) != null ? _g : "list",
           onChange: (v) => set("op", v),
           options: ["list", "get", "create", "update"].map((o) => ({ value: o, label: o })),
           style: { width: 140 }
         }
       )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Filter (JSON, templated)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.filter, onChange: (v) => set("filter", v), rows: 3 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Values (JSON, for create/update)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.values, onChange: (v) => set("values", v), rows: 3 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Allow write" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Checkbox, { checked: cfg.allowWrite === true, onChange: (e) => set("allowWrite", e.target.checked) }, "permit create/update (explicit opt-in)")));
+      break;
+    }
+    case "mcp_tool":
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "MCP server (registered in the MCP Servers tab)" }, /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Select,
+        {
+          showSearch: true,
+          value: (_h = cfg.serverId) != null ? _h : void 0,
+          placeholder: "Select a registered MCP server\u2026",
+          options: mcpServers.map((s) => ({ value: s.id, label: s.name })),
+          filterOption: (input, option) => {
+            var _a2;
+            return String((_a2 = option == null ? void 0 : option.label) != null ? _a2 : "").toLowerCase().includes(input.toLowerCase());
+          },
+          onChange: (v) => set("serverId", v),
+          style: { width: "100%" },
+          notFoundContent: "No MCP servers registered yet"
+        }
+      )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Tool name" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.toolName, placeholder: "search_issues", onChange: (e) => set("toolName", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Args (JSON of templates)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.args, onChange: (v) => set("args", v != null ? v : {}), rows: 5, placeholder: '{ "query": "{{input.query}}" }' })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Allow private/internal target" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Checkbox, { checked: cfg.allowPrivate === true, onChange: (e) => set("allowPrivate", e.target.checked) }, "permit calling a private/loopback host (SSRF guard escape hatch)")), retries);
       break;
     case "transform":
       body = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Map (JSON of templates)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.map, onChange: (v) => set("map", v != null ? v : {}), rows: 8, placeholder: '{ "lat": "{{nodes.geo.body.0.lat}}" }' }));
@@ -722,7 +796,7 @@ function NodeConfigForm({ node, onChange }) {
       body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Left (templated)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.left, onChange: (e) => set("left", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Operator" }, /* @__PURE__ */ import_react3.default.createElement(
         import_antd3.Select,
         {
-          value: (_g = cfg.op) != null ? _g : "notEmpty",
+          value: (_i = cfg.op) != null ? _i : "notEmpty",
           onChange: (v) => set("op", v),
           options: ["truthy", "eq", "ne", "gt", "gte", "lt", "lte", "contains", "empty", "notEmpty"].map((o) => ({ value: o, label: o })),
           style: { width: 160 }
@@ -1661,29 +1735,244 @@ function FunctionsPanel() {
   return /* @__PURE__ */ import_react6.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 6, gap: 10 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, flex: 1 } }, "Functions"), creating ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Space.Compact, null, /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "key (e.g. crm.draftReply)", value: draft.key, onChange: (e) => setDraft({ ...draft, key: e.target.value }), style: { width: 220 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Title", value: draft.title, onChange: (e) => setDraft({ ...draft, title: e.target.value }), style: { width: 180 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Plugin", value: draft.plugin, onChange: (e) => setDraft({ ...draft, plugin: e.target.value }), style: { width: 140 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", onClick: create }, "Create"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: () => setCreating(false) }, "Cancel")) : /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: load }, "Refresh"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", onClick: () => setCreating(true) }, "Register function"))), /* @__PURE__ */ import_react6.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 760 } }, "Host plugins (Konfigurator, CRM) register their AI functions here and gain a workflow selector; an empty binding keeps their built-in legacy behaviour. Bindings take effect immediately \u2014 dispatches use the bound workflow's published version."), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Table, { rowKey: "id", size: "middle", dataSource: rows, columns, pagination: false }), testing ? /* @__PURE__ */ import_react6.default.createElement(TestDispatchDrawer, { fn: testing, onClose: () => setTesting(null) }) : null);
 }
 
-// src/client/console/SettingsPanel.tsx
+// src/client/console/McpServersPanel.tsx
 var import_react7 = __toESM(require("react"));
 var import_antd7 = require("antd");
 var import_client5 = require("@nocobase/client");
+function McpServersPanel() {
+  const api = (0, import_client5.useAPIClient)();
+  const [rows, setRows] = (0, import_react7.useState)([]);
+  const [secrets, setSecrets] = (0, import_react7.useState)([]);
+  const [creating, setCreating] = (0, import_react7.useState)(false);
+  const [draft, setDraft] = (0, import_react7.useState)({
+    name: "",
+    url: "https://",
+    auth_header: "",
+    description: ""
+  });
+  const [editingId, setEditingId] = (0, import_react7.useState)(null);
+  const load = async () => {
+    var _a, _b;
+    try {
+      const [m, s] = await Promise.all([
+        listResource(api, "neoai_mcp_servers", { sort: "name", pageSize: 100, appends: "auth_secret" }),
+        neoaiAction(api, "secretsList", {})
+      ]);
+      setRows(m.rows);
+      setSecrets((_a = s.rows) != null ? _a : []);
+    } catch (err) {
+      import_antd7.message.error(`Load failed: ${(_b = err == null ? void 0 : err.message) != null ? _b : err}`);
+    }
+  };
+  usePoll(load, 3e4, !creating && editingId == null);
+  const secretOptions = secrets.map((s) => ({ value: s.id, label: s.name }));
+  const resetDraft = () => setDraft({ name: "", url: "https://", auth_header: "", description: "", auth_secret_id: void 0 });
+  const create = async () => {
+    var _a, _b;
+    if (!draft.name.trim() || !draft.url.trim()) {
+      import_antd7.message.error("Name and URL are required");
+      return;
+    }
+    try {
+      await createResource(api, "neoai_mcp_servers", {
+        name: draft.name.trim(),
+        url: draft.url.trim(),
+        auth_header: draft.auth_header || void 0,
+        auth_secret_id: (_a = draft.auth_secret_id) != null ? _a : null,
+        description: draft.description
+      });
+      setCreating(false);
+      resetDraft();
+      await load();
+      import_antd7.message.success("MCP server registered");
+    } catch (err) {
+      import_antd7.message.error(`Create failed: ${(_b = err == null ? void 0 : err.message) != null ? _b : err}`);
+    }
+  };
+  const startEdit = (r) => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    setEditingId(r.id);
+    setDraft({
+      name: (_a = r.name) != null ? _a : "",
+      url: (_b = r.url) != null ? _b : "",
+      auth_header: (_c = r.auth_header) != null ? _c : "",
+      auth_secret_id: (_f = (_e = (_d = r.auth_secret) == null ? void 0 : _d.id) != null ? _e : r.auth_secret_id) != null ? _f : void 0,
+      description: (_g = r.description) != null ? _g : ""
+    });
+  };
+  const saveEdit = async () => {
+    var _a, _b;
+    if (editingId == null) return;
+    try {
+      await updateResource(api, "neoai_mcp_servers", editingId, {
+        name: draft.name.trim(),
+        url: draft.url.trim(),
+        auth_header: draft.auth_header || void 0,
+        auth_secret_id: (_a = draft.auth_secret_id) != null ? _a : null,
+        description: draft.description
+      });
+      setEditingId(null);
+      resetDraft();
+      await load();
+      import_antd7.message.success("MCP server updated");
+    } catch (err) {
+      import_antd7.message.error(`Update failed: ${(_b = err == null ? void 0 : err.message) != null ? _b : err}`);
+    }
+  };
+  const remove = async (r) => {
+    var _a;
+    try {
+      await api.request({ url: "neoai_mcp_servers:destroy", method: "post", params: { filterByTk: r.id } });
+      await load();
+      import_antd7.message.success("MCP server removed");
+    } catch (err) {
+      import_antd7.message.error(`Delete failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+    }
+  };
+  const columns = [
+    { title: "Name", dataIndex: "name", render: (v) => /* @__PURE__ */ import_react7.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "URL", dataIndex: "url", ellipsis: true },
+    { title: "Auth header", dataIndex: "auth_header", width: 140, render: (v) => v || "\u2014" },
+    {
+      title: "Auth secret",
+      key: "secret",
+      width: 160,
+      render: (_, r) => {
+        var _a, _b;
+        return (_b = (_a = r.auth_secret) == null ? void 0 : _a.name) != null ? _b : "\u2014";
+      }
+    },
+    { title: "Description", dataIndex: "description", ellipsis: true },
+    {
+      title: "",
+      key: "act",
+      width: 150,
+      render: (_, r) => /* @__PURE__ */ import_react7.default.createElement(import_antd7.Space, null, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Button, { size: "small", onClick: () => startEdit(r) }, "Edit"), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Button, { size: "small", danger: true, onClick: () => remove(r) }, "Delete"))
+    }
+  ];
+  const editorOpen = creating || editingId != null;
+  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 6, gap: 10 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, flex: 1 } }, "MCP Servers"), !editorOpen ? /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Button, { onClick: load }, "Refresh"), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Button, { type: "primary", onClick: () => setCreating(true) }, "Register server")) : null), /* @__PURE__ */ import_react7.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 760 } }, "Registered MCP (Model Context Protocol) HTTP-transport servers. An ", /* @__PURE__ */ import_react7.default.createElement("code", null, "mcp_tool"), " workflow node picks one of these by name instead of typing a URL per node. Auth secrets are managed in Settings \u2192 Secrets vault and never appear here in cleartext."), editorOpen ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { border: "1px solid #ececea", borderRadius: 10, padding: 16, marginBottom: 16, maxWidth: 640 } }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Space, { direction: "vertical", style: { width: "100%" }, size: 10 }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input, { placeholder: "Name (e.g. jira)", value: draft.name, onChange: (e) => setDraft({ ...draft, name: e.target.value }) }), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input, { placeholder: "https://mcp.example.com/tools", value: draft.url, onChange: (e) => setDraft({ ...draft, url: e.target.value }) }), /* @__PURE__ */ import_react7.default.createElement(
+    import_antd7.Input,
+    {
+      placeholder: 'Auth header name (e.g. "Authorization")',
+      value: draft.auth_header,
+      onChange: (e) => setDraft({ ...draft, auth_header: e.target.value })
+    }
+  ), /* @__PURE__ */ import_react7.default.createElement(
+    import_antd7.Select,
+    {
+      allowClear: true,
+      placeholder: "Auth secret (optional)",
+      style: { width: "100%" },
+      value: draft.auth_secret_id,
+      options: secretOptions,
+      onChange: (v) => setDraft({ ...draft, auth_secret_id: v != null ? v : void 0 })
+    }
+  ), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input.TextArea, { rows: 2, placeholder: "Description", value: draft.description, onChange: (e) => setDraft({ ...draft, description: e.target.value }) }), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Space, null, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Button, { type: "primary", onClick: editingId != null ? saveEdit : create }, editingId != null ? "Save" : "Create"), /* @__PURE__ */ import_react7.default.createElement(
+    import_antd7.Button,
+    {
+      onClick: () => {
+        setCreating(false);
+        setEditingId(null);
+        resetDraft();
+      }
+    },
+    "Cancel"
+  )))) : null, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Table, { rowKey: "id", size: "middle", dataSource: rows, columns, pagination: false }));
+}
+
+// src/client/console/SettingsPanel.tsx
+var import_react8 = __toESM(require("react"));
+var import_antd8 = require("antd");
+var import_client6 = require("@nocobase/client");
 function Field2({ label, children, hint }) {
-  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { marginBottom: 14, maxWidth: 560 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children, hint ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginTop: 4 } }, hint) : null);
+  return /* @__PURE__ */ import_react8.default.createElement("div", { style: { marginBottom: 14, maxWidth: 560 } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children, hint ? /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginTop: 4 } }, hint) : null);
 }
 function Section({ title, children }) {
-  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { border: "1px solid #ececea", borderRadius: 10, padding: "16px 18px", marginBottom: 16, maxWidth: 620 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "#191a19", marginBottom: 14 } }, title), children);
+  return /* @__PURE__ */ import_react8.default.createElement("div", { style: { border: "1px solid #ececea", borderRadius: 10, padding: "16px 18px", marginBottom: 16, maxWidth: 620 } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "#191a19", marginBottom: 14 } }, title), children);
 }
 function Sparkline({ data }) {
   const max = Math.max(1e-9, ...data.map((d) => d.value));
-  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 60 } }, data.map((d) => /* @__PURE__ */ import_react7.default.createElement("div", { key: d.label, title: `${d.label}: $${d.value.toFixed(2)}`, style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { width: "100%", height: Math.max(2, d.value / max * 52), background: "#009900", borderRadius: "2px 2px 0 0" } }))));
+  return /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 60 } }, data.map((d) => /* @__PURE__ */ import_react8.default.createElement("div", { key: d.label, title: `${d.label}: $${d.value.toFixed(2)}`, style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { width: "100%", height: Math.max(2, d.value / max * 52), background: "#009900", borderRadius: "2px 2px 0 0" } }))));
+}
+function SecretsSection() {
+  const api = (0, import_client6.useAPIClient)();
+  const [rows, setRows] = (0, import_react8.useState)([]);
+  const [name, setName] = (0, import_react8.useState)("");
+  const [value, setValue] = (0, import_react8.useState)("");
+  const [busy, setBusy] = (0, import_react8.useState)(false);
+  const load = async () => {
+    var _a, _b;
+    try {
+      const res = await neoaiAction(api, "secretsList", {});
+      setRows((_a = res.rows) != null ? _a : []);
+    } catch (err) {
+      import_antd8.message.error(`Load failed: ${(_b = err == null ? void 0 : err.message) != null ? _b : err}`);
+    }
+  };
+  usePoll(load, 36e5, true);
+  const save = async () => {
+    var _a;
+    if (!name.trim() || !value) {
+      import_antd8.message.error("Name and value are required");
+      return;
+    }
+    setBusy(true);
+    try {
+      await neoaiAction(api, "secretsSave", { name: name.trim(), value });
+      setName("");
+      setValue("");
+      import_antd8.message.success("Secret saved");
+      await load();
+    } catch (err) {
+      import_antd8.message.error(`Save failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = (row) => {
+    import_antd8.Modal.confirm({
+      title: `Delete secret "${row.name}"?`,
+      content: "Any MCP server or workflow referencing this secret will lose its auth value.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        await neoaiAction(api, "secretsDelete", { id: row.id });
+        import_antd8.message.success("Secret deleted");
+        await load();
+      }
+    });
+  };
+  return /* @__PURE__ */ import_react8.default.createElement(Section, { title: "Secrets vault" }, /* @__PURE__ */ import_react8.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 560 } }, "Encrypted at rest (AES-256-GCM, key derived from APP_KEY) \u2014 used via ", /* @__PURE__ */ import_react8.default.createElement("code", null, "{{secrets.name}}"), " in workflow templates, and by MCP servers as an auth-header value. Values are write-only: this list never shows a decrypted or even encrypted value, only whether one is configured."), /* @__PURE__ */ import_react8.default.createElement(
+    import_antd8.Table,
+    {
+      rowKey: "id",
+      size: "small",
+      dataSource: rows,
+      pagination: false,
+      style: { marginBottom: 14 },
+      columns: [
+        { title: "Name", dataIndex: "name", render: (v) => /* @__PURE__ */ import_react8.default.createElement("code", null, v) },
+        { title: "Status", dataIndex: "configured", width: 120, render: (v) => /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: v ? "green" : "default" }, v ? "configured" : "empty") },
+        {
+          title: "",
+          key: "act",
+          width: 90,
+          render: (_, r) => /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { size: "small", danger: true, onClick: () => remove(r) }, "Delete")
+        }
+      ]
+    }
+  ), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Space.Compact, { style: { width: "100%", maxWidth: 560 } }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input, { placeholder: "name (e.g. jira_api_key)", value: name, onChange: (e) => setName(e.target.value), style: { width: "35%" } }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input.Password, { placeholder: "value", value, onChange: (e) => setValue(e.target.value), style: { width: "45%" } }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { type: "primary", loading: busy, onClick: save, style: { width: "20%" } }, "Save")));
 }
 function SettingsPanel() {
   var _a, _b, _c, _d, _e, _f;
-  const api = (0, import_client5.useAPIClient)();
-  const [s, setS] = (0, import_react7.useState)(null);
-  const [key, setKey] = (0, import_react7.useState)("");
-  const [pricesText, setPricesText] = (0, import_react7.useState)("");
-  const [ping, setPing] = (0, import_react7.useState)(null);
-  const [spend, setSpend] = (0, import_react7.useState)(null);
-  const [trend, setTrend] = (0, import_react7.useState)(null);
+  const api = (0, import_client6.useAPIClient)();
+  const [s, setS] = (0, import_react8.useState)(null);
+  const [key, setKey] = (0, import_react8.useState)("");
+  const [pricesText, setPricesText] = (0, import_react8.useState)("");
+  const [ping, setPing] = (0, import_react8.useState)(null);
+  const [spend, setSpend] = (0, import_react8.useState)(null);
+  const [trend, setTrend] = (0, import_react8.useState)(null);
   usePoll(
     async () => {
       var _a2;
@@ -1695,13 +1984,13 @@ function SettingsPanel() {
         setSpend(await neoaiAction(api, "spendToday", {}));
         setTrend(await neoaiAction(api, "spendTrend", {}));
       } catch (err) {
-        import_antd7.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
+        import_antd8.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
       }
     },
     36e5,
     s == null
   );
-  if (!s) return /* @__PURE__ */ import_react7.default.createElement("div", { style: { padding: 20 } }, "Loading\u2026");
+  if (!s) return /* @__PURE__ */ import_react8.default.createElement("div", { style: { padding: 20 } }, "Loading\u2026");
   const save = async () => {
     var _a2, _b2, _c2;
     let prices;
@@ -1709,7 +1998,7 @@ function SettingsPanel() {
       try {
         prices = JSON.parse(pricesText);
       } catch (e) {
-        import_antd7.message.error("Price table is not valid JSON");
+        import_antd8.message.error("Price table is not valid JSON");
         return;
       }
     }
@@ -1725,46 +2014,46 @@ function SettingsPanel() {
         ...key ? { gemini_api_key: key } : {}
       });
       setKey("");
-      import_antd7.message.success("Settings saved");
+      import_antd8.message.success("Settings saved");
     } catch (err) {
-      import_antd7.message.error(`Save failed: ${(_c2 = err == null ? void 0 : err.message) != null ? _c2 : err}`);
+      import_antd8.message.error(`Save failed: ${(_c2 = err == null ? void 0 : err.message) != null ? _c2 : err}`);
     }
   };
-  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, marginBottom: 16 } }, "Settings"), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Mode" }, /* @__PURE__ */ import_react7.default.createElement(
+  return /* @__PURE__ */ import_react8.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, marginBottom: 16 } }, "Settings"), /* @__PURE__ */ import_react8.default.createElement(Section, { title: "Mode" }, /* @__PURE__ */ import_react8.default.createElement(
     Field2,
     {
       label: "Force mock mode",
       hint: "ON: every LLM/image node returns a labelled deterministic mock \u2014 zero spend, even though a real key is configured. For test rounds; turn OFF for real model calls."
     },
-    /* @__PURE__ */ import_react7.default.createElement(import_antd7.Switch, { checked: s.force_mock === true, onChange: (v) => setS({ ...s, force_mock: v }) }),
-    s.force_mock === true ? /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: "orange", style: { marginLeft: 10 } }, "mock mode active") : null
-  )), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Model & provider" }, /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Default plugin-ai LLM service", hint: "Name of an llmService configured under Settings \u2192 AI. Empty = plugin-ai default / raw Gemini fallback." }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input, { value: s.default_llm_service, onChange: (e) => setS({ ...s, default_llm_service: e.target.value }) })), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Default model" }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input, { value: s.default_model, placeholder: "gemini-2.5-flash", onChange: (e) => setS({ ...s, default_model: e.target.value }) })), /* @__PURE__ */ import_react7.default.createElement(
+    /* @__PURE__ */ import_react8.default.createElement(import_antd8.Switch, { checked: s.force_mock === true, onChange: (v) => setS({ ...s, force_mock: v }) }),
+    s.force_mock === true ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "orange", style: { marginLeft: 10 } }, "mock mode active") : null
+  )), /* @__PURE__ */ import_react8.default.createElement(Section, { title: "Model & provider" }, /* @__PURE__ */ import_react8.default.createElement(Field2, { label: "Default plugin-ai LLM service", hint: "Name of an llmService configured under Settings \u2192 AI. Empty = plugin-ai default / raw Gemini fallback." }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input, { value: s.default_llm_service, onChange: (e) => setS({ ...s, default_llm_service: e.target.value }) })), /* @__PURE__ */ import_react8.default.createElement(Field2, { label: "Default model" }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input, { value: s.default_model, placeholder: "gemini-2.5-flash", onChange: (e) => setS({ ...s, default_model: e.target.value }) })), /* @__PURE__ */ import_react8.default.createElement(
     Field2,
     {
       label: "Gemini API key (raw-path fallback + image nodes)",
       hint: s.geminiKeyFromEnv ? "GEMINI_API_KEY env var is set and wins \u2014 this field is a fallback." : s.geminiKeyConfigured ? "A key is configured. Leave empty to keep it; enter a new value to replace." : "No key configured yet."
     },
-    /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input.Password, { value: key, placeholder: s.geminiKeyConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (configured)" : "AIza\u2026", onChange: (e) => setKey(e.target.value) })
-  )), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Cost management" }, /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Global daily budget (USD, 0 = unlimited)", hint: "Blocks further model calls once today's estimated spend across ALL workflows exceeds this." }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.InputNumber, { min: 0, step: 0.5, value: Number(s.daily_budget_usd) || 0, onChange: (v) => setS({ ...s, daily_budget_usd: v != null ? v : 0 }) })), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Estimated price per generated image (USD)" }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.InputNumber, { min: 0, step: 0.01, value: Number(s.image_price_usd) || 0.04, onChange: (v) => setS({ ...s, image_price_usd: v != null ? v : 0.04 }) })), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Price table override (JSON, USD per 1M tokens)", hint: 'Example: { "gemini-2.5-flash": { "in": 0.3, "out": 2.5 } }' }, /* @__PURE__ */ import_react7.default.createElement(
-    import_antd7.Input.TextArea,
+    /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input.Password, { value: key, placeholder: s.geminiKeyConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (configured)" : "AIza\u2026", onChange: (e) => setKey(e.target.value) })
+  )), /* @__PURE__ */ import_react8.default.createElement(Section, { title: "Cost management" }, /* @__PURE__ */ import_react8.default.createElement(Field2, { label: "Global daily budget (USD, 0 = unlimited)", hint: "Blocks further model calls once today's estimated spend across ALL workflows exceeds this." }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.InputNumber, { min: 0, step: 0.5, value: Number(s.daily_budget_usd) || 0, onChange: (v) => setS({ ...s, daily_budget_usd: v != null ? v : 0 }) })), /* @__PURE__ */ import_react8.default.createElement(Field2, { label: "Estimated price per generated image (USD)" }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.InputNumber, { min: 0, step: 0.01, value: Number(s.image_price_usd) || 0.04, onChange: (v) => setS({ ...s, image_price_usd: v != null ? v : 0.04 }) })), /* @__PURE__ */ import_react8.default.createElement(Field2, { label: "Price table override (JSON, USD per 1M tokens)", hint: 'Example: { "gemini-2.5-flash": { "in": 0.3, "out": 2.5 } }' }, /* @__PURE__ */ import_react8.default.createElement(
+    import_antd8.Input.TextArea,
     {
       rows: 5,
       value: pricesText,
       onChange: (e) => setPricesText(e.target.value),
       style: { fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12 }
     }
-  )), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Proactive spend alert threshold (% of daily budget)", hint: "Shows a warning banner in the console once today's global spend crosses this \u2014 the hard block still only ever fires at 100% via the budget itself." }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.InputNumber, { min: 1, max: 100, value: Number(s.spend_alert_pct) || 80, onChange: (v) => setS({ ...s, spend_alert_pct: v != null ? v : 80 }) }))), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Button, { type: "primary", onClick: save }, "Save settings"), /* @__PURE__ */ import_react7.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "24px 0 16px", maxWidth: 620 } }), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Plugin health" }, ping ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: spend ? 14 : 0 } }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: "green" }, ping.plugin, " v", ping.version), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: ping.pluginAi ? "green" : "orange" }, ping.pluginAi ? "plugin-ai available" : "plugin-ai NOT available (raw Gemini fallback)"), ping.sandbox ? /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: "orange" }, "sandbox") : null, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, null, ((_a = ping.collections) != null ? _a : []).length, " collections")) : null, spend ? /* @__PURE__ */ import_react7.default.createElement("div", null, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginBottom: 4 } }, "Spend today (estimated)"), /* @__PURE__ */ import_react7.default.createElement(JsonBox, { value: spend, maxHeight: 140 })) : null), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Spend trend (last 30 days)" }, trend ? /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 6 } }, "By day"), /* @__PURE__ */ import_react7.default.createElement(
+  )), /* @__PURE__ */ import_react8.default.createElement(Field2, { label: "Proactive spend alert threshold (% of daily budget)", hint: "Shows a warning banner in the console once today's global spend crosses this \u2014 the hard block still only ever fires at 100% via the budget itself." }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.InputNumber, { min: 1, max: 100, value: Number(s.spend_alert_pct) || 80, onChange: (v) => setS({ ...s, spend_alert_pct: v != null ? v : 80 }) }))), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { type: "primary", onClick: save }, "Save settings"), /* @__PURE__ */ import_react8.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "24px 0 16px", maxWidth: 620 } }), /* @__PURE__ */ import_react8.default.createElement(SecretsSection, null), /* @__PURE__ */ import_react8.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "24px 0 16px", maxWidth: 620 } }), /* @__PURE__ */ import_react8.default.createElement(Section, { title: "Plugin health" }, ping ? /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: spend ? 14 : 0 } }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "green" }, ping.plugin, " v", ping.version), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: ping.pluginAi ? "green" : "orange" }, ping.pluginAi ? "plugin-ai available" : "plugin-ai NOT available (raw Gemini fallback)"), ping.sandbox ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "orange" }, "sandbox") : null, /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, null, ((_a = ping.collections) != null ? _a : []).length, " collections")) : null, spend ? /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginBottom: 4 } }, "Spend today (estimated)"), /* @__PURE__ */ import_react8.default.createElement(JsonBox, { value: spend, maxHeight: 140 })) : null), /* @__PURE__ */ import_react8.default.createElement(Section, { title: "Spend trend (last 30 days)" }, trend ? /* @__PURE__ */ import_react8.default.createElement(import_react8.default.Fragment, null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 6 } }, "By day"), /* @__PURE__ */ import_react8.default.createElement(
     Sparkline,
     {
       data: Object.entries((_b = trend.byDay) != null ? _b : {}).sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ label: day, value: Number(v) }))
     }
-  ), /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", margin: "16px 0 6px" } }, "Top workflows"), ((_c = trend.byWorkflow) != null ? _c : []).length === 0 ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No spend recorded yet.") : ((_d = trend.byWorkflow) != null ? _d : []).slice(0, 8).map((w) => /* @__PURE__ */ import_react7.default.createElement("div", { key: w.workflowId, style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0" } }, /* @__PURE__ */ import_react7.default.createElement("span", null, w.name), /* @__PURE__ */ import_react7.default.createElement("b", null, "$", w.totalUsd.toFixed(2)))), /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", margin: "16px 0 6px" } }, "Top functions"), ((_e = trend.byFunction) != null ? _e : []).length === 0 ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No spend recorded yet.") : ((_f = trend.byFunction) != null ? _f : []).slice(0, 8).map((f) => /* @__PURE__ */ import_react7.default.createElement("div", { key: f.functionKey, style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0" } }, /* @__PURE__ */ import_react7.default.createElement("code", null, f.functionKey), /* @__PURE__ */ import_react7.default.createElement("b", null, "$", f.totalUsd.toFixed(2))))) : null));
+  ), /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", margin: "16px 0 6px" } }, "Top workflows"), ((_c = trend.byWorkflow) != null ? _c : []).length === 0 ? /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No spend recorded yet.") : ((_d = trend.byWorkflow) != null ? _d : []).slice(0, 8).map((w) => /* @__PURE__ */ import_react8.default.createElement("div", { key: w.workflowId, style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0" } }, /* @__PURE__ */ import_react8.default.createElement("span", null, w.name), /* @__PURE__ */ import_react8.default.createElement("b", null, "$", w.totalUsd.toFixed(2)))), /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", margin: "16px 0 6px" } }, "Top functions"), ((_e = trend.byFunction) != null ? _e : []).length === 0 ? /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No spend recorded yet.") : ((_f = trend.byFunction) != null ? _f : []).slice(0, 8).map((f) => /* @__PURE__ */ import_react8.default.createElement("div", { key: f.functionKey, style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0" } }, /* @__PURE__ */ import_react8.default.createElement("code", null, f.functionKey), /* @__PURE__ */ import_react8.default.createElement("b", null, "$", f.totalUsd.toFixed(2))))) : null));
 }
 
 // src/client/console/MemoryPanel.tsx
-var import_react8 = __toESM(require("react"));
-var import_antd8 = require("antd");
-var import_client6 = require("@nocobase/client");
+var import_react9 = __toESM(require("react"));
+var import_antd9 = require("antd");
+var import_client7 = require("@nocobase/client");
 var PENDING_SUFFIX = "__pending";
 function baseKeyOf(key) {
   return key.endsWith(PENDING_SUFFIX) ? key.slice(0, -PENDING_SUFFIX.length) : key;
@@ -1779,64 +2068,64 @@ function stalenessBadge(confirmedAt) {
   const t = new Date(confirmedAt).getTime();
   if (Number.isNaN(t)) return null;
   const ageMs = Date.now() - t;
-  if (ageMs > VERY_STALE_AFTER_MS) return /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "red" }, "very stale");
-  if (ageMs > STALE_AFTER_MS) return /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "orange" }, "stale");
+  if (ageMs > VERY_STALE_AFTER_MS) return /* @__PURE__ */ import_react9.default.createElement(import_antd9.Tag, { color: "red" }, "very stale");
+  if (ageMs > STALE_AFTER_MS) return /* @__PURE__ */ import_react9.default.createElement(import_antd9.Tag, { color: "orange" }, "stale");
   return null;
 }
 function MemoryDetail({ row, confirmedSibling, onClose, onSaved }) {
   var _a, _b;
-  const api = (0, import_client6.useAPIClient)();
+  const api = (0, import_client7.useAPIClient)();
   const isPending = String((_a = row.key) != null ? _a : "").endsWith(PENDING_SUFFIX);
-  const [summary, setSummary] = (0, import_react8.useState)(String((_b = row.summary) != null ? _b : ""));
-  const [busy, setBusy] = (0, import_react8.useState)(false);
+  const [summary, setSummary] = (0, import_react9.useState)(String((_b = row.summary) != null ? _b : ""));
+  const [busy, setBusy] = (0, import_react9.useState)(false);
   const confirm = async () => {
     var _a2, _b2;
     setBusy(true);
     try {
       const res = await neoaiAction(api, "memoryConfirm", { id: row.id, editedSummary: summary });
       if (res == null ? void 0 : res.ok) {
-        import_antd8.message.success(isPending ? "Confirmed \u2014 swapped in over the previous version" : "Confirmed");
+        import_antd9.message.success(isPending ? "Confirmed \u2014 swapped in over the previous version" : "Confirmed");
         onSaved();
         onClose();
       } else {
-        import_antd8.message.error((_a2 = res == null ? void 0 : res.reason) != null ? _a2 : "Confirm failed");
+        import_antd9.message.error((_a2 = res == null ? void 0 : res.reason) != null ? _a2 : "Confirm failed");
       }
     } catch (err) {
-      import_antd8.message.error(String((_b2 = err == null ? void 0 : err.message) != null ? _b2 : err));
+      import_antd9.message.error(String((_b2 = err == null ? void 0 : err.message) != null ? _b2 : err));
     } finally {
       setBusy(false);
     }
   };
-  return /* @__PURE__ */ import_react8.default.createElement(
+  return /* @__PURE__ */ import_react9.default.createElement(
     ConsoleDrawer,
     {
       open: true,
-      title: /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 13 } }, row.entity_type), /* @__PURE__ */ import_react8.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 13 } }, row.entity_id), /* @__PURE__ */ import_react8.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), baseKeyOf(row.key), isPending ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "gold", style: { marginLeft: 8 } }, "pending review") : null, !isPending && row.status === "confirmed" ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "green", style: { marginLeft: 8 } }, "confirmed") : null),
+      title: /* @__PURE__ */ import_react9.default.createElement("span", null, /* @__PURE__ */ import_react9.default.createElement("code", { style: { fontSize: 13 } }, row.entity_type), /* @__PURE__ */ import_react9.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), /* @__PURE__ */ import_react9.default.createElement("code", { style: { fontSize: 13 } }, row.entity_id), /* @__PURE__ */ import_react9.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), baseKeyOf(row.key), isPending ? /* @__PURE__ */ import_react9.default.createElement(import_antd9.Tag, { color: "gold", style: { marginLeft: 8 } }, "pending review") : null, !isPending && row.status === "confirmed" ? /* @__PURE__ */ import_react9.default.createElement(import_antd9.Tag, { color: "green", style: { marginLeft: 8 } }, "confirmed") : null),
       onClose,
-      footer: /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { onClick: onClose }, "Close"), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { type: "primary", loading: busy, onClick: confirm }, isPending ? "Confirm & swap in" : row.status === "confirmed" ? "Save changes" : "Confirm"))
+      footer: /* @__PURE__ */ import_react9.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ import_react9.default.createElement(import_antd9.Button, { onClick: onClose }, "Close"), /* @__PURE__ */ import_react9.default.createElement(import_antd9.Button, { type: "primary", loading: busy, onClick: confirm }, isPending ? "Confirm & swap in" : row.status === "confirmed" ? "Save changes" : "Confirm"))
     },
-    /* @__PURE__ */ import_react8.default.createElement("div", { style: { padding: 18, display: "flex", flexDirection: "column", gap: 14, maxWidth: 900 } }, isPending && confirmedSibling ? /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "CURRENTLY CONFIRMED (unaffected until you confirm the draft below)"), /* @__PURE__ */ import_react8.default.createElement(JsonBox, { value: confirmedSibling.summary, maxHeight: 140 })) : null, /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, isPending ? "NEW DRAFT \u2014 REVIEW BEFORE CONFIRMING" : "SUMMARY"), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input.TextArea, { rows: 8, value: summary, onChange: (e) => setSummary(e.target.value) })), row.structured ? /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "STRUCTURED (Phase 2 \u2014 informational only, not applied anywhere yet)"), /* @__PURE__ */ import_react8.default.createElement(JsonBox, { value: row.structured, maxHeight: 200 })) : null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13, color: "#5c605c" } }, /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("b", null, "Updated by:"), " ", row.updated_by || "\u2014"), /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("b", null, "Confirmed at:"), " ", fmtTime(row.confirmed_at)), /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("b", null, "Source run:"), " ", row.source_run_id ? `#${row.source_run_id}` : "\u2014")))
+    /* @__PURE__ */ import_react9.default.createElement("div", { style: { padding: 18, display: "flex", flexDirection: "column", gap: 14, maxWidth: 900 } }, isPending && confirmedSibling ? /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "CURRENTLY CONFIRMED (unaffected until you confirm the draft below)"), /* @__PURE__ */ import_react9.default.createElement(JsonBox, { value: confirmedSibling.summary, maxHeight: 140 })) : null, /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, isPending ? "NEW DRAFT \u2014 REVIEW BEFORE CONFIRMING" : "SUMMARY"), /* @__PURE__ */ import_react9.default.createElement(import_antd9.Input.TextArea, { rows: 8, value: summary, onChange: (e) => setSummary(e.target.value) })), row.structured ? /* @__PURE__ */ import_react9.default.createElement("div", null, /* @__PURE__ */ import_react9.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "STRUCTURED (Phase 2 \u2014 informational only, not applied anywhere yet)"), /* @__PURE__ */ import_react9.default.createElement(JsonBox, { value: row.structured, maxHeight: 200 })) : null, /* @__PURE__ */ import_react9.default.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13, color: "#5c605c" } }, /* @__PURE__ */ import_react9.default.createElement("span", null, /* @__PURE__ */ import_react9.default.createElement("b", null, "Updated by:"), " ", row.updated_by || "\u2014"), /* @__PURE__ */ import_react9.default.createElement("span", null, /* @__PURE__ */ import_react9.default.createElement("b", null, "Confirmed at:"), " ", fmtTime(row.confirmed_at)), /* @__PURE__ */ import_react9.default.createElement("span", null, /* @__PURE__ */ import_react9.default.createElement("b", null, "Source run:"), " ", row.source_run_id ? `#${row.source_run_id}` : "\u2014")))
   );
 }
 function MemoryPanel() {
   var _a, _b, _c;
-  const api = (0, import_client6.useAPIClient)();
-  const [rows, setRows] = (0, import_react8.useState)([]);
-  const [entityType, setEntityType] = (0, import_react8.useState)("");
-  const [entityId, setEntityId] = (0, import_react8.useState)("");
-  const [pendingOnly, setPendingOnly] = (0, import_react8.useState)(false);
-  const [openId, setOpenId] = (0, import_react8.useState)(null);
+  const api = (0, import_client7.useAPIClient)();
+  const [rows, setRows] = (0, import_react9.useState)([]);
+  const [entityType, setEntityType] = (0, import_react9.useState)("");
+  const [entityId, setEntityId] = (0, import_react9.useState)("");
+  const [pendingOnly, setPendingOnly] = (0, import_react9.useState)(false);
+  const [openId, setOpenId] = (0, import_react9.useState)(null);
   const load = async () => {
     var _a2;
     try {
       const { rows: rows2 } = await listResource(api, "neoai_memories", { sort: "-id", pageSize: 500 });
       setRows(rows2);
     } catch (err) {
-      import_antd8.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
+      import_antd9.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
     }
   };
   usePoll(load, 15e3, openId == null);
-  const filteredRows = (0, import_react8.useMemo)(() => {
+  const filteredRows = (0, import_react9.useMemo)(() => {
     const et = entityType.trim().toLowerCase();
     const ei = entityId.trim().toLowerCase();
     return rows.filter((r) => {
@@ -1857,13 +2146,13 @@ function MemoryPanel() {
     (r) => r.entity_type === openRow.entity_type && r.entity_id === openRow.entity_id && r.key === baseKeyOf(openRow.key) && r.status === "confirmed"
   )) != null ? _c : null : null;
   const columns = [
-    { title: "Entity type", dataIndex: "entity_type", width: 180, render: (v) => /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 12 } }, v) },
-    { title: "Entity id", dataIndex: "entity_id", width: 140, render: (v) => /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "Entity type", dataIndex: "entity_type", width: 180, render: (v) => /* @__PURE__ */ import_react9.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "Entity id", dataIndex: "entity_id", width: 140, render: (v) => /* @__PURE__ */ import_react9.default.createElement("code", { style: { fontSize: 12 } }, v) },
     {
       title: "Key",
       dataIndex: "key",
       width: 160,
-      render: (v) => String(v).endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react8.default.createElement("span", null, baseKeyOf(v), " ", /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "gold" }, "pending")) : v
+      render: (v) => String(v).endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react9.default.createElement("span", null, baseKeyOf(v), " ", /* @__PURE__ */ import_react9.default.createElement(import_antd9.Tag, { color: "gold" }, "pending")) : v
     },
     {
       title: "Status",
@@ -1871,26 +2160,26 @@ function MemoryPanel() {
       width: 110,
       render: (v, r) => {
         var _a2;
-        return String((_a2 = r.key) != null ? _a2 : "").endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "gold" }, "awaiting review") : /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: v === "confirmed" ? "green" : "default" }, v);
+        return String((_a2 = r.key) != null ? _a2 : "").endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react9.default.createElement(import_antd9.Tag, { color: "gold" }, "awaiting review") : /* @__PURE__ */ import_react9.default.createElement(import_antd9.Tag, { color: v === "confirmed" ? "green" : "default" }, v);
       }
     },
-    { title: "Summary", dataIndex: "summary", render: (v) => /* @__PURE__ */ import_react8.default.createElement("span", { style: { color: "#3c4043" } }, (v != null ? v : "").slice(0, 140), (v != null ? v : "").length > 140 ? "\u2026" : "") },
+    { title: "Summary", dataIndex: "summary", render: (v) => /* @__PURE__ */ import_react9.default.createElement("span", { style: { color: "#3c4043" } }, (v != null ? v : "").slice(0, 140), (v != null ? v : "").length > 140 ? "\u2026" : "") },
     { title: "Updated by", dataIndex: "updated_by", width: 160 },
     {
       title: "Confirmed at",
       dataIndex: "confirmed_at",
       width: 190,
-      render: (v) => /* @__PURE__ */ import_react8.default.createElement("span", null, fmtTime(v), " ", stalenessBadge(v))
+      render: (v) => /* @__PURE__ */ import_react9.default.createElement("span", null, fmtTime(v), " ", stalenessBadge(v))
     },
     {
       title: "",
       key: "act",
       width: 90,
-      render: (_, r) => /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { size: "small", onClick: () => setOpenId(r.id) }, "Open")
+      render: (_, r) => /* @__PURE__ */ import_react9.default.createElement(import_antd9.Button, { size: "small", onClick: () => setOpenId(r.id) }, "Open")
     }
   ];
-  return /* @__PURE__ */ import_react8.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Memory"), /* @__PURE__ */ import_react8.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input, { placeholder: "Filter entity type (e.g. crm.deal)", value: entityType, onChange: (e) => setEntityType(e.target.value), style: { width: 220 }, allowClear: true }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input, { placeholder: "Filter entity id", value: entityId, onChange: (e) => setEntityId(e.target.value), style: { width: 160 }, allowClear: true }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Checkbox, { checked: pendingOnly, onChange: (e) => setPendingOnly(e.target.checked) }, "Pending review only"), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { onClick: load }, "Refresh")), /* @__PURE__ */ import_react8.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 820 } }, 'Central, entity-agnostic AI memory: host plugins (CRM, Konfigurator, \u2026) write a draft summary about one of their records here; nothing feeds back into that record until a human opens it and confirms. Once confirmed, a later AI re-draft never overwrites it directly \u2014 it stages as a "pending" row you review and swap in explicitly.'), /* @__PURE__ */ import_react8.default.createElement(
-    import_antd8.Table,
+  return /* @__PURE__ */ import_react9.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react9.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react9.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Memory"), /* @__PURE__ */ import_react9.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react9.default.createElement(import_antd9.Input, { placeholder: "Filter entity type (e.g. crm.deal)", value: entityType, onChange: (e) => setEntityType(e.target.value), style: { width: 220 }, allowClear: true }), /* @__PURE__ */ import_react9.default.createElement(import_antd9.Input, { placeholder: "Filter entity id", value: entityId, onChange: (e) => setEntityId(e.target.value), style: { width: 160 }, allowClear: true }), /* @__PURE__ */ import_react9.default.createElement(import_antd9.Checkbox, { checked: pendingOnly, onChange: (e) => setPendingOnly(e.target.checked) }, "Pending review only"), /* @__PURE__ */ import_react9.default.createElement(import_antd9.Button, { onClick: load }, "Refresh")), /* @__PURE__ */ import_react9.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 820 } }, 'Central, entity-agnostic AI memory: host plugins (CRM, Konfigurator, \u2026) write a draft summary about one of their records here; nothing feeds back into that record until a human opens it and confirms. Once confirmed, a later AI re-draft never overwrites it directly \u2014 it stages as a "pending" row you review and swap in explicitly.'), /* @__PURE__ */ import_react9.default.createElement(
+    import_antd9.Table,
     {
       rowKey: "id",
       size: "middle",
@@ -1900,7 +2189,7 @@ function MemoryPanel() {
       locale: { emptyText: rows.length ? "No memory rows match this filter" : "No memory rows yet" },
       onRow: (r) => ({ onClick: () => setOpenId(r.id), style: { cursor: "pointer" } })
     }
-  ), openRow ? /* @__PURE__ */ import_react8.default.createElement(
+  ), openRow ? /* @__PURE__ */ import_react9.default.createElement(
     MemoryDetail,
     {
       row: openRow,
@@ -1917,13 +2206,14 @@ var TABS = [
   { key: "runs", label: "Runs", icon: "PlayCircleOutlined" },
   { key: "approvals", label: "Approvals", icon: "CheckSquareOutlined" },
   { key: "functions", label: "Functions", icon: "ApiOutlined" },
+  { key: "mcp", label: "MCP Servers", icon: "CloudServerOutlined" },
   { key: "memory", label: "Memory", icon: "DatabaseOutlined" },
   { key: "settings", label: "Settings", icon: "SettingOutlined" }
 ];
 function SpendAlertBanner() {
-  const api = (0, import_client7.useAPIClient)();
-  const [pct, setPct] = (0, import_react9.useState)(null);
-  const [alertPct, setAlertPct] = (0, import_react9.useState)(80);
+  const api = (0, import_client8.useAPIClient)();
+  const [pct, setPct] = (0, import_react10.useState)(null);
+  const [alertPct, setAlertPct] = (0, import_react10.useState)(80);
   usePoll(
     async () => {
       try {
@@ -1942,8 +2232,8 @@ function SpendAlertBanner() {
     true
   );
   if (pct == null || pct < alertPct) return null;
-  return /* @__PURE__ */ import_react9.default.createElement(
-    import_antd9.Alert,
+  return /* @__PURE__ */ import_react10.default.createElement(
+    import_antd10.Alert,
     {
       type: pct >= 100 ? "error" : "warning",
       showIcon: true,
@@ -1965,7 +2255,7 @@ function activeTabFromPath(pathname) {
   return TABS.some((t) => t.key === key) ? key : "workflows";
 }
 function SideItem(props) {
-  return /* @__PURE__ */ import_react9.default.createElement(
+  return /* @__PURE__ */ import_react10.default.createElement(
     "div",
     {
       onClick: props.onClick,
@@ -1983,12 +2273,12 @@ function SideItem(props) {
         userSelect: "none"
       }
     },
-    /* @__PURE__ */ import_react9.default.createElement(import_client7.Icon, { type: props.icon }),
-    /* @__PURE__ */ import_react9.default.createElement("span", null, props.label)
+    /* @__PURE__ */ import_react10.default.createElement(import_client8.Icon, { type: props.icon }),
+    /* @__PURE__ */ import_react10.default.createElement("span", null, props.label)
   );
 }
 function NeoaiConsolePage() {
-  (0, import_react9.useEffect)(() => {
+  (0, import_react10.useEffect)(() => {
     ensureInterFont();
   }, []);
   const pathname = window.location.pathname;
@@ -1996,10 +2286,10 @@ function NeoaiConsolePage() {
   const prefix = embedded ? "/admin" : "";
   const active = activeTabFromPath(pathname);
   const go = (href) => window.location.assign(href);
-  return /* @__PURE__ */ import_react9.default.createElement(import_antd9.ConfigProvider, { theme: NEOHOME_THEME, getPopupContainer: (n) => {
+  return /* @__PURE__ */ import_react10.default.createElement(import_antd10.ConfigProvider, { theme: NEOHOME_THEME, getPopupContainer: (n) => {
     var _a;
     return (_a = n == null ? void 0 : n.parentElement) != null ? _a : document.body;
-  } }, /* @__PURE__ */ import_react9.default.createElement(
+  } }, /* @__PURE__ */ import_react10.default.createElement(
     "div",
     {
       style: {
@@ -2010,7 +2300,7 @@ function NeoaiConsolePage() {
         color: "#1b1e21"
       }
     },
-    /* @__PURE__ */ import_react9.default.createElement(
+    /* @__PURE__ */ import_react10.default.createElement(
       "aside",
       {
         style: {
@@ -2023,19 +2313,19 @@ function NeoaiConsolePage() {
           flexShrink: 0
         }
       },
-      /* @__PURE__ */ import_react9.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, padding: "2px 8px 12px" } }, /* @__PURE__ */ import_react9.default.createElement("img", { src: NEOMODUL_FAVICON_SRC, alt: "Neomodul", style: { width: 26, height: 26, borderRadius: 7 } }), /* @__PURE__ */ import_react9.default.createElement("span", { style: { fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" } }, "NeoAI")),
-      TABS.map((t) => /* @__PURE__ */ import_react9.default.createElement(SideItem, { key: t.key, icon: t.icon, label: t.label, active: active === t.key, onClick: () => go(`${prefix}/neoai/${t.key}`) })),
-      /* @__PURE__ */ import_react9.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "10px 4px" } }),
-      CROSS_LINKS.map((l) => /* @__PURE__ */ import_react9.default.createElement(SideItem, { key: l.href, icon: l.icon, label: l.label, muted: true, onClick: () => go(l.href) })),
-      /* @__PURE__ */ import_react9.default.createElement("div", { style: { flex: 1 } }),
-      /* @__PURE__ */ import_react9.default.createElement("div", { style: { fontSize: 10.5, color: "#b0b4ba", padding: "0 8px 4px" } }, "Admin-only \xB7 tree workflows \xB7 Gemini via plugin-ai")
+      /* @__PURE__ */ import_react10.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, padding: "2px 8px 12px" } }, /* @__PURE__ */ import_react10.default.createElement("img", { src: NEOMODUL_FAVICON_SRC, alt: "Neomodul", style: { width: 26, height: 26, borderRadius: 7 } }), /* @__PURE__ */ import_react10.default.createElement("span", { style: { fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" } }, "NeoAI")),
+      TABS.map((t) => /* @__PURE__ */ import_react10.default.createElement(SideItem, { key: t.key, icon: t.icon, label: t.label, active: active === t.key, onClick: () => go(`${prefix}/neoai/${t.key}`) })),
+      /* @__PURE__ */ import_react10.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "10px 4px" } }),
+      CROSS_LINKS.map((l) => /* @__PURE__ */ import_react10.default.createElement(SideItem, { key: l.href, icon: l.icon, label: l.label, muted: true, onClick: () => go(l.href) })),
+      /* @__PURE__ */ import_react10.default.createElement("div", { style: { flex: 1 } }),
+      /* @__PURE__ */ import_react10.default.createElement("div", { style: { fontSize: 10.5, color: "#b0b4ba", padding: "0 8px 4px" } }, "Admin-only \xB7 tree workflows \xB7 Gemini via plugin-ai")
     ),
-    /* @__PURE__ */ import_react9.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, /* @__PURE__ */ import_react9.default.createElement(SpendAlertBanner, null), active === "workflows" ? /* @__PURE__ */ import_react9.default.createElement(WorkflowsPanel, null) : null, active === "runs" ? /* @__PURE__ */ import_react9.default.createElement(RunsPanel, null) : null, active === "approvals" ? /* @__PURE__ */ import_react9.default.createElement(ApprovalsPanel, null) : null, active === "functions" ? /* @__PURE__ */ import_react9.default.createElement(FunctionsPanel, null) : null, active === "memory" ? /* @__PURE__ */ import_react9.default.createElement(MemoryPanel, null) : null, active === "settings" ? /* @__PURE__ */ import_react9.default.createElement(SettingsPanel, null) : null)
+    /* @__PURE__ */ import_react10.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, /* @__PURE__ */ import_react10.default.createElement(SpendAlertBanner, null), active === "workflows" ? /* @__PURE__ */ import_react10.default.createElement(WorkflowsPanel, null) : null, active === "runs" ? /* @__PURE__ */ import_react10.default.createElement(RunsPanel, null) : null, active === "approvals" ? /* @__PURE__ */ import_react10.default.createElement(ApprovalsPanel, null) : null, active === "functions" ? /* @__PURE__ */ import_react10.default.createElement(FunctionsPanel, null) : null, active === "mcp" ? /* @__PURE__ */ import_react10.default.createElement(McpServersPanel, null) : null, active === "memory" ? /* @__PURE__ */ import_react10.default.createElement(MemoryPanel, null) : null, active === "settings" ? /* @__PURE__ */ import_react10.default.createElement(SettingsPanel, null) : null)
   ));
 }
 
 // src/client/index.tsx
-var NeoaiRunInstruction = class extends import_client9.Instruction {
+var NeoaiRunInstruction = class extends import_client10.Instruction {
   constructor() {
     super(...arguments);
     this.title = "NeoAI workflow";
@@ -2082,7 +2372,7 @@ var NeoaiRunInstruction = class extends import_client9.Instruction {
     };
   }
 };
-var NeoaiClientPlugin = class extends import_client8.Plugin {
+var NeoaiClientPlugin = class extends import_client9.Plugin {
   /**
    * Automation bridge UI: contribute the "neoai-run" node to NocoBase's
    * plugin-workflow editor as a PLAIN instruction object (no import from

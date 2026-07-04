@@ -33,6 +33,7 @@ const NODE_TYPES: Array<{ type: string; label: string; hint: string }> = [
   { type: 'http', label: 'HTTP', hint: 'Call an external API' },
   { type: 'data', label: 'Data', hint: 'Read/write a NocoBase collection' },
   { type: 'transform', label: 'Transform', hint: 'Map values between nodes' },
+  { type: 'mcp_tool', label: 'MCP Tool', hint: 'Call a tool on a registered MCP server' },
   { type: 'condition', label: 'Condition', hint: 'True/false branches' },
   { type: 'parallel', label: 'Parallel', hint: 'Run branches concurrently' },
   { type: 'loop', label: 'Loop', hint: 'Iterate over an array' },
@@ -47,6 +48,7 @@ const TYPE_COLORS: Record<string, string> = {
   http: 'blue',
   data: 'geekblue',
   transform: 'default',
+  mcp_tool: 'volcano',
   condition: 'orange',
   parallel: 'purple',
   loop: 'magenta',
@@ -67,6 +69,8 @@ function defaultConfig(type: string): any {
       return { collection: '', op: 'list', filter: {}, limit: 20 };
     case 'transform':
       return { map: {} };
+    case 'mcp_tool':
+      return { serverId: undefined, toolName: '', args: {} };
     case 'condition':
       return { left: '', op: 'notEmpty', right: '' };
     case 'loop':
@@ -414,11 +418,48 @@ function NodeList(props: {
 // --- per-type config forms -------------------------------------------------------
 
 function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => void }) {
+  const api = useAPIClient();
   const cfg = node.config ?? (node.config = {});
   const set = (k: string, v: any) => {
     cfg[k] = v;
     onChange();
   };
+
+  // mcp_tool (item 11): registered-server picker, fetched lazily only when a
+  // mcp_tool node is selected — avoids an extra request for every other node type.
+  const [mcpServers, setMcpServers] = useState<any[]>([]);
+  useEffect(() => {
+    if (node.type !== 'mcp_tool') return;
+    let cancelled = false;
+    listResource(api, 'neoai_mcp_servers', { sort: 'name', pageSize: 100 })
+      .then((res) => {
+        if (!cancelled) setMcpServers(res.rows ?? []);
+      })
+      .catch(() => {
+        /* best-effort — the Select just shows no options */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.type]);
+
+  // data (item 12): NocoBase's own collection listing, excluding neoai_*
+  // internal collections — replaces the freehand collection Input.
+  const [collections, setCollections] = useState<any[]>([]);
+  useEffect(() => {
+    if (node.type !== 'data') return;
+    let cancelled = false;
+    listResource(api, 'collections', { pageSize: 500 })
+      .then((res) => {
+        if (!cancelled) setCollections((res.rows ?? []).filter((c: any) => !String(c.name ?? '').startsWith('neoai_')));
+      })
+      .catch(() => {
+        /* best-effort — falls back to a plain Input below */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.type]);
   const common = (
     <Field label="Title">
       <Input value={node.title} placeholder={node.id} onChange={(e) => ((node.title = e.target.value), onChange())} />
@@ -511,12 +552,45 @@ function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => voi
         </>
       );
       break;
-    case 'data':
+    case 'data': {
+      // Item 12: a Select populated from NocoBase's own collection listing
+      // (neoai_* internal collections excluded) instead of a freehand Input,
+      // plus a clickable "available fields" hint strip once a collection is
+      // picked — inserts "fieldName": "" at the end of the Filter box. No
+      // code-editor library; JsonArea stays a plain Input.TextArea.
+      const selectedCollection = collections.find((c: any) => c.name === cfg.collection);
+      const fieldNames: string[] = (selectedCollection?.fields ?? [])
+        .map((f: any) => f?.name)
+        .filter((n: any) => typeof n === 'string' && n && n !== 'id');
+      const insertField = (fieldName: string) => {
+        const current = cfg.filter && typeof cfg.filter === 'object' ? cfg.filter : {};
+        set('filter', { ...current, [fieldName]: '' });
+      };
       body = (
         <>
           <Field label="Collection">
-            <Input value={cfg.collection} placeholder="konfigurator_plots" onChange={(e) => set('collection', e.target.value)} />
+            <Select
+              showSearch
+              value={cfg.collection || undefined}
+              placeholder="Select a collection…"
+              options={collections.map((c: any) => ({ value: c.name, label: c.title ? `${c.title} (${c.name})` : c.name }))}
+              filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+              onChange={(v) => set('collection', v)}
+              style={{ width: '100%' }}
+              notFoundContent="No collections found"
+            />
           </Field>
+          {cfg.collection && fieldNames.length ? (
+            <Field label="Available fields (click to insert into Filter)">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {fieldNames.map((f) => (
+                  <Tag key={f} style={{ cursor: 'pointer' }} onClick={() => insertField(f)}>
+                    {f}
+                  </Tag>
+                ))}
+              </div>
+            </Field>
+          ) : null}
           <Field label="Operation">
             <Select
               value={cfg.op ?? 'list'}
@@ -536,6 +610,37 @@ function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => voi
               permit create/update (explicit opt-in)
             </Checkbox>
           </Field>
+        </>
+      );
+      break;
+    }
+    case 'mcp_tool':
+      body = (
+        <>
+          <Field label="MCP server (registered in the MCP Servers tab)">
+            <Select
+              showSearch
+              value={cfg.serverId ?? undefined}
+              placeholder="Select a registered MCP server…"
+              options={mcpServers.map((s: any) => ({ value: s.id, label: s.name }))}
+              filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+              onChange={(v) => set('serverId', v)}
+              style={{ width: '100%' }}
+              notFoundContent="No MCP servers registered yet"
+            />
+          </Field>
+          <Field label="Tool name">
+            <Input value={cfg.toolName} placeholder="search_issues" onChange={(e) => set('toolName', e.target.value)} />
+          </Field>
+          <Field label="Args (JSON of templates)">
+            <JsonArea value={cfg.args} onChange={(v) => set('args', v ?? {})} rows={5} placeholder='{ "query": "{{input.query}}" }' />
+          </Field>
+          <Field label="Allow private/internal target">
+            <Checkbox checked={cfg.allowPrivate === true} onChange={(e) => set('allowPrivate', e.target.checked)}>
+              permit calling a private/loopback host (SSRF guard escape hatch)
+            </Checkbox>
+          </Field>
+          {retries}
         </>
       );
       break;

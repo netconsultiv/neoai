@@ -6,10 +6,17 @@
 
 import { costOf, DEFAULT_IMAGE_PRICE_USD } from './cost';
 import type { PriceTable } from './cost';
+import { callMcpTool } from './mcp';
+import { isPrivateHost } from './net';
 import { imageInvoke, llmInvoke } from './providers';
 import type { NodeDef, LeafResult } from './runner';
 import { resolveTemplates } from './template';
 import type { Scope } from './template';
+
+// Re-exported for backward compatibility (existing call sites/tests may still
+// import isPrivateHost from here) — the real implementation now lives in
+// ./net so it can be shared with mcp.ts without a circular import.
+export { isPrivateHost };
 
 export type LeafDeps = {
   app: any;
@@ -21,24 +28,11 @@ export type LeafDeps = {
   recordUsage: (usage: { inputTokens: number; outputTokens: number }, costUsd: number) => void;
   defaultModel?: string;
   defaultService?: string;
+  /** name → decrypted value, built ONCE at executeRun start (item 13/11) */
+  secrets?: Record<string, string>;
 };
 
 const HTTP_TIMEOUT_MS = 45_000;
-
-// Private/loopback/link-local targets are blocked unless the node explicitly
-// opts in (allowPrivate:true) — admin-only authoring reduces the SSRF risk,
-// but workflows run with the SERVER's network reach, so default-deny is right.
-const PRIVATE_HOST_RE =
-  /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|\[?::1\]?$|fd[0-9a-f]{2}:)/i;
-
-export function isPrivateHost(url: string): boolean {
-  try {
-    const host = new URL(url).hostname;
-    return PRIVATE_HOST_RE.test(host) || host.endsWith('.internal') || host.endsWith('.local');
-  } catch {
-    return true;
-  }
-}
 
 async function execHttp(node: NodeDef, scope: Scope): Promise<LeafResult> {
   const cfg = resolveTemplates(node.config ?? {}, scope);
@@ -164,6 +158,33 @@ function execTransform(node: NodeDef, scope: Scope): LeafResult {
   return { output: resolveTemplates(map, scope) };
 }
 
+// mcp_tool: thin wrapper around callMcpTool (src/server/lib/mcp.ts). Looks up
+// the registered neoai_mcp_servers row by id (the config carries the row id,
+// not a freehand URL — owner's explicit "registered-server picker" call), then
+// resolves the row's auth_secret association against the scope.secrets map
+// that executeRun decrypted ONCE at run start (one decrypt pass per run, not
+// per MCP call — see plugin.ts's executeRun / src/server/lib/secrets.ts).
+async function execMcpTool(node: NodeDef, scope: Scope, deps: LeafDeps): Promise<LeafResult> {
+  const cfg = resolveTemplates(node.config ?? {}, scope);
+  const serverId = cfg.serverId ?? cfg.server_id;
+  if (!serverId) throw new Error(`mcp_tool node "${node.id}": serverId is required`);
+  const toolName = String(cfg.toolName ?? '');
+  if (!toolName) throw new Error(`mcp_tool node "${node.id}": toolName is required`);
+  const repo = deps.app.db.getRepository('neoai_mcp_servers');
+  if (!repo) throw new Error(`mcp_tool node "${node.id}": neoai_mcp_servers collection unavailable`);
+  const serverRow = await repo.findOne({ filterByTk: Number(serverId), appends: ['auth_secret'] });
+  if (!serverRow) throw new Error(`mcp_tool node "${node.id}": MCP server ${serverId} not found`);
+  const serverUrl = String(serverRow.get('url') ?? '');
+  const authHeader = String(serverRow.get('auth_header') ?? '') || undefined;
+  let authValue: string | undefined;
+  const secretRow = serverRow.get('auth_secret');
+  const secretName = secretRow?.name ?? secretRow?.get?.('name');
+  if (secretName) authValue = deps.secrets?.[String(secretName)];
+  const args = cfg.args && typeof cfg.args === 'object' ? cfg.args : {};
+  const res = await callMcpTool(serverUrl, toolName, args, authHeader, authValue, { allowPrivate: cfg.allowPrivate === true });
+  return { output: res };
+}
+
 function execHumanGate(node: NodeDef, scope: Scope): LeafResult {
   const message = String(resolveTemplates(node.config?.message ?? 'Approval required', scope) ?? '');
   return { suspend: true, output: { message } };
@@ -187,6 +208,8 @@ export function execLeafFactory(deps: LeafDeps) {
         return execData(node, scope, deps);
       case 'transform':
         return execTransform(node, scope);
+      case 'mcp_tool':
+        return execMcpTool(node, scope, deps);
       case 'human_gate':
         return execHumanGate(node, scope);
       case 'output':

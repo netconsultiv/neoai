@@ -16,6 +16,7 @@ import { WorkflowsPanel } from './WorkflowsPanel';
 import { RunsPanel } from './RunsPanel';
 import { ApprovalsPanel } from './ApprovalsPanel';
 import { FunctionsPanel } from './FunctionsPanel';
+import { McpServersPanel } from './McpServersPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { MemoryPanel } from './MemoryPanel';
 
@@ -24,6 +25,7 @@ const TABS: Array<{ key: string; label: string; icon: string }> = [
   { key: 'runs', label: 'Runs', icon: 'PlayCircleOutlined' },
   { key: 'approvals', label: 'Approvals', icon: 'CheckSquareOutlined' },
   { key: 'functions', label: 'Functions', icon: 'ApiOutlined' },
+  { key: 'mcp', label: 'MCP Servers', icon: 'CloudServerOutlined' },
   { key: 'memory', label: 'Memory', icon: 'DatabaseOutlined' },
   { key: 'settings', label: 'Settings', icon: 'SettingOutlined' },
 ];
@@ -155,6 +157,7 @@ export function NeoaiConsolePage() {
           {active === 'runs' ? <RunsPanel /> : null}
           {active === 'approvals' ? <ApprovalsPanel /> : null}
           {active === 'functions' ? <FunctionsPanel /> : null}
+          {active === 'mcp' ? <McpServersPanel /> : null}
           {active === 'memory' ? <MemoryPanel /> : null}
           {active === 'settings' ? <SettingsPanel /> : null}
         </main>

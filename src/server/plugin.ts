@@ -27,6 +27,7 @@ import { DEFAULT_IMAGE_PRICE_USD, DEFAULT_PRICES, checkBudget } from './lib/cost
 import { execLeafFactory } from './lib/nodes';
 import { Runner, RunOutcome, StepEvent, WorkflowDef, validateDefinition } from './lib/runner';
 import { isDue, parseSchedule } from './lib/schedule';
+import { decryptSecret, encryptSecret } from './lib/secrets';
 import { resolveTemplates, truncateJson } from './lib/template';
 import { ensureSeedWorkflows } from './seed';
 
@@ -301,6 +302,56 @@ export class NeoaiPlugin extends Plugin {
             editedSummary: p.editedSummary,
             editedStructured: p.editedStructured,
           });
+          await next();
+        },
+
+        // Encrypted secrets vault (item 13) — list NEVER decrypts (not even
+        // the encrypted blob leaves the server; only {id, name, configured}).
+        secretsList: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const repo = this.db.getRepository('neoai_secrets');
+          const rows = repo ? await repo.find({ sort: ['name'], limit: 500 }) : [];
+          ctx.body = {
+            rows: rows.map((r: any) => ({
+              id: r.get('id'),
+              name: r.get('name'),
+              configured: !!r.get('value_encrypted'),
+            })),
+          };
+          await next();
+        },
+
+        secretsSave: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const name = String(p.name ?? '').trim();
+          if (!name) ctx.throw(400, 'name is required');
+          if (typeof p.value !== 'string' || !p.value) ctx.throw(400, 'value is required');
+          let encrypted: string;
+          try {
+            encrypted = encryptSecret(p.value);
+          } catch (err: any) {
+            ctx.throw(500, `encryption failed: ${err?.message ?? err}`);
+            return;
+          }
+          const repo = this.db.getRepository('neoai_secrets');
+          const existing = await repo.findOne({ filter: { name } });
+          if (existing) {
+            await repo.update({ filterByTk: existing.get('id'), values: { value_encrypted: encrypted } });
+          } else {
+            await repo.create({ values: { name, value_encrypted: encrypted } });
+          }
+          ctx.body = { ok: true };
+          await next();
+        },
+
+        secretsDelete: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const id = Number(p.id);
+          if (!id) ctx.throw(400, 'id is required');
+          await this.db.getRepository('neoai_secrets').destroy({ filterByTk: id });
+          ctx.body = { ok: true };
           await next();
         },
       },
@@ -618,6 +669,32 @@ export class NeoaiPlugin extends Plugin {
     }
   }
 
+  // Item 13: decrypt every configured secret ONCE per run (not per node/per
+  // MCP call), into an in-memory name→value map. A secret that fails to
+  // decrypt (e.g. after an APP_KEY rotation) is OMITTED with a log line —
+  // never crashes the run just because one stale secret can't be read.
+  private async decryptAllSecrets(): Promise<Record<string, string>> {
+    const out: Record<string, string> = {};
+    try {
+      const repo = this.db.getRepository('neoai_secrets');
+      if (!repo) return out;
+      const rows = await repo.find({ limit: 500 });
+      for (const row of rows) {
+        const name = String(row.get('name') ?? '');
+        const encrypted = row.get('value_encrypted');
+        if (!name || !encrypted) continue;
+        try {
+          out[name] = decryptSecret(String(encrypted));
+        } catch (err) {
+          this.app.logger.warn(`[neoai] secret "${name}" failed to decrypt (omitted from run scope): ${err}`);
+        }
+      }
+    } catch (err) {
+      this.app.logger.warn(`[neoai] decryptAllSecrets failed (non-fatal, run proceeds with no secrets): ${err}`);
+    }
+    return out;
+  }
+
   private dayStart(): Date {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -900,6 +977,7 @@ export class NeoaiPlugin extends Plugin {
     const workflowId = Number(wf.get('id'));
     const fnRow = functionKey ? await this.db.getRepository('neoai_functions')?.findOne({ filter: { key: functionKey } }) : null;
     const functionDailyBudgetUsd = Number(fnRow?.get?.('daily_budget_usd')) || 0;
+    const secrets = await this.decryptAllSecrets();
 
     let seq = 0;
     let totalIn = 0;
@@ -981,6 +1059,7 @@ export class NeoaiPlugin extends Plugin {
       imagePriceUsd: Number(settings?.get?.('image_price_usd')) || DEFAULT_IMAGE_PRICE_USD,
       defaultModel: String(settings?.get?.('default_model') || 'gemini-2.5-flash'),
       defaultService: String(settings?.get?.('default_llm_service') || ''),
+      secrets,
       guardModelCall: async () => {
         // One DB scan feeds ALL THREE budget checks; cached 5s so multi-LLM
         // workflows don't re-scan runs on every node.
@@ -1009,7 +1088,10 @@ export class NeoaiPlugin extends Plugin {
     });
 
     const runner = new Runner({
-      execLeaf: (node, scope) => execLeaf(node, scope),
+      // {{secrets.name}} resolves through the existing getPath(scope, ...)
+      // mechanism with zero changes to template.ts — secrets are merged into
+      // the scope right here, the one place every leaf's scope passes through.
+      execLeaf: (node, scope) => execLeaf(node, { ...scope, secrets }),
       onStep,
       isCancelled: () => handle.cancelled,
       loadWorkflow: async (key: string) => {
