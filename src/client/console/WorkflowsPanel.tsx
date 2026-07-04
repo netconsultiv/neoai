@@ -792,6 +792,58 @@ function TestRunBox({
   );
 }
 
+// --- batch/bulk dispatch (item 9) --------------------------------------------------
+
+function BatchRunBox({ workflowId }: { workflowId: number }) {
+  const api = useAPIClient();
+  const [itemsText, setItemsText] = useState('[\n  {}\n]');
+  const [busy, setBusy] = useState(false);
+  const start = async () => {
+    let items: any[];
+    try {
+      const parsed = JSON.parse(itemsText);
+      if (!Array.isArray(parsed)) throw new Error('not an array');
+      items = parsed;
+    } catch {
+      message.error('Items must be a JSON array, e.g. [{"x":1},{"x":2}]');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await neoaiAction(api, 'batchRun', { workflowId, items });
+      if (res.error) {
+        message.error(res.error);
+        return;
+      }
+      const started = (res.started ?? []).filter((r: any) => r.runId).length;
+      const failed = (res.started ?? []).length - started;
+      message.success(`Batch: ${started} run${started === 1 ? '' : 's'} started${failed ? `, ${failed} failed to start` : ''}`);
+    } catch (err: any) {
+      message.error(String(err?.message ?? err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div>
+      <Field label='Items (JSON array — one run per item, e.g. [{"dealId":1},{"dealId":2}])'>
+        <Input.TextArea
+          rows={4}
+          value={itemsText}
+          onChange={(e) => setItemsText(e.target.value)}
+          style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
+        />
+      </Field>
+      <Button loading={busy} onClick={start}>
+        Run batch
+      </Button>
+      <span style={{ marginLeft: 10, fontSize: 12, color: '#8a8f8a' }}>
+        Runs against the published version — view progress in the Runs tab (trigger: batch).
+      </span>
+    </div>
+  );
+}
+
 // --- editor drawer ----------------------------------------------------------------
 
 function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }) {
@@ -920,6 +972,8 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
         description: wf.description ?? '',
         schedule: wf.schedule ?? '',
         schedule_input: wf.schedule_input ?? null,
+        on_failure_workflow_key: wf.on_failure_workflow_key ?? '',
+        on_failure_input: wf.on_failure_input ?? null,
       });
       setDirty(false);
       if (!silent) message.success('Draft saved');
@@ -1021,6 +1075,18 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
               <Field label="Schedule input (JSON passed to scheduled runs)">
                 <JsonArea value={wf.schedule_input} onChange={(v) => (setWf({ ...wf, schedule_input: v ?? null }), setDirty(true))} rows={3} />
               </Field>
+              <Field label="Run a workflow on failure (key, empty = off)">
+                <Input
+                  value={wf.on_failure_workflow_key ?? ''}
+                  placeholder="e.g. notify-admin-of-failure"
+                  onChange={(e) => (setWf({ ...wf, on_failure_workflow_key: e.target.value }), setDirty(true))}
+                />
+              </Field>
+              {wf.on_failure_workflow_key ? (
+                <Field label="On-failure hook input (JSON of templates: {{run.id}}, {{run.error}}, {{input.x}})">
+                  <JsonArea value={wf.on_failure_input} onChange={(v) => (setWf({ ...wf, on_failure_input: v ?? null }), setDirty(true))} rows={3} />
+                </Field>
+              ) : null}
               <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>RUN</div>
               <TestRunBox
@@ -1031,6 +1097,13 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
                 skipSet={skipSet}
                 cachedOutputs={cachedOutputsRef.current}
               />
+              {Number(wf.current_version) > 0 ? (
+                <>
+                  <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>BATCH RUN</div>
+                  <BatchRunBox workflowId={wf.id} />
+                </>
+              ) : null}
               <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>VERSIONS</div>
               {versions.length === 0 ? (

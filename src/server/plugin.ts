@@ -27,7 +27,7 @@ import { DEFAULT_IMAGE_PRICE_USD, DEFAULT_PRICES, checkBudget } from './lib/cost
 import { execLeafFactory } from './lib/nodes';
 import { Runner, RunOutcome, StepEvent, WorkflowDef, validateDefinition } from './lib/runner';
 import { isDue, parseSchedule } from './lib/schedule';
-import { truncateJson } from './lib/template';
+import { resolveTemplates, truncateJson } from './lib/template';
 import { ensureSeedWorkflows } from './seed';
 
 /** Count budget-relevant nodes for the confirm-gate estimate. */
@@ -153,6 +153,27 @@ export class NeoaiPlugin extends Plugin {
             approved,
             comment,
             by: String(ctx.state?.currentUser?.nickname ?? 'admin'),
+          });
+          await next();
+        },
+
+        rerunRun: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.rerunRun(Number(p.runId), p.newInput ?? {}, {
+            triggeredBy: String(ctx.state?.currentUser?.nickname ?? 'admin'),
+          });
+          await next();
+        },
+
+        batchRun: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.batchRun({
+            workflowId: p.workflowId,
+            workflowKey: p.workflowKey,
+            items: p.items ?? [],
+            triggeredBy: String(ctx.state?.currentUser?.nickname ?? 'admin'),
           });
           await next();
         },
@@ -621,10 +642,11 @@ export class NeoaiPlugin extends Plugin {
     }
   }
 
-  private async loadPublishedDefinition(workflowId: number): Promise<{ def: WorkflowDef; version: number } | null> {
+  /** `versionOverride` re-runs a SPECIFIC historical version (item 8's re-run) instead of always the current published one. */
+  private async loadPublishedDefinition(workflowId: number, versionOverride?: number): Promise<{ def: WorkflowDef; version: number } | null> {
     const wf = await this.db.getRepository('neoai_workflows').findOne({ filterByTk: workflowId });
     if (!wf) return null;
-    const version = Number(wf.get('current_version') ?? 0);
+    const version = versionOverride ?? Number(wf.get('current_version') ?? 0);
     if (!version) return null;
     const row = await this.db.getRepository('neoai_workflow_versions').findOne({
       filter: { workflow_id: workflowId, version },
@@ -645,6 +667,8 @@ export class NeoaiPlugin extends Plugin {
     /** Draft-test-run only (never used for real triggers): skip already-known-good top-level nodes. */
     skipToNodeId?: string;
     seedVars?: Record<string, any>;
+    /** Re-run (item 8) only: reproduce a SPECIFIC historical published version, not necessarily current. */
+    pinnedVersion?: number;
   }): Promise<{ runId: number } | { needsConfirm: true; workflowId: number } | { error: string }> {
     const wfRepo = this.db.getRepository('neoai_workflows');
     const wf = opts.workflowId
@@ -658,7 +682,7 @@ export class NeoaiPlugin extends Plugin {
     if (opts.draft) {
       def = (wf.get('definition_draft') ?? {}) as WorkflowDef;
     } else {
-      const published = await this.loadPublishedDefinition(workflowId);
+      const published = await this.loadPublishedDefinition(workflowId, opts.pinnedVersion);
       if (!published) return { error: 'workflow has no published version (publish it first, or run as draft test)' };
       def = published.def;
       version = published.version;
@@ -706,7 +730,7 @@ export class NeoaiPlugin extends Plugin {
 
     const seed = opts.draft && opts.skipToNodeId ? { skipToNodeId: opts.skipToNodeId, vars: opts.seedVars } : undefined;
     setImmediate(() => {
-      this.executeRun(runId, def, opts.input, handle, wf, undefined, seed).catch((err) => {
+      this.executeRun(runId, def, opts.input, handle, wf, opts.trigger, undefined, seed).catch((err) => {
         this.app.logger.error(`[neoai] run ${runId} crashed outside runner: ${err}`);
       });
     });
@@ -730,11 +754,59 @@ export class NeoaiPlugin extends Plugin {
     const input = run.get('input') ?? {};
 
     setImmediate(() => {
-      this.executeRun(runId, { nodes: [] }, input, handle, wf, { state, approval }).catch((err) => {
+      this.executeRun(runId, { nodes: [] }, input, handle, wf, String(run.get('trigger') ?? ''), { state, approval }).catch((err) => {
         this.app.logger.error(`[neoai] resume ${runId} crashed outside runner: ${err}`);
       });
     });
     return { ok: true, runId };
+  }
+
+  /**
+   * Re-run a terminal run with (optionally) edited input (item 8). Reproduces
+   * the SAME published version the original run used (falls back to the
+   * current published version if the original was a draft test run, since
+   * draft snapshots aren't retained).
+   */
+  async rerunRun(runId: number, newInput: any, opts: { triggeredBy?: string } = {}) {
+    const repo = this.db.getRepository('neoai_runs');
+    const run = await repo.findOne({ filterByTk: runId });
+    if (!run) return { error: `run ${runId} not found` };
+    const workflowId = Number(run.get('workflow_id'));
+    const originalVersion = Number(run.get('version') ?? 0);
+    return this.startRun({
+      workflowId,
+      input: newInput,
+      draft: originalVersion === 0,
+      pinnedVersion: originalVersion || undefined,
+      trigger: 're-run',
+      triggeredBy: opts.triggeredBy ?? `re-run:#${runId}`,
+      confirmed: true, // reviewing the input before clicking Re-run IS the confirmation
+    });
+  }
+
+  /**
+   * Batch/bulk dispatch (item 9): one run per item, sequential enqueue (each
+   * startRun call only queues via setImmediate and returns almost instantly —
+   * sequential keeps a cold budget-cache from being scanned N times at once).
+   */
+  async batchRun(opts: { workflowId?: number; workflowKey?: string; items: any[]; triggeredBy?: string }) {
+    const items = Array.isArray(opts.items) ? opts.items : [];
+    if (!items.length) return { error: 'items array required' };
+    if (items.length > 200) return { error: 'batch too large (max 200 — split into multiple batches)' };
+    const results: Array<{ runId?: number; error?: string }> = [];
+    for (const item of items) {
+      const started = await this.startRun({
+        workflowId: opts.workflowId,
+        workflowKey: opts.workflowKey,
+        input: item,
+        trigger: 'batch',
+        triggeredBy: opts.triggeredBy ?? 'batch',
+        confirmed: true, // batch-dispatching from the console IS the admin's consent
+      });
+      if ('runId' in started) results.push({ runId: started.runId });
+      else results.push({ error: 'error' in started ? started.error : 'needs confirmation (unexpected for batch)' });
+    }
+    return { started: results };
   }
 
   private async executeRun(
@@ -743,6 +815,7 @@ export class NeoaiPlugin extends Plugin {
     input: any,
     handle: RunHandle,
     wf: any,
+    trigger: string,
     resume?: { state: any; approval: any },
     seed?: { skipToNodeId?: string; vars?: Record<string, any> },
   ) {
@@ -923,6 +996,27 @@ export class NeoaiPlugin extends Plugin {
             ...this.addTotals(totals, runId),
           },
         });
+        // On-failure hook (item 7): fires the named workflow once, only for a
+        // REAL failure (not a cancellation) and never for a run that IS
+        // itself a hook — hooks are single-level, they don't chain.
+        if (!handle.cancelled && trigger !== 'failure-hook') {
+          const hookKey = String(wf.get('on_failure_workflow_key') ?? '').trim();
+          if (hookKey) {
+            try {
+              const hookScope = { run: { id: runId, error: outcome.status === 'failed' ? outcome.error : null }, input };
+              const hookInput = resolveTemplates(wf.get('on_failure_input') ?? {}, hookScope);
+              await this.startRun({
+                workflowKey: hookKey,
+                input: hookInput,
+                trigger: 'failure-hook',
+                triggeredBy: `failure-hook:${workflowId}`,
+                confirmed: true, // configuring the hook IS the admin's consent
+              });
+            } catch (err) {
+              this.app.logger.warn(`[neoai] on-failure hook for run ${runId} failed to start (non-fatal): ${err}`);
+            }
+          }
+        }
       }
     } catch (err) {
       this.app.logger.error(`[neoai] run ${runId}: final status persist failed: ${err}`);

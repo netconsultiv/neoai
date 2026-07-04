@@ -250,6 +250,11 @@ export const NEOAI_EXTRA_FIELDS: Array<{ collection: string; field: any }> = [
   { collection: 'neoai_workflows', field: str('schedule', 'Schedule (empty = off)') },
   { collection: 'neoai_workflows', field: json('schedule_input', 'Schedule input') },
   { collection: 'neoai_workflows', field: dt('last_scheduled_at', 'Last scheduled run') },
+  // On-failure hook (item 7): fires the named workflow after THIS one ends
+  // failed, reusing the same startRun path a subworkflow node uses — single
+  // level only, never chains (a hook's own failure never fires another hook).
+  { collection: 'neoai_workflows', field: str('on_failure_workflow_key', 'On-failure hook: workflow key (empty = off)') },
+  { collection: 'neoai_workflows', field: json('on_failure_input', 'On-failure hook input (JSON of templates: {{run.id}}, {{run.error}}, {{input.x}})') },
   {
     collection: 'neoai_workflows',
     field: {

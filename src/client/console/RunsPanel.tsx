@@ -5,7 +5,7 @@
 // waiting human gates, cancel for running runs.
 
 import React, { useMemo, useState } from 'react';
-import { Button, Input, Popover, Select, Space, Table, message } from 'antd';
+import { Button, Input, Modal, Popover, Select, Space, Table, message } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import {
   ConsoleDrawer,
@@ -24,10 +24,12 @@ import { NEOHOME_GREEN } from '../theme';
 
 const TERMINAL = new Set(['succeeded', 'failed', 'cancelled', 'rejected']);
 
-function RunDetail({ runId, onClose }: { runId: number; onClose: () => void }) {
+export function RunDetail({ runId, onClose, onRerun }: { runId: number; onClose: () => void; onRerun?: (newRunId: number) => void }) {
   const api = useAPIClient();
   const [data, setData] = useState<{ run?: any; steps?: any[] }>({});
   const [comment, setComment] = useState('');
+  const [rerunOpen, setRerunOpen] = useState(false);
+  const [rerunText, setRerunText] = useState('');
   const run = data.run;
   const live = !run || !TERMINAL.has(String(run.status));
   usePoll(
@@ -56,6 +58,31 @@ function RunDetail({ runId, onClose }: { runId: number; onClose: () => void }) {
     try {
       await neoaiAction(api, 'cancelRun', { runId });
       message.success('Cancel requested');
+    } catch (err: any) {
+      message.error(String(err?.message ?? err));
+    }
+  };
+  const openRerun = () => {
+    setRerunText(JSON.stringify(run?.input ?? {}, null, 2));
+    setRerunOpen(true);
+  };
+  const submitRerun = async () => {
+    let newInput: any;
+    try {
+      newInput = rerunText.trim() ? JSON.parse(rerunText) : {};
+    } catch {
+      message.error('Input is not valid JSON');
+      return;
+    }
+    try {
+      const res = await neoaiAction(api, 'rerunRun', { runId, newInput });
+      if (res.error) {
+        message.error(res.error);
+        return;
+      }
+      message.success(`Re-run started as run #${res.runId}`);
+      setRerunOpen(false);
+      onRerun?.(res.runId);
     } catch (err: any) {
       message.error(String(err?.message ?? err));
     }
@@ -99,10 +126,25 @@ function RunDetail({ runId, onClose }: { runId: number; onClose: () => void }) {
             </>
           ) : null}
           {run && !TERMINAL.has(String(run.status)) ? <Button onClick={cancel}>Cancel run</Button> : null}
+          {run && TERMINAL.has(String(run.status)) ? <Button onClick={openRerun}>Re-run</Button> : null}
         </Space>
       }
       onClose={onClose}
     >
+      <Modal
+        open={rerunOpen}
+        title="Re-run with edited input"
+        onCancel={() => setRerunOpen(false)}
+        onOk={submitRerun}
+        okText="Start re-run"
+      >
+        <Input.TextArea
+          rows={10}
+          value={rerunText}
+          onChange={(e) => setRerunText(e.target.value)}
+          style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
+        />
+      </Modal>
       <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 1200 }}>
         {run?.status === 'waiting' ? (
           <div style={{ border: '1px solid #e7d9a8', background: '#fdf7e3', borderRadius: 10, padding: '10px 14px' }}>
@@ -259,7 +301,7 @@ export function RunsPanel() {
         pagination={{ pageSize: 25 }}
         locale={{ emptyText: rows.length ? 'No runs match this filter' : 'No runs yet' }}
       />
-      {openRun != null ? <RunDetail runId={openRun} onClose={() => setOpenRun(null)} /> : null}
+      {openRun != null ? <RunDetail runId={openRun} onClose={() => setOpenRun(null)} onRerun={setOpenRun} /> : null}
     </div>
   );
 }
