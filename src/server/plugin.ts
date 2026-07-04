@@ -231,6 +231,47 @@ export class NeoaiPlugin extends Plugin {
           ctx.body = res ?? { legacy: true, reason: 'no workflow bound (or function disabled) — caller must use its legacy code path' };
           await next();
         },
+
+        // Memory HTTP surface — console panel + manual/E2E testing. Real
+        // host-plugin writes call upsertMemory/confirmMemory directly (same
+        // convention as runFunction above).
+        memoryList: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = { ...(ctx.action.params.values ?? {}), ...(ctx.action.params ?? {}) };
+          const filter: any = {};
+          if (p.entityType) filter.entity_type = String(p.entityType);
+          if (p.entityId) filter.entity_id = String(p.entityId);
+          const repo = this.db.getRepository('neoai_memories');
+          const rows = repo ? await repo.find({ filter, sort: ['-id'], limit: 500 }) : [];
+          ctx.body = { rows: rows.map((r: any) => r.toJSON()) };
+          await next();
+        },
+
+        memoryUpsert: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.upsertMemory({
+            entityType: String(p.entityType ?? ''),
+            entityId: String(p.entityId ?? ''),
+            key: p.key,
+            summary: String(p.summary ?? ''),
+            structured: p.structured,
+            sourceRunId: p.sourceRunId,
+            updatedBy: String(ctx.state?.currentUser?.nickname ?? 'admin'),
+          });
+          await next();
+        },
+
+        memoryConfirm: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.confirmMemory(Number(p.id), {
+            confirmedBy: String(ctx.state?.currentUser?.nickname ?? ctx.state?.currentUser?.username ?? 'admin'),
+            editedSummary: p.editedSummary,
+            editedStructured: p.editedStructured,
+          });
+          await next();
+        },
       },
     });
 
@@ -404,6 +445,114 @@ export class NeoaiPlugin extends Plugin {
     if (!('runId' in started)) return started;
     if (!opts.wait) return started;
     return this.waitForRun(started.runId);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Memory — central, entity-agnostic store (loose entity_type+entity_id, no
+  // FK; mirrors neoai_functions.plugin's convention). Human-in-the-loop gate:
+  // confirmMemory is the ONLY path that ever sets status:'confirmed'. Once a
+  // key is confirmed, upsertMemory never touches that row again — a fresh AI
+  // draft stages separately as "<key>__pending" until a human reviews it
+  // (owner decision: confirmed content stays frozen, never silently reverted).
+
+  private static PENDING_SUFFIX = '__pending';
+
+  /** Idempotent upsert. Returns the row that was written (always 'draft'). */
+  async upsertMemory(input: {
+    entityType: string;
+    entityId: string;
+    key?: string;
+    summary: string;
+    structured?: any;
+    sourceRunId?: number;
+    updatedBy?: string;
+  }): Promise<{ id: number; status: 'draft' | 'confirmed' }> {
+    const repo = this.db.getRepository('neoai_memories');
+    if (!repo) return { id: 0, status: 'draft' };
+    const entity_type = input.entityType;
+    const entity_id = input.entityId;
+    const baseKey = input.key ?? 'summary';
+    const values = {
+      summary: input.summary,
+      structured: input.structured ?? null,
+      source_run_id: input.sourceRunId ?? null,
+      updated_by: input.updatedBy ?? '',
+    };
+
+    const confirmed = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey, status: 'confirmed' } });
+    const targetKey = confirmed ? `${baseKey}${NeoaiPlugin.PENDING_SUFFIX}` : baseKey;
+
+    const existing = await repo.findOne({ filter: { entity_type, entity_id, key: targetKey } });
+    if (existing) {
+      await repo.update({ filterByTk: existing.get('id'), values: { ...values, status: 'draft' } });
+      return { id: Number(existing.get('id')), status: 'draft' };
+    }
+    const created = await repo.create({ values: { entity_type, entity_id, key: targetKey, status: 'draft', ...values } });
+    return { id: Number(created.get('id')), status: 'draft' };
+  }
+
+  /**
+   * Human confirms a memory row. On a plain draft row: confirms in place. On a
+   * "<key>__pending" row: copies its content onto the base-key row (creating
+   * it on the entity's first-ever confirmation), then deletes the pending row
+   * — so there is always at most one confirmed + one pending row per key.
+   */
+  async confirmMemory(
+    id: number,
+    opts: { confirmedBy: string; editedSummary?: string; editedStructured?: any },
+  ): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const repo = this.db.getRepository('neoai_memories');
+    if (!repo) return { ok: false, reason: 'neoai_memories collection unavailable' };
+    const row = await repo.findOne({ filterByTk: id });
+    if (!row) return { ok: false, reason: `memory ${id} not found` };
+
+    const key = String(row.get('key') ?? '');
+    const summary = opts.editedSummary ?? row.get('summary');
+    const structured = opts.editedStructured !== undefined ? opts.editedStructured : row.get('structured');
+    const isPending = key.endsWith(NeoaiPlugin.PENDING_SUFFIX);
+
+    if (!isPending) {
+      await repo.update({
+        filterByTk: id,
+        values: { summary, structured, status: 'confirmed', confirmed_at: new Date(), updated_by: opts.confirmedBy },
+      });
+      return { ok: true };
+    }
+
+    const baseKey = key.slice(0, -NeoaiPlugin.PENDING_SUFFIX.length);
+    const entity_type = row.get('entity_type');
+    const entity_id = row.get('entity_id');
+    const sourceRunId = row.get('source_run_id') ?? null;
+    const baseRow = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey } });
+    const baseValues = { summary, structured, status: 'confirmed', confirmed_at: new Date(), updated_by: opts.confirmedBy, source_run_id: sourceRunId };
+    if (baseRow) {
+      await repo.update({ filterByTk: baseRow.get('id'), values: baseValues });
+    } else {
+      await repo.create({ values: { entity_type, entity_id, key: baseKey, ...baseValues } });
+    }
+    await repo.destroy({ filterByTk: id });
+    return { ok: true };
+  }
+
+  /** All memory rows (any status/key) for one entity — console panel use. */
+  async getMemories(entityType: string, entityId: string): Promise<any[]> {
+    const repo = this.db.getRepository('neoai_memories');
+    if (!repo) return [];
+    const rows = await repo.find({ filter: { entity_type: entityType, entity_id: entityId }, sort: ['key'] });
+    return rows.map((r: any) => r.toJSON());
+  }
+
+  /** The one confirmed row for a key — best-effort read for host-plugin context assembly. */
+  async getConfirmedMemory(
+    entityType: string,
+    entityId: string,
+    key = 'summary',
+  ): Promise<{ summary: string; structured: any; confirmedAt: Date } | null> {
+    const repo = this.db.getRepository('neoai_memories');
+    if (!repo) return null;
+    const row = await repo.findOne({ filter: { entity_type: entityType, entity_id: entityId, key, status: 'confirmed' } });
+    if (!row) return null;
+    return { summary: row.get('summary'), structured: row.get('structured'), confirmedAt: row.get('confirmed_at') };
   }
 
   private async waitForRun(runId: number, timeoutMs = 180_000) {

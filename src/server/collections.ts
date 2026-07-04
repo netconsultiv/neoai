@@ -212,6 +212,34 @@ export const NEOAI_COLLECTIONS: any[] = [
       json('prices', 'Price table override (USD per 1M tokens)'),
     ],
   },
+  {
+    name: 'neoai_memories',
+    title: 'NeoAI Memories',
+    titleField: 'id',
+    fields: [
+      // Loose namespace reference (e.g. "crm.deal", "konfigurator.configuration") —
+      // no FK, matches neoai_functions.plugin's existing convention so the store
+      // stays central and works even when the referencing plugin isn't installed.
+      str('entity_type', 'Entity type'),
+      // Always a string, even for numeric ids (String(dealId)) — keeps this column
+      // uniform across entity types with no per-type branching.
+      str('entity_id', 'Entity id'),
+      str('key', 'Key', { defaultValue: 'summary' }),
+      text('summary', 'Summary'),
+      json('structured', 'Structured (reserved for Phase 2)'),
+      select('status', 'Status', ['draft', 'confirmed'], 'draft'),
+      {
+        name: 'source_run',
+        type: 'belongsTo',
+        interface: 'm2o',
+        target: 'neoai_runs',
+        foreignKey: 'source_run_id',
+        uiSchema: { title: 'Source run', 'x-component': 'AssociationField' },
+      },
+      str('updated_by', 'Updated by'),
+      dt('confirmed_at', 'Confirmed at'),
+    ],
+  },
 ];
 
 // Reverse relations + post-P0 field additions — ensured AFTER all collections

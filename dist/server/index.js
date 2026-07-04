@@ -260,6 +260,34 @@ var NEOAI_COLLECTIONS = [
       dbl("image_price_usd", "Estimated price per generated image (USD)", 0.04),
       json("prices", "Price table override (USD per 1M tokens)")
     ]
+  },
+  {
+    name: "neoai_memories",
+    title: "NeoAI Memories",
+    titleField: "id",
+    fields: [
+      // Loose namespace reference (e.g. "crm.deal", "konfigurator.configuration") —
+      // no FK, matches neoai_functions.plugin's existing convention so the store
+      // stays central and works even when the referencing plugin isn't installed.
+      str("entity_type", "Entity type"),
+      // Always a string, even for numeric ids (String(dealId)) — keeps this column
+      // uniform across entity types with no per-type branching.
+      str("entity_id", "Entity id"),
+      str("key", "Key", { defaultValue: "summary" }),
+      text("summary", "Summary"),
+      json("structured", "Structured (reserved for Phase 2)"),
+      select("status", "Status", ["draft", "confirmed"], "draft"),
+      {
+        name: "source_run",
+        type: "belongsTo",
+        interface: "m2o",
+        target: "neoai_runs",
+        foreignKey: "source_run_id",
+        uiSchema: { title: "Source run", "x-component": "AssociationField" }
+      },
+      str("updated_by", "Updated by"),
+      dt("confirmed_at", "Confirmed at")
+    ]
   }
 ];
 var NEOAI_EXTRA_FIELDS = [
@@ -1168,7 +1196,7 @@ var SYNTH_SCHEMA = {
       items: {
         type: "object",
         properties: {
-          kind: { type: "string", description: "transport|vegetation|zufahrt|sonstig" },
+          kind: { type: "string", description: "bplan|transport|vegetation|zufahrt|sonstig" },
           severity: { type: "string", description: "info|warn|block" },
           title: { type: "string" },
           detail: { type: "string" }
@@ -1334,7 +1362,7 @@ function countModelNodes(def) {
   return out;
 }
 var pkg = require_package();
-var NeoaiPlugin = class extends import_server.Plugin {
+var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
   constructor() {
     super(...arguments);
     this.running = /* @__PURE__ */ new Map();
@@ -1499,6 +1527,44 @@ var NeoaiPlugin = class extends import_server.Plugin {
           });
           ctx.body = res ?? { legacy: true, reason: "no workflow bound (or function disabled) \u2014 caller must use its legacy code path" };
           await next();
+        },
+        // Memory HTTP surface — console panel + manual/E2E testing. Real
+        // host-plugin writes call upsertMemory/confirmMemory directly (same
+        // convention as runFunction above).
+        memoryList: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = { ...ctx.action.params.values ?? {}, ...ctx.action.params ?? {} };
+          const filter = {};
+          if (p.entityType) filter.entity_type = String(p.entityType);
+          if (p.entityId) filter.entity_id = String(p.entityId);
+          const repo = this.db.getRepository("neoai_memories");
+          const rows = repo ? await repo.find({ filter, sort: ["-id"], limit: 500 }) : [];
+          ctx.body = { rows: rows.map((r) => r.toJSON()) };
+          await next();
+        },
+        memoryUpsert: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.upsertMemory({
+            entityType: String(p.entityType ?? ""),
+            entityId: String(p.entityId ?? ""),
+            key: p.key,
+            summary: String(p.summary ?? ""),
+            structured: p.structured,
+            sourceRunId: p.sourceRunId,
+            updatedBy: String(ctx.state?.currentUser?.nickname ?? "admin")
+          });
+          await next();
+        },
+        memoryConfirm: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.confirmMemory(Number(p.id), {
+            confirmedBy: String(ctx.state?.currentUser?.nickname ?? ctx.state?.currentUser?.username ?? "admin"),
+            editedSummary: p.editedSummary,
+            editedStructured: p.editedStructured
+          });
+          await next();
         }
       }
     });
@@ -1661,6 +1727,90 @@ var NeoaiPlugin = class extends import_server.Plugin {
     if (!("runId" in started)) return started;
     if (!opts.wait) return started;
     return this.waitForRun(started.runId);
+  }
+  static {
+    // ---------------------------------------------------------------------------
+    // Memory — central, entity-agnostic store (loose entity_type+entity_id, no
+    // FK; mirrors neoai_functions.plugin's convention). Human-in-the-loop gate:
+    // confirmMemory is the ONLY path that ever sets status:'confirmed'. Once a
+    // key is confirmed, upsertMemory never touches that row again — a fresh AI
+    // draft stages separately as "<key>__pending" until a human reviews it
+    // (owner decision: confirmed content stays frozen, never silently reverted).
+    this.PENDING_SUFFIX = "__pending";
+  }
+  /** Idempotent upsert. Returns the row that was written (always 'draft'). */
+  async upsertMemory(input) {
+    const repo = this.db.getRepository("neoai_memories");
+    if (!repo) return { id: 0, status: "draft" };
+    const entity_type = input.entityType;
+    const entity_id = input.entityId;
+    const baseKey = input.key ?? "summary";
+    const values = {
+      summary: input.summary,
+      structured: input.structured ?? null,
+      source_run_id: input.sourceRunId ?? null,
+      updated_by: input.updatedBy ?? ""
+    };
+    const confirmed = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey, status: "confirmed" } });
+    const targetKey = confirmed ? `${baseKey}${_NeoaiPlugin.PENDING_SUFFIX}` : baseKey;
+    const existing = await repo.findOne({ filter: { entity_type, entity_id, key: targetKey } });
+    if (existing) {
+      await repo.update({ filterByTk: existing.get("id"), values: { ...values, status: "draft" } });
+      return { id: Number(existing.get("id")), status: "draft" };
+    }
+    const created = await repo.create({ values: { entity_type, entity_id, key: targetKey, status: "draft", ...values } });
+    return { id: Number(created.get("id")), status: "draft" };
+  }
+  /**
+   * Human confirms a memory row. On a plain draft row: confirms in place. On a
+   * "<key>__pending" row: copies its content onto the base-key row (creating
+   * it on the entity's first-ever confirmation), then deletes the pending row
+   * — so there is always at most one confirmed + one pending row per key.
+   */
+  async confirmMemory(id, opts) {
+    const repo = this.db.getRepository("neoai_memories");
+    if (!repo) return { ok: false, reason: "neoai_memories collection unavailable" };
+    const row = await repo.findOne({ filterByTk: id });
+    if (!row) return { ok: false, reason: `memory ${id} not found` };
+    const key = String(row.get("key") ?? "");
+    const summary = opts.editedSummary ?? row.get("summary");
+    const structured = opts.editedStructured !== void 0 ? opts.editedStructured : row.get("structured");
+    const isPending = key.endsWith(_NeoaiPlugin.PENDING_SUFFIX);
+    if (!isPending) {
+      await repo.update({
+        filterByTk: id,
+        values: { summary, structured, status: "confirmed", confirmed_at: /* @__PURE__ */ new Date(), updated_by: opts.confirmedBy }
+      });
+      return { ok: true };
+    }
+    const baseKey = key.slice(0, -_NeoaiPlugin.PENDING_SUFFIX.length);
+    const entity_type = row.get("entity_type");
+    const entity_id = row.get("entity_id");
+    const sourceRunId = row.get("source_run_id") ?? null;
+    const baseRow = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey } });
+    const baseValues = { summary, structured, status: "confirmed", confirmed_at: /* @__PURE__ */ new Date(), updated_by: opts.confirmedBy, source_run_id: sourceRunId };
+    if (baseRow) {
+      await repo.update({ filterByTk: baseRow.get("id"), values: baseValues });
+    } else {
+      await repo.create({ values: { entity_type, entity_id, key: baseKey, ...baseValues } });
+    }
+    await repo.destroy({ filterByTk: id });
+    return { ok: true };
+  }
+  /** All memory rows (any status/key) for one entity — console panel use. */
+  async getMemories(entityType, entityId) {
+    const repo = this.db.getRepository("neoai_memories");
+    if (!repo) return [];
+    const rows = await repo.find({ filter: { entity_type: entityType, entity_id: entityId }, sort: ["key"] });
+    return rows.map((r) => r.toJSON());
+  }
+  /** The one confirmed row for a key — best-effort read for host-plugin context assembly. */
+  async getConfirmedMemory(entityType, entityId, key = "summary") {
+    const repo = this.db.getRepository("neoai_memories");
+    if (!repo) return null;
+    const row = await repo.findOne({ filter: { entity_type: entityType, entity_id: entityId, key, status: "confirmed" } });
+    if (!row) return null;
+    return { summary: row.get("summary"), structured: row.get("structured"), confirmedAt: row.get("confirmed_at") };
   }
   async waitForRun(runId, timeoutMs = 18e4) {
     const repo = this.db.getRepository("neoai_runs");

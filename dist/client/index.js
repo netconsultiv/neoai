@@ -67,13 +67,13 @@ __export(client_exports, {
   default: () => client_default
 });
 module.exports = __toCommonJS(client_exports);
-var import_client6 = require("@nocobase/client");
-var import_client7 = require("@nocobase/plugin-workflow/client");
+var import_client7 = require("@nocobase/client");
+var import_client8 = require("@nocobase/plugin-workflow/client");
 
 // src/client/console/NeoaiConsole.tsx
-var import_react6 = __toESM(require("react"));
-var import_antd6 = require("antd");
-var import_client5 = require("@nocobase/client");
+var import_react7 = __toESM(require("react"));
+var import_antd7 = require("antd");
+var import_client6 = require("@nocobase/client");
 
 // src/client/theme.ts
 var NEOHOME_GREEN = "#009900";
@@ -1302,11 +1302,136 @@ function SettingsPanel() {
   ))), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Button, { type: "primary", onClick: save }, "Save settings"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "24px 0 16px", maxWidth: 620 } }), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Plugin health" }, ping ? /* @__PURE__ */ import_react5.default.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: spend ? 14 : 0 } }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "green" }, ping.plugin, " v", ping.version), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: ping.pluginAi ? "green" : "orange" }, ping.pluginAi ? "plugin-ai available" : "plugin-ai NOT available (raw Gemini fallback)"), ping.sandbox ? /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "orange" }, "sandbox") : null, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, null, ((_a = ping.collections) != null ? _a : []).length, " collections")) : null, spend ? /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginBottom: 4 } }, "Spend today (estimated)"), /* @__PURE__ */ import_react5.default.createElement(JsonBox, { value: spend, maxHeight: 140 })) : null));
 }
 
+// src/client/console/MemoryPanel.tsx
+var import_react6 = __toESM(require("react"));
+var import_antd6 = require("antd");
+var import_client5 = require("@nocobase/client");
+var PENDING_SUFFIX = "__pending";
+function baseKeyOf(key) {
+  return key.endsWith(PENDING_SUFFIX) ? key.slice(0, -PENDING_SUFFIX.length) : key;
+}
+function MemoryDetail({ row, confirmedSibling, onClose, onSaved }) {
+  var _a, _b;
+  const api = (0, import_client5.useAPIClient)();
+  const isPending = String((_a = row.key) != null ? _a : "").endsWith(PENDING_SUFFIX);
+  const [summary, setSummary] = (0, import_react6.useState)(String((_b = row.summary) != null ? _b : ""));
+  const [busy, setBusy] = (0, import_react6.useState)(false);
+  const confirm = async () => {
+    var _a2, _b2;
+    setBusy(true);
+    try {
+      const res = await neoaiAction(api, "memoryConfirm", { id: row.id, editedSummary: summary });
+      if (res == null ? void 0 : res.ok) {
+        import_antd6.message.success(isPending ? "Confirmed \u2014 swapped in over the previous version" : "Confirmed");
+        onSaved();
+        onClose();
+      } else {
+        import_antd6.message.error((_a2 = res == null ? void 0 : res.reason) != null ? _a2 : "Confirm failed");
+      }
+    } catch (err) {
+      import_antd6.message.error(String((_b2 = err == null ? void 0 : err.message) != null ? _b2 : err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return /* @__PURE__ */ import_react6.default.createElement(
+    ConsoleDrawer,
+    {
+      open: true,
+      title: /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 13 } }, row.entity_type), /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 13 } }, row.entity_id), /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), baseKeyOf(row.key), isPending ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "gold", style: { marginLeft: 8 } }, "pending review") : null, !isPending && row.status === "confirmed" ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "green", style: { marginLeft: 8 } }, "confirmed") : null),
+      onClose,
+      footer: /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: onClose }, "Close"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", loading: busy, onClick: confirm }, isPending ? "Confirm & swap in" : row.status === "confirmed" ? "Save changes" : "Confirm"))
+    },
+    /* @__PURE__ */ import_react6.default.createElement("div", { style: { padding: 18, display: "flex", flexDirection: "column", gap: 14, maxWidth: 900 } }, isPending && confirmedSibling ? /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "CURRENTLY CONFIRMED (unaffected until you confirm the draft below)"), /* @__PURE__ */ import_react6.default.createElement(JsonBox, { value: confirmedSibling.summary, maxHeight: 140 })) : null, /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, isPending ? "NEW DRAFT \u2014 REVIEW BEFORE CONFIRMING" : "SUMMARY"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input.TextArea, { rows: 8, value: summary, onChange: (e) => setSummary(e.target.value) })), row.structured ? /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "STRUCTURED (Phase 2 \u2014 informational only, not applied anywhere yet)"), /* @__PURE__ */ import_react6.default.createElement(JsonBox, { value: row.structured, maxHeight: 200 })) : null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13, color: "#5c605c" } }, /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("b", null, "Updated by:"), " ", row.updated_by || "\u2014"), /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("b", null, "Confirmed at:"), " ", fmtTime(row.confirmed_at)), /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("b", null, "Source run:"), " ", row.source_run_id ? `#${row.source_run_id}` : "\u2014")))
+  );
+}
+function MemoryPanel() {
+  var _a, _b, _c;
+  const api = (0, import_client5.useAPIClient)();
+  const [rows, setRows] = (0, import_react6.useState)([]);
+  const [entityType, setEntityType] = (0, import_react6.useState)("");
+  const [entityId, setEntityId] = (0, import_react6.useState)("");
+  const [openId, setOpenId] = (0, import_react6.useState)(null);
+  const load = async () => {
+    var _a2;
+    try {
+      const { rows: rows2 } = await listResource(api, "neoai_memories", { sort: "-id", pageSize: 500 });
+      setRows(rows2);
+    } catch (err) {
+      import_antd6.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
+    }
+  };
+  usePoll(load, 15e3, openId == null);
+  const filteredRows = (0, import_react6.useMemo)(() => {
+    const et = entityType.trim().toLowerCase();
+    const ei = entityId.trim().toLowerCase();
+    return rows.filter((r) => {
+      var _a2, _b2;
+      if (et && !String((_a2 = r.entity_type) != null ? _a2 : "").toLowerCase().includes(et)) return false;
+      if (ei && !String((_b2 = r.entity_id) != null ? _b2 : "").toLowerCase().includes(ei)) return false;
+      return true;
+    });
+  }, [rows, entityType, entityId]);
+  const openRow = (_a = rows.find((r) => r.id === openId)) != null ? _a : null;
+  const confirmedSibling = openRow && String((_b = openRow.key) != null ? _b : "").endsWith(PENDING_SUFFIX) ? (_c = rows.find(
+    (r) => r.entity_type === openRow.entity_type && r.entity_id === openRow.entity_id && r.key === baseKeyOf(openRow.key) && r.status === "confirmed"
+  )) != null ? _c : null : null;
+  const columns = [
+    { title: "Entity type", dataIndex: "entity_type", width: 180, render: (v) => /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "Entity id", dataIndex: "entity_id", width: 140, render: (v) => /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    {
+      title: "Key",
+      dataIndex: "key",
+      width: 160,
+      render: (v) => String(v).endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react6.default.createElement("span", null, baseKeyOf(v), " ", /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "gold" }, "pending")) : v
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      width: 110,
+      render: (v, r) => {
+        var _a2;
+        return String((_a2 = r.key) != null ? _a2 : "").endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "gold" }, "awaiting review") : /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: v === "confirmed" ? "green" : "default" }, v);
+      }
+    },
+    { title: "Summary", dataIndex: "summary", render: (v) => /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: "#3c4043" } }, (v != null ? v : "").slice(0, 140), (v != null ? v : "").length > 140 ? "\u2026" : "") },
+    { title: "Updated by", dataIndex: "updated_by", width: 160 },
+    { title: "Confirmed at", dataIndex: "confirmed_at", width: 150, render: (v) => fmtTime(v) },
+    {
+      title: "",
+      key: "act",
+      width: 90,
+      render: (_, r) => /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { size: "small", onClick: () => setOpenId(r.id) }, "Open")
+    }
+  ];
+  return /* @__PURE__ */ import_react6.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Memory"), /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Filter entity type (e.g. crm.deal)", value: entityType, onChange: (e) => setEntityType(e.target.value), style: { width: 220 }, allowClear: true }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Filter entity id", value: entityId, onChange: (e) => setEntityId(e.target.value), style: { width: 160 }, allowClear: true }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: load }, "Refresh")), /* @__PURE__ */ import_react6.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 820 } }, 'Central, entity-agnostic AI memory: host plugins (CRM, Konfigurator, \u2026) write a draft summary about one of their records here; nothing feeds back into that record until a human opens it and confirms. Once confirmed, a later AI re-draft never overwrites it directly \u2014 it stages as a "pending" row you review and swap in explicitly.'), /* @__PURE__ */ import_react6.default.createElement(
+    import_antd6.Table,
+    {
+      rowKey: "id",
+      size: "middle",
+      dataSource: filteredRows,
+      columns,
+      pagination: { pageSize: 25 },
+      locale: { emptyText: rows.length ? "No memory rows match this filter" : "No memory rows yet" },
+      onRow: (r) => ({ onClick: () => setOpenId(r.id), style: { cursor: "pointer" } })
+    }
+  ), openRow ? /* @__PURE__ */ import_react6.default.createElement(
+    MemoryDetail,
+    {
+      row: openRow,
+      confirmedSibling,
+      onClose: () => setOpenId(null),
+      onSaved: load
+    }
+  ) : null);
+}
+
 // src/client/console/NeoaiConsole.tsx
 var TABS = [
   { key: "workflows", label: "AI Workflows", icon: "PartitionOutlined" },
   { key: "runs", label: "Runs", icon: "PlayCircleOutlined" },
   { key: "functions", label: "Functions", icon: "ApiOutlined" },
+  { key: "memory", label: "Memory", icon: "DatabaseOutlined" },
   { key: "settings", label: "Settings", icon: "SettingOutlined" }
 ];
 var CROSS_LINKS = [
@@ -1322,7 +1447,7 @@ function activeTabFromPath(pathname) {
   return TABS.some((t) => t.key === key) ? key : "workflows";
 }
 function SideItem(props) {
-  return /* @__PURE__ */ import_react6.default.createElement(
+  return /* @__PURE__ */ import_react7.default.createElement(
     "div",
     {
       onClick: props.onClick,
@@ -1340,12 +1465,12 @@ function SideItem(props) {
         userSelect: "none"
       }
     },
-    /* @__PURE__ */ import_react6.default.createElement(import_client5.Icon, { type: props.icon }),
-    /* @__PURE__ */ import_react6.default.createElement("span", null, props.label)
+    /* @__PURE__ */ import_react7.default.createElement(import_client6.Icon, { type: props.icon }),
+    /* @__PURE__ */ import_react7.default.createElement("span", null, props.label)
   );
 }
 function NeoaiConsolePage() {
-  (0, import_react6.useEffect)(() => {
+  (0, import_react7.useEffect)(() => {
     ensureInterFont();
   }, []);
   const pathname = window.location.pathname;
@@ -1353,10 +1478,10 @@ function NeoaiConsolePage() {
   const prefix = embedded ? "/admin" : "";
   const active = activeTabFromPath(pathname);
   const go = (href) => window.location.assign(href);
-  return /* @__PURE__ */ import_react6.default.createElement(import_antd6.ConfigProvider, { theme: NEOHOME_THEME, getPopupContainer: (n) => {
+  return /* @__PURE__ */ import_react7.default.createElement(import_antd7.ConfigProvider, { theme: NEOHOME_THEME, getPopupContainer: (n) => {
     var _a;
     return (_a = n == null ? void 0 : n.parentElement) != null ? _a : document.body;
-  } }, /* @__PURE__ */ import_react6.default.createElement(
+  } }, /* @__PURE__ */ import_react7.default.createElement(
     "div",
     {
       style: {
@@ -1367,7 +1492,7 @@ function NeoaiConsolePage() {
         color: "#1b1e21"
       }
     },
-    /* @__PURE__ */ import_react6.default.createElement(
+    /* @__PURE__ */ import_react7.default.createElement(
       "aside",
       {
         style: {
@@ -1380,19 +1505,19 @@ function NeoaiConsolePage() {
           flexShrink: 0
         }
       },
-      /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, padding: "2px 8px 12px" } }, /* @__PURE__ */ import_react6.default.createElement("img", { src: NEOMODUL_FAVICON_SRC, alt: "Neomodul", style: { width: 26, height: 26, borderRadius: 7 } }), /* @__PURE__ */ import_react6.default.createElement("span", { style: { fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" } }, "NeoAI")),
-      TABS.map((t) => /* @__PURE__ */ import_react6.default.createElement(SideItem, { key: t.key, icon: t.icon, label: t.label, active: active === t.key, onClick: () => go(`${prefix}/neoai/${t.key}`) })),
-      /* @__PURE__ */ import_react6.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "10px 4px" } }),
-      CROSS_LINKS.map((l) => /* @__PURE__ */ import_react6.default.createElement(SideItem, { key: l.href, icon: l.icon, label: l.label, muted: true, onClick: () => go(l.href) })),
-      /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }),
-      /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 10.5, color: "#b0b4ba", padding: "0 8px 4px" } }, "Admin-only \xB7 tree workflows \xB7 Gemini via plugin-ai")
+      /* @__PURE__ */ import_react7.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, padding: "2px 8px 12px" } }, /* @__PURE__ */ import_react7.default.createElement("img", { src: NEOMODUL_FAVICON_SRC, alt: "Neomodul", style: { width: 26, height: 26, borderRadius: 7 } }), /* @__PURE__ */ import_react7.default.createElement("span", { style: { fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" } }, "NeoAI")),
+      TABS.map((t) => /* @__PURE__ */ import_react7.default.createElement(SideItem, { key: t.key, icon: t.icon, label: t.label, active: active === t.key, onClick: () => go(`${prefix}/neoai/${t.key}`) })),
+      /* @__PURE__ */ import_react7.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "10px 4px" } }),
+      CROSS_LINKS.map((l) => /* @__PURE__ */ import_react7.default.createElement(SideItem, { key: l.href, icon: l.icon, label: l.label, muted: true, onClick: () => go(l.href) })),
+      /* @__PURE__ */ import_react7.default.createElement("div", { style: { flex: 1 } }),
+      /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 10.5, color: "#b0b4ba", padding: "0 8px 4px" } }, "Admin-only \xB7 tree workflows \xB7 Gemini via plugin-ai")
     ),
-    /* @__PURE__ */ import_react6.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, active === "workflows" ? /* @__PURE__ */ import_react6.default.createElement(WorkflowsPanel, null) : null, active === "runs" ? /* @__PURE__ */ import_react6.default.createElement(RunsPanel, null) : null, active === "functions" ? /* @__PURE__ */ import_react6.default.createElement(FunctionsPanel, null) : null, active === "settings" ? /* @__PURE__ */ import_react6.default.createElement(SettingsPanel, null) : null)
+    /* @__PURE__ */ import_react7.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, active === "workflows" ? /* @__PURE__ */ import_react7.default.createElement(WorkflowsPanel, null) : null, active === "runs" ? /* @__PURE__ */ import_react7.default.createElement(RunsPanel, null) : null, active === "functions" ? /* @__PURE__ */ import_react7.default.createElement(FunctionsPanel, null) : null, active === "memory" ? /* @__PURE__ */ import_react7.default.createElement(MemoryPanel, null) : null, active === "settings" ? /* @__PURE__ */ import_react7.default.createElement(SettingsPanel, null) : null)
   ));
 }
 
 // src/client/index.tsx
-var NeoaiRunInstruction = class extends import_client7.Instruction {
+var NeoaiRunInstruction = class extends import_client8.Instruction {
   constructor() {
     super(...arguments);
     this.title = "NeoAI workflow";
@@ -1402,11 +1527,25 @@ var NeoaiRunInstruction = class extends import_client7.Instruction {
     this.fieldset = {
       workflowKey: {
         type: "string",
-        title: "NeoAI workflow key",
+        title: "NeoAI workflow",
         required: true,
-        description: "Key from NeoAI \u2192 AI Workflows (the published version runs).",
+        description: "Only published workflows (current_version > 0) are offered \u2014 the bound automation always runs the published version, never a draft.",
         "x-decorator": "FormItem",
-        "x-component": "Input"
+        "x-component": "RemoteSelect",
+        "x-component-props": {
+          placeholder: "Select a published NeoAI workflow\u2026",
+          fieldNames: { label: "name", value: "key" },
+          service: {
+            resource: "neoai_workflows",
+            action: "list",
+            params: {
+              filter: { current_version: { $gt: 0 } },
+              fields: ["key", "name", "current_version"],
+              sort: ["name"],
+              pageSize: 200
+            }
+          }
+        }
       },
       inputJson: {
         type: "string",
@@ -1425,7 +1564,7 @@ var NeoaiRunInstruction = class extends import_client7.Instruction {
     };
   }
 };
-var NeoaiClientPlugin = class extends import_client6.Plugin {
+var NeoaiClientPlugin = class extends import_client7.Plugin {
   /**
    * Automation bridge UI: contribute the "neoai-run" node to NocoBase's
    * plugin-workflow editor as a PLAIN instruction object (no import from
@@ -1452,11 +1591,13 @@ var NeoaiClientPlugin = class extends import_client6.Plugin {
     this.app.router.add("admin.neoaiWorkflows", { path: "neoai/workflows", Component: NeoaiConsolePage });
     this.app.router.add("admin.neoaiRuns", { path: "neoai/runs", Component: NeoaiConsolePage });
     this.app.router.add("admin.neoaiFunctions", { path: "neoai/functions", Component: NeoaiConsolePage });
+    this.app.router.add("admin.neoaiMemory", { path: "neoai/memory", Component: NeoaiConsolePage });
     this.app.router.add("admin.neoaiSettings", { path: "neoai/settings", Component: NeoaiConsolePage });
     this.app.router.add("neoai", { path: "/neoai", Component: NeoaiConsolePage });
     this.app.router.add("neoai-workflows", { path: "/neoai/workflows", Component: NeoaiConsolePage });
     this.app.router.add("neoai-runs", { path: "/neoai/runs", Component: NeoaiConsolePage });
     this.app.router.add("neoai-functions", { path: "/neoai/functions", Component: NeoaiConsolePage });
+    this.app.router.add("neoai-memory", { path: "/neoai/memory", Component: NeoaiConsolePage });
     this.app.router.add("neoai-settings", { path: "/neoai/settings", Component: NeoaiConsolePage });
     this.registerAutomationBridgeUI();
   }

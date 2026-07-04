@@ -15,11 +15,13 @@ import { WorkflowsPanel } from './WorkflowsPanel';
 import { RunsPanel } from './RunsPanel';
 import { FunctionsPanel } from './FunctionsPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { MemoryPanel } from './MemoryPanel';
 
 const TABS: Array<{ key: string; label: string; icon: string }> = [
   { key: 'workflows', label: 'AI Workflows', icon: 'PartitionOutlined' },
   { key: 'runs', label: 'Runs', icon: 'PlayCircleOutlined' },
   { key: 'functions', label: 'Functions', icon: 'ApiOutlined' },
+  { key: 'memory', label: 'Memory', icon: 'DatabaseOutlined' },
   { key: 'settings', label: 'Settings', icon: 'SettingOutlined' },
 ];
 
@@ -110,6 +112,7 @@ export function NeoaiConsolePage() {
           {active === 'workflows' ? <WorkflowsPanel /> : null}
           {active === 'runs' ? <RunsPanel /> : null}
           {active === 'functions' ? <FunctionsPanel /> : null}
+          {active === 'memory' ? <MemoryPanel /> : null}
           {active === 'settings' ? <SettingsPanel /> : null}
         </main>
       </div>

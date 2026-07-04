@@ -21,11 +21,25 @@ class NeoaiRunInstruction extends Instruction {
   fieldset = {
     workflowKey: {
       type: 'string',
-      title: 'NeoAI workflow key',
+      title: 'NeoAI workflow',
       required: true,
-      description: 'Key from NeoAI → AI Workflows (the published version runs).',
+      description: 'Only published workflows (current_version > 0) are offered — the bound automation always runs the published version, never a draft.',
       'x-decorator': 'FormItem',
-      'x-component': 'Input',
+      'x-component': 'RemoteSelect',
+      'x-component-props': {
+        placeholder: 'Select a published NeoAI workflow…',
+        fieldNames: { label: 'name', value: 'key' },
+        service: {
+          resource: 'neoai_workflows',
+          action: 'list',
+          params: {
+            filter: { current_version: { $gt: 0 } },
+            fields: ['key', 'name', 'current_version'],
+            sort: ['name'],
+            pageSize: 200,
+          },
+        },
+      },
     },
     inputJson: {
       type: 'string',
@@ -74,12 +88,14 @@ export class NeoaiClientPlugin extends Plugin {
     this.app.router.add('admin.neoaiWorkflows', { path: 'neoai/workflows', Component: NeoaiConsolePage });
     this.app.router.add('admin.neoaiRuns', { path: 'neoai/runs', Component: NeoaiConsolePage });
     this.app.router.add('admin.neoaiFunctions', { path: 'neoai/functions', Component: NeoaiConsolePage });
+    this.app.router.add('admin.neoaiMemory', { path: 'neoai/memory', Component: NeoaiConsolePage });
     this.app.router.add('admin.neoaiSettings', { path: 'neoai/settings', Component: NeoaiConsolePage });
     // Standalone aliases.
     this.app.router.add('neoai', { path: '/neoai', Component: NeoaiConsolePage });
     this.app.router.add('neoai-workflows', { path: '/neoai/workflows', Component: NeoaiConsolePage });
     this.app.router.add('neoai-runs', { path: '/neoai/runs', Component: NeoaiConsolePage });
     this.app.router.add('neoai-functions', { path: '/neoai/functions', Component: NeoaiConsolePage });
+    this.app.router.add('neoai-memory', { path: '/neoai/memory', Component: NeoaiConsolePage });
     this.app.router.add('neoai-settings', { path: '/neoai/settings', Component: NeoaiConsolePage });
 
     this.registerAutomationBridgeUI();
