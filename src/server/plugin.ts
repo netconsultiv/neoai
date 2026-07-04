@@ -508,6 +508,7 @@ export class NeoaiPlugin extends Plugin {
       structured: input.structured ?? null,
       source_run_id: input.sourceRunId ?? null,
       updated_by: input.updatedBy ?? '',
+      updated_at: new Date(),
     };
 
     const confirmed = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey, status: 'confirmed' } });
@@ -545,7 +546,7 @@ export class NeoaiPlugin extends Plugin {
     if (!isPending) {
       await repo.update({
         filterByTk: id,
-        values: { summary, structured, status: 'confirmed', confirmed_at: new Date(), updated_by: opts.confirmedBy },
+        values: { summary, structured, status: 'confirmed', confirmed_at: new Date(), updated_by: opts.confirmedBy, updated_at: new Date() },
       });
       return { ok: true };
     }
@@ -555,7 +556,15 @@ export class NeoaiPlugin extends Plugin {
     const entity_id = row.get('entity_id');
     const sourceRunId = row.get('source_run_id') ?? null;
     const baseRow = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey } });
-    const baseValues = { summary, structured, status: 'confirmed', confirmed_at: new Date(), updated_by: opts.confirmedBy, source_run_id: sourceRunId };
+    const baseValues = {
+      summary,
+      structured,
+      status: 'confirmed',
+      confirmed_at: new Date(),
+      updated_by: opts.confirmedBy,
+      updated_at: new Date(),
+      source_run_id: sourceRunId,
+    };
     if (baseRow) {
       await repo.update({ filterByTk: baseRow.get('id'), values: baseValues });
     } else {

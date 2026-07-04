@@ -13,7 +13,7 @@
 // which handles the "adopt pending onto the base row" swap server-side.
 
 import React, { useMemo, useState } from 'react';
-import { Button, Input, Popconfirm, Table, Tag, message } from 'antd';
+import { Button, Checkbox, Input, Popconfirm, Table, Tag, message } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import { ConsoleDrawer, JsonBox, fmtTime, listResource, neoaiAction, usePoll } from './shared';
 import { NEOHOME_GREEN } from '../theme';
@@ -22,6 +22,26 @@ const PENDING_SUFFIX = '__pending';
 
 function baseKeyOf(key: string) {
   return key.endsWith(PENDING_SUFFIX) ? key.slice(0, -PENDING_SUFFIX.length) : key;
+}
+
+function isPendingKey(key: string) {
+  return String(key ?? '').endsWith(PENDING_SUFFIX);
+}
+
+// Staleness badge (item 19) — based on confirmed_at, NOT updated_at: this is
+// "how long since a human last vouched for this", not "how long since the
+// row last changed". Draft/pending rows have no confirmed_at yet → no badge.
+const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000; // 7d
+const VERY_STALE_AFTER_MS = 30 * 24 * 60 * 60 * 1000; // 30d
+
+function stalenessBadge(confirmedAt: any): React.ReactNode {
+  if (!confirmedAt) return null;
+  const t = new Date(confirmedAt).getTime();
+  if (Number.isNaN(t)) return null;
+  const ageMs = Date.now() - t;
+  if (ageMs > VERY_STALE_AFTER_MS) return <Tag color="red">very stale</Tag>;
+  if (ageMs > STALE_AFTER_MS) return <Tag color="orange">stale</Tag>;
+  return null; // fresh <7d — deliberately no badge/subtle dot, per plan
 }
 
 function MemoryDetail({ row, confirmedSibling, onClose, onSaved }: { row: any; confirmedSibling: any | null; onClose: () => void; onSaved: () => void }) {
@@ -116,6 +136,7 @@ export function MemoryPanel() {
   const [rows, setRows] = useState<any[]>([]);
   const [entityType, setEntityType] = useState('');
   const [entityId, setEntityId] = useState('');
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
 
   const load = async () => {
@@ -128,15 +149,28 @@ export function MemoryPanel() {
   };
   usePoll(load, 15_000, openId == null);
 
+  // Pending rows sort to the top regardless of the toggle (item 18) — a
+  // stable sort (index tiebreak) so same-bucket rows keep their existing
+  // -id ordering from the server instead of jittering on every reload.
   const filteredRows = useMemo(() => {
     const et = entityType.trim().toLowerCase();
     const ei = entityId.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (et && !String(r.entity_type ?? '').toLowerCase().includes(et)) return false;
-      if (ei && !String(r.entity_id ?? '').toLowerCase().includes(ei)) return false;
-      return true;
-    });
-  }, [rows, entityType, entityId]);
+    return rows
+      .filter((r) => {
+        if (pendingOnly && !isPendingKey(r.key)) return false;
+        if (et && !String(r.entity_type ?? '').toLowerCase().includes(et)) return false;
+        if (ei && !String(r.entity_id ?? '').toLowerCase().includes(ei)) return false;
+        return true;
+      })
+      .map((r, idx) => ({ r, idx }))
+      .sort((a, b) => {
+        const pa = isPendingKey(a.r.key) ? 0 : 1;
+        const pb = isPendingKey(b.r.key) ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return a.idx - b.idx;
+      })
+      .map(({ r }) => r);
+  }, [rows, entityType, entityId, pendingOnly]);
 
   const openRow = rows.find((r) => r.id === openId) ?? null;
   const confirmedSibling =
@@ -168,7 +202,16 @@ export function MemoryPanel() {
     },
     { title: 'Summary', dataIndex: 'summary', render: (v: string) => <span style={{ color: '#3c4043' }}>{(v ?? '').slice(0, 140)}{(v ?? '').length > 140 ? '…' : ''}</span> },
     { title: 'Updated by', dataIndex: 'updated_by', width: 160 },
-    { title: 'Confirmed at', dataIndex: 'confirmed_at', width: 150, render: (v: string) => fmtTime(v) },
+    {
+      title: 'Confirmed at',
+      dataIndex: 'confirmed_at',
+      width: 190,
+      render: (v: string) => (
+        <span>
+          {fmtTime(v)} {stalenessBadge(v)}
+        </span>
+      ),
+    },
     {
       title: '',
       key: 'act',
@@ -188,6 +231,9 @@ export function MemoryPanel() {
         <div style={{ flex: 1 }} />
         <Input placeholder="Filter entity type (e.g. crm.deal)" value={entityType} onChange={(e) => setEntityType(e.target.value)} style={{ width: 220 }} allowClear />
         <Input placeholder="Filter entity id" value={entityId} onChange={(e) => setEntityId(e.target.value)} style={{ width: 160 }} allowClear />
+        <Checkbox checked={pendingOnly} onChange={(e) => setPendingOnly(e.target.checked)}>
+          Pending review only
+        </Checkbox>
         <Button onClick={load}>Refresh</Button>
       </div>
       <p style={{ fontSize: 12.5, color: '#8a8f8a', margin: '0 0 12px', maxWidth: 820 }}>

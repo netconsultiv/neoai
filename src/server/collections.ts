@@ -261,6 +261,11 @@ export const NEOAI_EXTRA_FIELDS: Array<{ collection: string; field: any }> = [
   // Proactive spend alerts (item 15): forward-looking warning threshold —
   // the hard block still only ever comes from daily_budget_usd via checkBudget.
   { collection: 'neoai_settings', field: dbl('spend_alert_pct', 'Warn when spend crosses this % of the daily budget', 80) },
+  // Staleness indicator (item 19): stamped on every upsert/confirm write, so
+  // the panel can show "last touched" even before anything is ever confirmed.
+  // The staleness BADGE itself is based on confirmed_at, not this field — see
+  // MemoryPanel.tsx.
+  { collection: 'neoai_memories', field: dt('updated_at', 'Last updated at') },
   {
     collection: 'neoai_workflows',
     field: {

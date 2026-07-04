@@ -67,13 +67,13 @@ __export(client_exports, {
   default: () => client_default
 });
 module.exports = __toCommonJS(client_exports);
-var import_client7 = require("@nocobase/client");
-var import_client8 = require("@nocobase/plugin-workflow/client");
+var import_client8 = require("@nocobase/client");
+var import_client9 = require("@nocobase/plugin-workflow/client");
 
 // src/client/console/NeoaiConsole.tsx
-var import_react7 = __toESM(require("react"));
-var import_antd7 = require("antd");
-var import_client6 = require("@nocobase/client");
+var import_react9 = __toESM(require("react"));
+var import_antd9 = require("antd");
+var import_client7 = require("@nocobase/client");
 
 // src/client/theme.ts
 var NEOHOME_GREEN = "#009900";
@@ -123,11 +123,6 @@ function ensureInterFont() {
 
 // src/client/logo.ts
 var NEOMODUL_FAVICON_SRC = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZWlnaHQ9IjI1NiIgdmlld0JveD0iMCAwIDI1NiAyNTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIyNTYiIGhlaWdodD0iMjU2IiByeD0iMzAiIGZpbGw9IiMwMDk5MDAiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik01OCAyN0gxOThDMjE1LjEyMSAyNyAyMjkgNDAuODc5MiAyMjkgNThWMTk4QzIyOSAyMTUuMTIxIDIxNS4xMjEgMjI5IDE5OCAyMjlIMTYzTDkzIDIxOFYyMjlINThDNDAuODc5MiAyMjkgMjcgMjE1LjEyMSAyNyAxOThWNThDMjcgNDAuODc5MiA0MC44NzkyIDI3IDU4IDI3Wk01OCAzOEM0Ni45NTQzIDM4IDM4IDQ2Ljk1NDMgMzggNThWMTk4QzM4IDIwOS4wNDYgNDYuOTU0MyAyMTggNTggMjE4SDkzTDE2MyAyMjlWMjE4SDE5OEMyMDkuMDQ2IDIxOCAyMTggMjA5LjA0NiAyMTggMTk4VjU4QzIxOCA0Ni45NTQzIDIwOS4wNDYgMzggMTk4IDM4SDU4WiIgZmlsbD0id2hpdGUiLz4KPHBhdGggZD0iTTEyNy44ODUgNjhDMTM2LjE3NyA2OCAxNDMuOTMxIDY5LjY0MzggMTUxLjE0OCA3Mi45MzE1QzE1OC41MTggNzYuMDYyNiAxNjQuODkxIDgwLjM2NzkgMTcwLjI2NSA4NS44NDc0QzE3NS43OTMgOTEuMzI2OCAxODAuMDkyIDk3LjgyMzkgMTgzLjE2MyAxMDUuMzM5QzE4Ni4zODggMTEyLjg1MyAxODggMTIwLjgzOCAxODggMTI5LjI5MlYxODhIMTY4LjE5MlYxMjkuMjkyQzE2OC4xOTIgMTIzLjY1NiAxNjcuMTE3IDExOC4zMzMgMTY0Ljk2NyAxMTMuMzIzQzE2Mi45NzEgMTA4LjMxMyAxNjAuMTMxIDEwMy45MyAxNTYuNDQ1IDEwMC4xNzJDMTUyLjkxNCA5Ni40MTQ5IDE0OC42OTEgOTMuNTE4NiAxNDMuNzc3IDkxLjQ4MzRDMTM4Ljg2NCA4OS4yOTE2IDEzMy41NjYgODguMTk1NyAxMjcuODg1IDg4LjE5NTdDMTIyLjM1NyA4OC4xOTU3IDExNy4xMzYgODkuMjkxNiAxMTIuMjIzIDkxLjQ4MzRDMTA3LjMwOSA5My41MTg2IDEwMy4wMSA5Ni40MTQ5IDk5LjMyNDQgMTAwLjE3MkM5NS43OTI3IDEwMy45MyA5Mi45NTIgMTA4LjMxMyA5MC44MDIzIDExMy4zMjNDODguNjUyNiAxMTguMzMzIDg3LjU3NzcgMTIzLjY1NiA4Ny41Nzc3IDEyOS4yOTJWMTg4SDY4VjEyOS4yOTJDNjggMTIwLjgzOCA2OS41MzU1IDExMi44NTMgNzIuNjA2NSAxMDUuMzM5Qzc1LjgzMTEgOTcuODIzOSA4MC4xMzA1IDkxLjMyNjggODUuNTA0OCA4NS44NDc0QzkxLjAzMjYgODAuMzY3OSA5Ny40MDUgNzYuMDYyNiAxMDQuNjIyIDcyLjkzMTVDMTExLjgzOSA2OS42NDM4IDExOS41OTMgNjggMTI3Ljg4NSA2OFoiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik05MyAxOTFIMTYzVjI0NUg5M1YxOTFaIiBmaWxsPSIjMDA5OTAwIi8+Cjwvc3ZnPgo=";
-
-// src/client/console/WorkflowsPanel.tsx
-var import_react2 = __toESM(require("react"));
-var import_antd2 = require("antd");
-var import_client = require("@nocobase/client");
 
 // src/client/console/shared.tsx
 var import_react = __toESM(require("react"));
@@ -274,6 +269,95 @@ function ConsoleDrawer(props) {
 }
 
 // src/client/console/WorkflowsPanel.tsx
+var import_react3 = __toESM(require("react"));
+var import_antd3 = require("antd");
+var import_client = require("@nocobase/client");
+
+// src/client/console/VersionDiffDrawer.tsx
+var import_react2 = __toESM(require("react"));
+var import_antd2 = require("antd");
+var TYPE_LABELS = {
+  llm: "LLM",
+  image: "Image",
+  http: "HTTP",
+  data: "Data",
+  transform: "Transform",
+  condition: "Condition",
+  parallel: "Parallel",
+  loop: "Loop",
+  human_gate: "Approval",
+  subworkflow: "Sub-workflow",
+  output: "Output"
+};
+function flatten(nodes, out) {
+  var _a;
+  for (const n of nodes != null ? nodes : []) {
+    out.set(n.id, n);
+    for (const b of (_a = n.branches) != null ? _a : []) flatten(b, out);
+  }
+}
+function diffWorkflowDef(a, b) {
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+  const aMap = /* @__PURE__ */ new Map();
+  const bMap = /* @__PURE__ */ new Map();
+  flatten(a == null ? void 0 : a.nodes, aMap);
+  flatten(b == null ? void 0 : b.nodes, bMap);
+  const entries = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const [id, bNode] of bMap) {
+    seen.add(id);
+    const aNode = aMap.get(id);
+    if (!aNode) {
+      entries.push({ nodeId: id, kind: "added", type: bNode.type, title: bNode.title });
+      continue;
+    }
+    const diffs = [];
+    if (aNode.type !== bNode.type) diffs.push(`type: ${aNode.type} \u2192 ${bNode.type}`);
+    if (((_a = aNode.title) != null ? _a : "") !== ((_b = bNode.title) != null ? _b : "")) diffs.push(`title: "${(_c = aNode.title) != null ? _c : ""}" \u2192 "${(_d = bNode.title) != null ? _d : ""}"`);
+    if (JSON.stringify((_e = aNode.config) != null ? _e : {}) !== JSON.stringify((_f = bNode.config) != null ? _f : {})) diffs.push("config changed");
+    const aBranchCount = (_h = (_g = aNode.branches) == null ? void 0 : _g.length) != null ? _h : 0;
+    const bBranchCount = (_j = (_i = bNode.branches) == null ? void 0 : _i.length) != null ? _j : 0;
+    if (aBranchCount !== bBranchCount) diffs.push(`branches: ${aBranchCount} \u2192 ${bBranchCount}`);
+    if (diffs.length) entries.push({ nodeId: id, kind: "changed", type: bNode.type, title: bNode.title, detail: diffs.join(" \xB7 ") });
+  }
+  for (const [id, aNode] of aMap) {
+    if (seen.has(id)) continue;
+    entries.push({ nodeId: id, kind: "removed", type: aNode.type, title: aNode.title });
+  }
+  return entries;
+}
+var KIND_COLOR = { added: "green", removed: "red", changed: "orange" };
+var KIND_LABEL = { added: "ADDED", removed: "REMOVED", changed: "CHANGED" };
+function VersionDiffDrawer(props) {
+  const [leftKey, setLeftKey] = (0, import_react2.useState)(props.initialLeftKey);
+  const [rightKey, setRightKey] = (0, import_react2.useState)(props.initialRightKey);
+  const left = props.options.find((o) => o.key === leftKey);
+  const right = props.options.find((o) => o.key === rightKey);
+  const entries = (0, import_react2.useMemo)(() => diffWorkflowDef(left == null ? void 0 : left.definition, right == null ? void 0 : right.definition), [left, right]);
+  const selectOpts = props.options.map((o) => ({ value: o.key, label: o.label }));
+  return /* @__PURE__ */ import_react2.default.createElement(ConsoleDrawer, { open: true, title: "Version diff", onClose: props.onClose }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { padding: 18, maxWidth: 900 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", gap: 10, alignItems: "center", marginBottom: 16 } }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Select, { value: leftKey, onChange: setLeftKey, options: selectOpts, style: { width: 220 } }), /* @__PURE__ */ import_react2.default.createElement("span", { style: { color: "#8a8f8a" } }, "vs."), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Select, { value: rightKey, onChange: setRightKey, options: selectOpts, style: { width: 220 } })), entries.length === 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { color: "#8a8f8a", fontSize: 13 } }, "No structural differences between these two.") : /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, entries.map((e) => {
+    var _a;
+    return /* @__PURE__ */ import_react2.default.createElement(
+      "div",
+      {
+        key: e.nodeId,
+        style: {
+          borderLeft: `3px solid ${e.kind === "added" ? "#389e0d" : e.kind === "removed" ? "#cf1322" : "#d46b08"}`,
+          padding: "6px 10px",
+          background: "#fafaf8",
+          borderRadius: 4,
+          fontSize: 13
+        }
+      },
+      /* @__PURE__ */ import_react2.default.createElement(import_antd2.Tag, { color: KIND_COLOR[e.kind], style: { marginRight: 8 } }, KIND_LABEL[e.kind]),
+      /* @__PURE__ */ import_react2.default.createElement("b", null, e.title || e.nodeId),
+      e.type ? /* @__PURE__ */ import_react2.default.createElement("span", { style: { color: "#8a8f8a" } }, " (", (_a = TYPE_LABELS[e.type]) != null ? _a : e.type, ")") : null,
+      e.detail ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { color: "#5c605c", marginTop: 2 } }, e.detail) : null
+    );
+  }))));
+}
+
+// src/client/console/WorkflowsPanel.tsx
 var NODE_TYPES = [
   { type: "llm", label: "LLM", hint: "Gemini text call (prompt + optional JSON schema)" },
   { type: "image", label: "Image", hint: "Gemini image generation (raw REST path)" },
@@ -362,9 +446,9 @@ function findNode(nodes, id) {
 }
 function JsonArea(props) {
   var _a, _b;
-  const [text, setText] = (0, import_react2.useState)(() => props.value == null ? "" : JSON.stringify(props.value, null, 2));
-  const [bad, setBad] = (0, import_react2.useState)(false);
-  const lastValue = (0, import_react2.useRef)(props.value);
+  const [text, setText] = (0, import_react3.useState)(() => props.value == null ? "" : JSON.stringify(props.value, null, 2));
+  const [bad, setBad] = (0, import_react3.useState)(false);
+  const lastValue = (0, import_react3.useRef)(props.value);
   if (lastValue.current !== props.value) {
     lastValue.current = props.value;
     const s = props.value == null ? "" : JSON.stringify(props.value, null, 2);
@@ -373,8 +457,8 @@ function JsonArea(props) {
       setBad(false);
     }
   }
-  return /* @__PURE__ */ import_react2.default.createElement(
-    import_antd2.Input.TextArea,
+  return /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Input.TextArea,
     {
       value: text,
       rows: (_a = props.rows) != null ? _a : 4,
@@ -400,11 +484,11 @@ function JsonArea(props) {
   );
 }
 function Field({ label, children }) {
-  return /* @__PURE__ */ import_react2.default.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children);
+  return /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginBottom: 10 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children);
 }
 function AddSlot({ onAdd }) {
-  return /* @__PURE__ */ import_react2.default.createElement(
-    import_antd2.Dropdown,
+  return /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Dropdown,
     {
       menu: {
         items: NODE_TYPES.map((t) => ({ key: t.type, label: `${t.label} \u2014 ${t.hint}` })),
@@ -412,7 +496,7 @@ function AddSlot({ onAdd }) {
       },
       trigger: ["click"]
     },
-    /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "2px 0", cursor: "pointer" }, title: "Add node" }, /* @__PURE__ */ import_react2.default.createElement(
+    /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", justifyContent: "center", padding: "2px 0", cursor: "pointer" }, title: "Add node" }, /* @__PURE__ */ import_react3.default.createElement(
       "span",
       {
         style: {
@@ -433,9 +517,10 @@ function AddSlot({ onAdd }) {
 }
 function NodeCard(props) {
   var _a, _b, _c;
-  const { node, selected } = props;
+  const { node, selected, runStep, errorMessages, cached, onToggleSkip } = props;
   const label = (_b = (_a = NODE_TYPES.find((t) => t.type === node.type)) == null ? void 0 : _a.label) != null ? _b : node.type;
-  return /* @__PURE__ */ import_react2.default.createElement(
+  const hasErrors = !!(errorMessages == null ? void 0 : errorMessages.length);
+  return /* @__PURE__ */ import_react3.default.createElement(
     "div",
     {
       onClick: (e) => {
@@ -443,7 +528,7 @@ function NodeCard(props) {
         props.onSelect();
       },
       style: {
-        border: `1.5px solid ${selected ? NEOHOME_GREEN : "#e2e4e1"}`,
+        border: `1.5px solid ${hasErrors ? "#d4380d" : selected ? NEOHOME_GREEN : "#e2e4e1"}`,
         borderRadius: 10,
         background: "#fff",
         padding: "8px 10px",
@@ -451,19 +536,28 @@ function NodeCard(props) {
         boxShadow: selected ? "0 1px 6px rgba(0,153,0,.15)" : "none"
       }
     },
-    /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Tag, { color: (_c = TYPE_COLORS[node.type]) != null ? _c : "default", style: { marginRight: 0 } }, label), /* @__PURE__ */ import_react2.default.createElement(
+    /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Tag, { color: (_c = TYPE_COLORS[node.type]) != null ? _c : "default", style: { marginRight: 0 } }, label), /* @__PURE__ */ import_react3.default.createElement(
       "span",
       {
         title: node.title || node.id,
         style: { fontWeight: 600, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }
       },
       node.title || node.id
-    ), /* @__PURE__ */ import_react2.default.createElement("span", { style: { display: "flex", gap: 4 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", onClick: () => props.onMove(-1), title: "Move up" }, "\u2191"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", onClick: () => props.onMove(1), title: "Move down" }, "\u2193"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { size: "small", type: "text", danger: true, onClick: props.onDelete, title: "Delete" }, "\u2715"))),
+    ), hasErrors ? /* @__PURE__ */ import_react3.default.createElement("span", { title: errorMessages.join(" \xB7 "), style: { display: "inline-flex" } }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Tag, { color: "error", style: { marginRight: 0, fontSize: 11 } }, "!")) : null, runStep ? /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: runStep.status }) : null, cached && onToggleSkip ? /* @__PURE__ */ import_react3.default.createElement(
+      import_antd3.Checkbox,
+      {
+        checked: props.skip === true,
+        onClick: (e) => e.stopPropagation(),
+        onChange: onToggleSkip,
+        title: "Skip this node on the next draft test run \u2014 reuse its last cached output"
+      },
+      /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 11.5, color: "#8a8f8a" } }, "skip (cached)")
+    ) : null, /* @__PURE__ */ import_react3.default.createElement("span", { style: { display: "flex", gap: 4 }, onClick: (e) => e.stopPropagation() }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { size: "small", type: "text", onClick: () => props.onMove(-1), title: "Move up" }, "\u2191"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { size: "small", type: "text", onClick: () => props.onMove(1), title: "Move down" }, "\u2193"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { size: "small", type: "text", danger: true, onClick: props.onDelete, title: "Delete" }, "\u2715"))),
     props.children
   );
 }
 function NodeList(props) {
-  const { nodes, def } = props;
+  const { nodes, def, stepsByNodeId, errorsByNodeId, isTopLevel, cachedOutputs, skipSet, onToggleSkip } = props;
   const insert = (index, type) => {
     nodes.splice(index, 0, makeNode(type, def));
     props.onChange();
@@ -484,7 +578,7 @@ function NodeList(props) {
     if (node.type === "loop") return "BODY (per item)";
     return `BRANCH ${i + 1}`;
   };
-  return /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, nodes.length === 0 && props.emptyHint ? /* @__PURE__ */ import_react2.default.createElement(
+  return /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 2 } }, nodes.length === 0 && props.emptyHint ? /* @__PURE__ */ import_react3.default.createElement(
     "div",
     {
       style: {
@@ -495,16 +589,21 @@ function NodeList(props) {
       }
     },
     props.emptyHint
-  ) : null, nodes.map((node, i) => /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, { key: node.id }, /* @__PURE__ */ import_react2.default.createElement(AddSlot, { onAdd: (t) => insert(i, t) }), /* @__PURE__ */ import_react2.default.createElement(
+  ) : null, nodes.map((node, i) => /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, { key: node.id }, /* @__PURE__ */ import_react3.default.createElement(AddSlot, { onAdd: (t) => insert(i, t) }), /* @__PURE__ */ import_react3.default.createElement(
     NodeCard,
     {
       node,
       selected: props.selectedId === node.id,
       onSelect: () => props.onSelect(node.id),
       onDelete: () => del(i),
-      onMove: (dir) => move(i, dir)
+      onMove: (dir) => move(i, dir),
+      runStep: stepsByNodeId == null ? void 0 : stepsByNodeId.get(node.id),
+      errorMessages: errorsByNodeId == null ? void 0 : errorsByNodeId.get(node.id),
+      cached: isTopLevel === true && (cachedOutputs == null ? void 0 : cachedOutputs[node.id]) !== void 0,
+      skip: (skipSet == null ? void 0 : skipSet.has(node.id)) === true,
+      onToggleSkip: isTopLevel === true && (cachedOutputs == null ? void 0 : cachedOutputs[node.id]) !== void 0 ? () => onToggleSkip == null ? void 0 : onToggleSkip(node.id) : void 0
     },
-    node.branches && node.branches.length > 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8, alignItems: "stretch", overflowX: "auto" } }, node.branches.map((branch, bi) => /* @__PURE__ */ import_react2.default.createElement(
+    node.branches && node.branches.length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", gap: 8, marginTop: 8, alignItems: "stretch", overflowX: "auto" } }, node.branches.map((branch, bi) => /* @__PURE__ */ import_react3.default.createElement(
       "div",
       {
         key: bi,
@@ -517,8 +616,8 @@ function NodeList(props) {
           background: "#fafbf9"
         }
       },
-      /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react2.default.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#8a8f8a", flex: 1 } }, branchLabel(node, bi)), node.type === "parallel" && node.branches.length > 1 ? /* @__PURE__ */ import_react2.default.createElement(
-        import_antd2.Button,
+      /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 4 } }, /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 10.5, fontWeight: 700, letterSpacing: ".06em", color: "#8a8f8a", flex: 1 } }, branchLabel(node, bi)), node.type === "parallel" && node.branches.length > 1 ? /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Button,
         {
           size: "small",
           type: "text",
@@ -532,9 +631,20 @@ function NodeList(props) {
         },
         "remove"
       ) : null),
-      /* @__PURE__ */ import_react2.default.createElement(NodeList, { nodes: branch, selectedId: props.selectedId, onSelect: props.onSelect, onChange: props.onChange, def })
-    )), node.type === "parallel" ? /* @__PURE__ */ import_react2.default.createElement(
-      import_antd2.Button,
+      /* @__PURE__ */ import_react3.default.createElement(
+        NodeList,
+        {
+          nodes: branch,
+          selectedId: props.selectedId,
+          onSelect: props.onSelect,
+          onChange: props.onChange,
+          def,
+          stepsByNodeId,
+          errorsByNodeId
+        }
+      )
+    )), node.type === "parallel" ? /* @__PURE__ */ import_react3.default.createElement(
+      import_antd3.Button,
       {
         size: "small",
         style: { alignSelf: "flex-start" },
@@ -546,7 +656,7 @@ function NodeList(props) {
       },
       "+ branch"
     ) : null) : null
-  ))), /* @__PURE__ */ import_react2.default.createElement(AddSlot, { onAdd: (t) => insert(nodes.length, t) }));
+  ))), /* @__PURE__ */ import_react3.default.createElement(AddSlot, { onAdd: (t) => insert(nodes.length, t) }));
 }
 function NodeConfigForm({ node, onChange }) {
   var _a, _b, _c, _d, _e, _f, _g;
@@ -555,34 +665,34 @@ function NodeConfigForm({ node, onChange }) {
     cfg[k] = v;
     onChange();
   };
-  const common = /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Title" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: node.title, placeholder: node.id, onChange: (e) => (node.title = e.target.value, onChange()) }));
-  const retries = /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Retries on failure" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.InputNumber, { min: 0, max: 5, value: (_b = cfg.retries) != null ? _b : 0, onChange: (v) => set("retries", v != null ? v : 0) }));
+  const common = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Title" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: node.title, placeholder: node.id, onChange: (e) => (node.title = e.target.value, onChange()) }));
+  const retries = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Retries on failure" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.InputNumber, { min: 0, max: 5, value: (_b = cfg.retries) != null ? _b : 0, onChange: (v) => set("retries", v != null ? v : 0) }));
   let body = null;
   switch (node.type) {
     case "llm":
-      body = /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Model (empty = default)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.model, placeholder: "gemini-2.5-flash", onChange: (e) => set("model", e.target.value || void 0) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "plugin-ai service (empty = default)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.service, onChange: (e) => set("service", e.target.value || void 0) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "System prompt" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input.TextArea, { rows: 3, value: cfg.system, onChange: (e) => set("system", e.target.value || void 0) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Prompt (templates: {{input.x}}, {{nodes.<id>.y}})" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input.TextArea, { rows: 6, value: cfg.prompt, onChange: (e) => set("prompt", e.target.value) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "JSON schema (optional \u2014 forces JSON output)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: cfg.jsonSchema, onChange: (v) => set("jsonSchema", v), rows: 5 })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Temperature" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.InputNumber, { min: 0, max: 2, step: 0.1, value: (_c = cfg.temperature) != null ? _c : 0.2, onChange: (v) => set("temperature", v != null ? v : 0.2) })), retries);
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Model (empty = default)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.model, placeholder: "gemini-2.5-flash", onChange: (e) => set("model", e.target.value || void 0) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "plugin-ai service (empty = default)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.service, onChange: (e) => set("service", e.target.value || void 0) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "System prompt" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input.TextArea, { rows: 3, value: cfg.system, onChange: (e) => set("system", e.target.value || void 0) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Prompt (templates: {{input.x}}, {{nodes.<id>.y}})" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input.TextArea, { rows: 6, value: cfg.prompt, onChange: (e) => set("prompt", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "JSON schema (optional \u2014 forces JSON output)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.jsonSchema, onChange: (v) => set("jsonSchema", v), rows: 5 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Temperature" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.InputNumber, { min: 0, max: 2, step: 0.1, value: (_c = cfg.temperature) != null ? _c : 0.2, onChange: (v) => set("temperature", v != null ? v : 0.2) })), retries);
       break;
     case "image":
-      body = /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Model" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.model, placeholder: "gemini-2.5-flash-image", onChange: (e) => set("model", e.target.value || void 0) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Prompt" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input.TextArea, { rows: 5, value: cfg.prompt, onChange: (e) => set("prompt", e.target.value) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Input image (template \u2192 data URL, optional)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.image, placeholder: "{{input.image}}", onChange: (e) => set("image", e.target.value || void 0) })), retries);
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Model" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.model, placeholder: "gemini-2.5-flash-image", onChange: (e) => set("model", e.target.value || void 0) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Prompt" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input.TextArea, { rows: 5, value: cfg.prompt, onChange: (e) => set("prompt", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Input image (template \u2192 data URL, optional)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.image, placeholder: "{{input.image}}", onChange: (e) => set("image", e.target.value || void 0) })), retries);
       break;
     case "http":
-      body = /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Method" }, /* @__PURE__ */ import_react2.default.createElement(
-        import_antd2.Select,
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Method" }, /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Select,
         {
           value: (_d = cfg.method) != null ? _d : "GET",
           onChange: (v) => set("method", v),
           options: ["GET", "POST", "PUT", "PATCH", "DELETE"].map((m) => ({ value: m, label: m })),
           style: { width: 120 }
         }
-      )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "URL (templated)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.url, onChange: (e) => set("url", e.target.value) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Headers (JSON)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: cfg.headers, onChange: (v) => set("headers", v), rows: 3 })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Body (string or JSON; templated)" }, /* @__PURE__ */ import_react2.default.createElement(
-        import_antd2.Input.TextArea,
+      )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "URL (templated)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.url, onChange: (e) => set("url", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Headers (JSON)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.headers, onChange: (v) => set("headers", v), rows: 3 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Body (string or JSON; templated)" }, /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Input.TextArea,
         {
           rows: 4,
           value: typeof cfg.body === "string" ? cfg.body : cfg.body ? JSON.stringify(cfg.body, null, 2) : "",
           onChange: (e) => set("body", e.target.value || void 0)
         }
-      )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Response type" }, /* @__PURE__ */ import_react2.default.createElement(
-        import_antd2.Select,
+      )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Response type" }, /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Select,
         {
           value: (_e = cfg.responseType) != null ? _e : "json",
           onChange: (v) => set("responseType", v),
@@ -595,46 +705,46 @@ function NodeConfigForm({ node, onChange }) {
       )), retries);
       break;
     case "data":
-      body = /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Collection" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.collection, placeholder: "konfigurator_plots", onChange: (e) => set("collection", e.target.value) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Operation" }, /* @__PURE__ */ import_react2.default.createElement(
-        import_antd2.Select,
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Collection" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.collection, placeholder: "konfigurator_plots", onChange: (e) => set("collection", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Operation" }, /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Select,
         {
           value: (_f = cfg.op) != null ? _f : "list",
           onChange: (v) => set("op", v),
           options: ["list", "get", "create", "update"].map((o) => ({ value: o, label: o })),
           style: { width: 140 }
         }
-      )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Filter (JSON, templated)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: cfg.filter, onChange: (v) => set("filter", v), rows: 3 })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Values (JSON, for create/update)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: cfg.values, onChange: (v) => set("values", v), rows: 3 })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Allow write" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Checkbox, { checked: cfg.allowWrite === true, onChange: (e) => set("allowWrite", e.target.checked) }, "permit create/update (explicit opt-in)")));
+      )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Filter (JSON, templated)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.filter, onChange: (v) => set("filter", v), rows: 3 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Values (JSON, for create/update)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.values, onChange: (v) => set("values", v), rows: 3 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Allow write" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Checkbox, { checked: cfg.allowWrite === true, onChange: (e) => set("allowWrite", e.target.checked) }, "permit create/update (explicit opt-in)")));
       break;
     case "transform":
-      body = /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Map (JSON of templates)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: cfg.map, onChange: (v) => set("map", v != null ? v : {}), rows: 8, placeholder: '{ "lat": "{{nodes.geo.body.0.lat}}" }' }));
+      body = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Map (JSON of templates)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.map, onChange: (v) => set("map", v != null ? v : {}), rows: 8, placeholder: '{ "lat": "{{nodes.geo.body.0.lat}}" }' }));
       break;
     case "condition":
-      body = /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Left (templated)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.left, onChange: (e) => set("left", e.target.value) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Operator" }, /* @__PURE__ */ import_react2.default.createElement(
-        import_antd2.Select,
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Left (templated)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.left, onChange: (e) => set("left", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Operator" }, /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Select,
         {
           value: (_g = cfg.op) != null ? _g : "notEmpty",
           onChange: (v) => set("op", v),
           options: ["truthy", "eq", "ne", "gt", "gte", "lt", "lte", "contains", "empty", "notEmpty"].map((o) => ({ value: o, label: o })),
           style: { width: 160 }
         }
-      )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Right (templated)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.right, onChange: (e) => set("right", e.target.value) })));
+      )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Right (templated)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.right, onChange: (e) => set("right", e.target.value) })));
       break;
     case "loop":
-      body = /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Items (template \u2192 array; body sees {{item}} / {{index}})" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.items, placeholder: "{{nodes.list.rows}}", onChange: (e) => set("items", e.target.value) }));
+      body = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Items (template \u2192 array; body sees {{item}} / {{index}})" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.items, placeholder: "{{nodes.list.rows}}", onChange: (e) => set("items", e.target.value) }));
       break;
     case "human_gate":
-      body = /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Message shown to the approver (templated)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input.TextArea, { rows: 3, value: cfg.message, onChange: (e) => set("message", e.target.value) }));
+      body = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Message shown to the approver (templated)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input.TextArea, { rows: 3, value: cfg.message, onChange: (e) => set("message", e.target.value) }));
       break;
     case "subworkflow":
-      body = /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Workflow key" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: cfg.workflowKey, onChange: (e) => set("workflowKey", e.target.value) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Input (JSON of templates)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: cfg.input, onChange: (v) => set("input", v != null ? v : {}), rows: 4 })));
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Workflow key" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.workflowKey, onChange: (e) => set("workflowKey", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Input (JSON of templates)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.input, onChange: (v) => set("input", v != null ? v : {}), rows: 4 })));
       break;
     case "output":
-      body = /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Result map (JSON of templates)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: cfg.map, onChange: (v) => set("map", v != null ? v : {}), rows: 6 })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "End run here" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Checkbox, { checked: cfg.end === true, onChange: (e) => set("end", e.target.checked) }, "stop the workflow after this node")));
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Result map (JSON of templates)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.map, onChange: (v) => set("map", v != null ? v : {}), rows: 6 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "End run here" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Checkbox, { checked: cfg.end === true, onChange: (e) => set("end", e.target.checked) }, "stop the workflow after this node")));
       break;
     default:
       body = null;
   }
-  return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, common, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Node id" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: node.id, disabled: true })), body);
+  return /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, common, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Node id" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: node.id, disabled: true })), body);
 }
 function confirmRun(estimate) {
   const e = estimate != null ? estimate : {};
@@ -646,7 +756,7 @@ function confirmRun(estimate) {
       settled = true;
       resolve(v);
     };
-    import_antd2.Modal.confirm({
+    import_antd3.Modal.confirm({
       title: "Run this workflow?",
       icon: null,
       width: 440,
@@ -654,83 +764,221 @@ function confirmRun(estimate) {
       cancelText: "Cancel",
       onOk: () => finish(true),
       onCancel: () => finish(false),
-      content: /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 13.5, lineHeight: 1.6 } }, /* @__PURE__ */ import_react2.default.createElement("p", { style: { margin: "0 0 10px" } }, "Makes ", /* @__PURE__ */ import_react2.default.createElement("b", null, (_a = e.llmCalls) != null ? _a : "?"), " LLM call", e.llmCalls === 1 ? "" : "s", " and ", /* @__PURE__ */ import_react2.default.createElement("b", null, (_b = e.imageCalls) != null ? _b : 0), " image call", e.imageCalls === 1 ? "" : "s", " per run."), /* @__PURE__ */ import_react2.default.createElement("div", { style: { background: "#fafaf8", border: "1px solid #ececea", borderRadius: 8, padding: "8px 12px" } }, /* @__PURE__ */ import_react2.default.createElement("div", null, "Spent today (global): ", /* @__PURE__ */ import_react2.default.createElement("b", null, "$", ((_c = e.spentTodayUsd) != null ? _c : 0).toFixed(2)), e.globalDailyBudgetUsd ? ` / $${e.globalDailyBudgetUsd} budget` : " (no budget set)"), /* @__PURE__ */ import_react2.default.createElement("div", null, "Spent today (this workflow): ", /* @__PURE__ */ import_react2.default.createElement("b", null, "$", ((_d = e.workflowSpentTodayUsd) != null ? _d : 0).toFixed(2)), e.workflowDailyBudgetUsd ? ` / $${e.workflowDailyBudgetUsd} budget` : " (no budget set)")))
+      content: /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 13.5, lineHeight: 1.6 } }, /* @__PURE__ */ import_react3.default.createElement("p", { style: { margin: "0 0 10px" } }, "Makes ", /* @__PURE__ */ import_react3.default.createElement("b", null, (_a = e.llmCalls) != null ? _a : "?"), " LLM call", e.llmCalls === 1 ? "" : "s", " and ", /* @__PURE__ */ import_react3.default.createElement("b", null, (_b = e.imageCalls) != null ? _b : 0), " image call", e.imageCalls === 1 ? "" : "s", " per run."), /* @__PURE__ */ import_react3.default.createElement("div", { style: { background: "#fafaf8", border: "1px solid #ececea", borderRadius: 8, padding: "8px 12px" } }, /* @__PURE__ */ import_react3.default.createElement("div", null, "Spent today (global): ", /* @__PURE__ */ import_react3.default.createElement("b", null, "$", ((_c = e.spentTodayUsd) != null ? _c : 0).toFixed(2)), e.globalDailyBudgetUsd ? ` / $${e.globalDailyBudgetUsd} budget` : " (no budget set)"), /* @__PURE__ */ import_react3.default.createElement("div", null, "Spent today (this workflow): ", /* @__PURE__ */ import_react3.default.createElement("b", null, "$", ((_d = e.workflowSpentTodayUsd) != null ? _d : 0).toFixed(2)), e.workflowDailyBudgetUsd ? ` / $${e.workflowDailyBudgetUsd} budget` : " (no budget set)")))
     });
   });
 }
-function TestRunBox({ workflowId, currentVersion, exampleInput }) {
+function TestRunBox({
+  workflowId,
+  currentVersion,
+  exampleInput,
+  onStatus,
+  topLevelNodes,
+  skipSet,
+  cachedOutputs
+}) {
   var _a, _b, _c, _d, _e, _f;
   const api = (0, import_client.useAPIClient)();
-  const [inputText, setInputText] = (0, import_react2.useState)(() => JSON.stringify(exampleInput != null ? exampleInput : {}, null, 2));
-  const [runId, setRunId] = (0, import_react2.useState)(null);
-  const [data, setData] = (0, import_react2.useState)({});
+  const [inputText, setInputText] = (0, import_react3.useState)(() => JSON.stringify(exampleInput != null ? exampleInput : {}, null, 2));
+  const [runId, setRunId] = (0, import_react3.useState)(null);
+  const [data, setData] = (0, import_react3.useState)({});
   const active = !!runId && !["succeeded", "failed", "cancelled", "rejected"].includes(String((_b = (_a = data.run) == null ? void 0 : _a.status) != null ? _b : ""));
+  const onStatusRef = (0, import_react3.useRef)(onStatus);
+  onStatusRef.current = onStatus;
   usePoll(
     async () => {
+      var _a2;
       if (!runId) return;
       try {
-        setData(await neoaiAction(api, "runStatus", { runId }));
+        const d = await neoaiAction(api, "runStatus", { runId });
+        setData(d);
+        (_a2 = onStatusRef.current) == null ? void 0 : _a2.call(onStatusRef, d);
       } catch (e) {
       }
     },
     2e3,
     !!runId && active
   );
+  const computeSeed = () => {
+    const nodes = topLevelNodes != null ? topLevelNodes : [];
+    if (!(skipSet == null ? void 0 : skipSet.size) || !nodes.length) return {};
+    let firstRunIndex = 0;
+    while (firstRunIndex < nodes.length && skipSet.has(nodes[firstRunIndex].id)) firstRunIndex += 1;
+    if (firstRunIndex === 0 || firstRunIndex >= nodes.length) return {};
+    const seedVars = {};
+    for (let i = 0; i < firstRunIndex; i++) {
+      const id = nodes[i].id;
+      if ((cachedOutputs == null ? void 0 : cachedOutputs[id]) !== void 0) seedVars[id] = cachedOutputs[id];
+    }
+    return { skipToNodeId: nodes[firstRunIndex].id, seedVars };
+  };
   const start = async (draft) => {
-    var _a2;
+    var _a2, _b2;
     let input = {};
     try {
       input = inputText.trim() ? JSON.parse(inputText) : {};
     } catch (e) {
-      import_antd2.message.error("Test input is not valid JSON");
+      import_antd3.message.error("Test input is not valid JSON");
       return;
     }
     try {
-      let res = await neoaiAction(api, "run", { workflowId, input, draft, confirmed: draft, trigger: draft ? "test" : "manual" });
+      const seed = draft ? computeSeed() : {};
+      let res = await neoaiAction(api, "run", { workflowId, input, draft, confirmed: draft, trigger: draft ? "test" : "manual", ...seed });
       if (res.needsConfirm) {
         const ok = await confirmRun(res.estimate);
         if (!ok) return;
         res = await neoaiAction(api, "run", { workflowId, input, draft, confirmed: true, trigger: "manual" });
       }
       if (res.error) {
-        import_antd2.message.error(res.error);
+        import_antd3.message.error(res.error);
         return;
       }
       setRunId(res.runId);
       setData({});
+      (_a2 = onStatusRef.current) == null ? void 0 : _a2.call(onStatusRef, {});
     } catch (err) {
-      import_antd2.message.error(String((_a2 = err == null ? void 0 : err.message) != null ? _a2 : err));
+      import_antd3.message.error(String((_b2 = err == null ? void 0 : err.message) != null ? _b2 : err));
     }
   };
-  return /* @__PURE__ */ import_react2.default.createElement("div", null, /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Input (JSON)" }, /* @__PURE__ */ import_react2.default.createElement(
-    import_antd2.Input.TextArea,
+  return /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Input (JSON)" }, /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Input.TextArea,
     {
       rows: 4,
       value: inputText,
       onChange: (e) => setInputText(e.target.value),
       style: { fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12 }
     }
-  )), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Space, { wrap: true }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { type: "primary", onClick: () => start(true) }, "Run draft test"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { disabled: !currentVersion, title: currentVersion ? "" : "Publish first", onClick: () => start(false) }, "Run published v", currentVersion || "\u2014"), runId ? /* @__PURE__ */ import_react2.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "run #", runId) : null, data.run ? /* @__PURE__ */ import_react2.default.createElement(StatusTag, { status: data.run.status }) : null), ((_c = data.steps) != null ? _c : []).length > 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { marginTop: 10, display: "flex", flexDirection: "column", gap: 4 } }, ((_d = data.steps) != null ? _d : []).map((s) => /* @__PURE__ */ import_react2.default.createElement("div", { key: s.id, style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12.5 } }, /* @__PURE__ */ import_react2.default.createElement(StatusTag, { status: s.status }), /* @__PURE__ */ import_react2.default.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, s.title || s.node_id), /* @__PURE__ */ import_react2.default.createElement("span", { style: { color: "#8a8f8a" } }, fmtDuration(s.duration_ms)), /* @__PURE__ */ import_react2.default.createElement("span", { style: { color: "#8a8f8a" } }, fmtCost(s.cost_usd))))) : null, ((_e = data.run) == null ? void 0 : _e.status) === "succeeded" ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ import_react2.default.createElement(JsonBox, { value: data.run.output, maxHeight: 200 })) : null, ((_f = data.run) == null ? void 0 : _f.status) === "failed" ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { marginTop: 8, color: "#b02a2a", fontSize: 12.5 } }, data.run.error) : null);
+  )), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Space, { wrap: true }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { type: "primary", onClick: () => start(true) }, "Run draft test"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { disabled: !currentVersion, title: currentVersion ? "" : "Publish first", onClick: () => start(false) }, "Run published v", currentVersion || "\u2014"), runId ? /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "run #", runId) : null, data.run ? /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: data.run.status }) : null), ((_c = data.steps) != null ? _c : []).length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 10, display: "flex", flexDirection: "column", gap: 4 } }, ((_d = data.steps) != null ? _d : []).map((s) => /* @__PURE__ */ import_react3.default.createElement("div", { key: s.id, style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12.5 } }, /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: s.status }), /* @__PURE__ */ import_react3.default.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, s.title || s.node_id), /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: "#8a8f8a" } }, fmtDuration(s.duration_ms)), /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: "#8a8f8a" } }, fmtCost(s.cost_usd))))) : null, ((_e = data.run) == null ? void 0 : _e.status) === "succeeded" ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ import_react3.default.createElement(JsonBox, { value: data.run.output, maxHeight: 200 })) : null, ((_f = data.run) == null ? void 0 : _f.status) === "failed" ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 8, color: "#b02a2a", fontSize: 12.5 } }, data.run.error) : null);
+}
+function BatchRunBox({ workflowId }) {
+  const api = (0, import_client.useAPIClient)();
+  const [itemsText, setItemsText] = (0, import_react3.useState)("[\n  {}\n]");
+  const [busy, setBusy] = (0, import_react3.useState)(false);
+  const start = async () => {
+    var _a, _b, _c;
+    let items;
+    try {
+      const parsed = JSON.parse(itemsText);
+      if (!Array.isArray(parsed)) throw new Error("not an array");
+      items = parsed;
+    } catch (e) {
+      import_antd3.message.error('Items must be a JSON array, e.g. [{"x":1},{"x":2}]');
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await neoaiAction(api, "batchRun", { workflowId, items });
+      if (res.error) {
+        import_antd3.message.error(res.error);
+        return;
+      }
+      const started = ((_a = res.started) != null ? _a : []).filter((r) => r.runId).length;
+      const failed = ((_b = res.started) != null ? _b : []).length - started;
+      import_antd3.message.success(`Batch: ${started} run${started === 1 ? "" : "s"} started${failed ? `, ${failed} failed to start` : ""}`);
+    } catch (err) {
+      import_antd3.message.error(String((_c = err == null ? void 0 : err.message) != null ? _c : err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: 'Items (JSON array \u2014 one run per item, e.g. [{"dealId":1},{"dealId":2}])' }, /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Input.TextArea,
+    {
+      rows: 4,
+      value: itemsText,
+      onChange: (e) => setItemsText(e.target.value),
+      style: { fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12 }
+    }
+  )), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { loading: busy, onClick: start }, "Run batch"), /* @__PURE__ */ import_react3.default.createElement("span", { style: { marginLeft: 10, fontSize: 12, color: "#8a8f8a" } }, "Runs against the published version \u2014 view progress in the Runs tab (trigger: batch)."));
 }
 function WorkflowEditor(props) {
-  var _a, _b;
+  var _a, _b, _c, _d;
   const api = (0, import_client.useAPIClient)();
-  const [wf, setWf] = (0, import_react2.useState)(props.row);
-  const defRef = (0, import_react2.useRef)(
+  const [wf, setWf] = (0, import_react3.useState)(props.row);
+  const defRef = (0, import_react3.useRef)(
     props.row.definition_draft && Array.isArray(props.row.definition_draft.nodes) ? JSON.parse(JSON.stringify(props.row.definition_draft)) : { nodes: [] }
   );
-  const [selectedId, setSelectedId] = (0, import_react2.useState)(null);
-  const [dirty, setDirty] = (0, import_react2.useState)(false);
-  const [, setTick] = (0, import_react2.useState)(0);
+  const [selectedId, setSelectedId] = (0, import_react3.useState)(null);
+  const [dirty, setDirty] = (0, import_react3.useState)(false);
+  const [, setTick] = (0, import_react3.useState)(0);
+  const [runStatus, setRunStatus] = (0, import_react3.useState)({});
+  const [validationErrors, setValidationErrors] = (0, import_react3.useState)([]);
+  const validateTimer = (0, import_react3.useRef)(null);
   const rerender = () => {
     setDirty(true);
     setTick((n) => n + 1);
+    if (validateTimer.current) clearTimeout(validateTimer.current);
+    validateTimer.current = setTimeout(async () => {
+      var _a2;
+      try {
+        const res = await neoaiAction(api, "publishWorkflow", { workflowId: wf.id, dryRun: true });
+        setValidationErrors((_a2 = res.errors) != null ? _a2 : []);
+      } catch (e) {
+      }
+    }, 500);
   };
   const selected = selectedId ? findNode(defRef.current.nodes, selectedId) : null;
   if (selectedId && !selected && selectedId !== null) {
     setSelectedId(null);
   }
-  const [versions, setVersions] = (0, import_react2.useState)([]);
+  const stepsByNodeId = (0, import_react3.useMemo)(() => {
+    var _a2;
+    const m = /* @__PURE__ */ new Map();
+    for (const s of (_a2 = runStatus.steps) != null ? _a2 : []) m.set(s.node_id, s);
+    return m;
+  }, [runStatus]);
+  const cachedOutputsRef = (0, import_react3.useRef)({});
+  const [skipSet, setSkipSet] = (0, import_react3.useState)(/* @__PURE__ */ new Set());
+  for (const s of (_a = runStatus.steps) != null ? _a : []) {
+    if (s.status === "done" && s.output !== void 0) cachedOutputsRef.current[s.node_id] = s.output;
+  }
+  const toggleSkip = (nodeId) => {
+    setSkipSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  };
+  const errorsByNodeId = (0, import_react3.useMemo)(() => {
+    var _a2;
+    const m = /* @__PURE__ */ new Map();
+    for (const e of validationErrors) {
+      if (!e.nodeId) continue;
+      const arr = (_a2 = m.get(e.nodeId)) != null ? _a2 : [];
+      arr.push(e.message);
+      m.set(e.nodeId, arr);
+    }
+    return m;
+  }, [validationErrors]);
+  const generalErrors = validationErrors.filter((e) => !e.nodeId);
+  (0, import_react3.useEffect)(() => {
+    (async () => {
+      var _a2;
+      try {
+        const res = await neoaiAction(api, "publishWorkflow", { workflowId: wf.id, dryRun: true });
+        setValidationErrors((_a2 = res.errors) != null ? _a2 : []);
+      } catch (e) {
+      }
+    })();
+  }, []);
+  usePoll(
+    async () => {
+      try {
+        const { rows } = await listResource(api, "neoai_runs", {
+          filter: JSON.stringify({ workflow_id: wf.id, status: { $in: ["queued", "running", "waiting"] } }),
+          sort: "-id",
+          pageSize: 1
+        });
+        if (rows[0]) setRunStatus(await neoaiAction(api, "runStatus", { runId: rows[0].id }));
+      } catch (e) {
+      }
+    },
+    5e3,
+    stepsByNodeId.size === 0 && !runStatus.run
+  );
+  const [versions, setVersions] = (0, import_react3.useState)([]);
+  const [diffAgainst, setDiffAgainst] = (0, import_react3.useState)(null);
   const loadVersions = async () => {
     try {
       const { rows } = await listResource(api, "neoai_workflow_versions", {
@@ -744,7 +992,7 @@ function WorkflowEditor(props) {
   };
   usePoll(loadVersions, 36e5, true);
   const saveDraft = async (silent = false) => {
-    var _a2, _b2, _c, _d;
+    var _a2, _b2, _c2, _d2, _e, _f;
     try {
       await updateResource(api, "neoai_workflows", wf.id, {
         definition_draft: defRef.current,
@@ -753,41 +1001,44 @@ function WorkflowEditor(props) {
         daily_budget_usd: Number(wf.daily_budget_usd) || 0,
         description: (_a2 = wf.description) != null ? _a2 : "",
         schedule: (_b2 = wf.schedule) != null ? _b2 : "",
-        schedule_input: (_c = wf.schedule_input) != null ? _c : null
+        schedule_input: (_c2 = wf.schedule_input) != null ? _c2 : null,
+        on_failure_workflow_key: (_d2 = wf.on_failure_workflow_key) != null ? _d2 : "",
+        on_failure_input: (_e = wf.on_failure_input) != null ? _e : null
       });
       setDirty(false);
-      if (!silent) import_antd2.message.success("Draft saved");
+      if (!silent) import_antd3.message.success("Draft saved");
       return true;
     } catch (err) {
-      import_antd2.message.error(`Save failed: ${(_d = err == null ? void 0 : err.message) != null ? _d : err}`);
+      import_antd3.message.error(`Save failed: ${(_f = err == null ? void 0 : err.message) != null ? _f : err}`);
       return false;
     }
   };
   const publish = async () => {
-    var _a2, _b2;
+    var _a2, _b2, _c2;
     if (dirty && !await saveDraft(true)) return;
     try {
       const res = await neoaiAction(api, "publishWorkflow", { workflowId: wf.id });
       if (res.ok) {
-        import_antd2.message.success(`Published as version ${res.version}`);
+        import_antd3.message.success(`Published as version ${res.version}`);
         setWf({ ...wf, current_version: res.version });
         loadVersions();
       } else {
-        import_antd2.message.error(`Not publishable: ${((_a2 = res.errors) != null ? _a2 : []).join(" \xB7 ")}`);
+        setValidationErrors((_a2 = res.errors) != null ? _a2 : []);
+        import_antd3.message.error(`Not publishable: ${((_b2 = res.errors) != null ? _b2 : []).map((e) => e.message).join(" \xB7 ")}`);
       }
     } catch (err) {
-      import_antd2.message.error(`Publish failed: ${(_b2 = err == null ? void 0 : err.message) != null ? _b2 : err}`);
+      import_antd3.message.error(`Publish failed: ${(_c2 = err == null ? void 0 : err.message) != null ? _c2 : err}`);
     }
   };
-  return /* @__PURE__ */ import_react2.default.createElement(
+  return /* @__PURE__ */ import_react3.default.createElement(
     ConsoleDrawer,
     {
       open: true,
-      title: /* @__PURE__ */ import_react2.default.createElement("span", null, wf.name, " ", /* @__PURE__ */ import_react2.default.createElement("span", { style: { color: "#8a8f8a", fontWeight: 400, fontSize: 13 } }, "(", wf.key, " \xB7 v", (_a = wf.current_version) != null ? _a : 0, dirty ? " \xB7 unsaved changes" : "", ")")),
-      extra: /* @__PURE__ */ import_react2.default.createElement(import_antd2.Space, null, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { onClick: saveDraft, disabled: !dirty }, "Save draft"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { type: "primary", onClick: publish }, "Publish")),
+      title: /* @__PURE__ */ import_react3.default.createElement("span", null, wf.name, " ", /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: "#8a8f8a", fontWeight: 400, fontSize: 13 } }, "(", wf.key, " \xB7 v", (_b = wf.current_version) != null ? _b : 0, dirty ? " \xB7 unsaved changes" : "", ")")),
+      extra: /* @__PURE__ */ import_react3.default.createElement(import_antd3.Space, null, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { onClick: saveDraft, disabled: !dirty }, "Save draft"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { type: "primary", onClick: publish }, "Publish")),
       onClose: () => props.onClose(true)
     },
-    /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", minHeight: "100%", alignItems: "stretch" } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { flex: 1, padding: 18, minWidth: 0 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { maxWidth: 860 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "WORKFLOW TREE"), /* @__PURE__ */ import_react2.default.createElement(
+    /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", minHeight: "100%", alignItems: "stretch" } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: 1, padding: 18, minWidth: 0 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { maxWidth: 860 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "WORKFLOW TREE"), generalErrors.length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginBottom: 10, fontSize: 12.5, color: "#b02a2a" } }, generalErrors.map((e) => e.message).join(" \xB7 ")) : null, /* @__PURE__ */ import_react3.default.createElement(
       NodeList,
       {
         nodes: defRef.current.nodes,
@@ -795,17 +1046,40 @@ function WorkflowEditor(props) {
         onSelect: setSelectedId,
         onChange: rerender,
         def: defRef.current,
-        emptyHint: "Empty workflow \u2014 click + below to add the first step."
+        emptyHint: "Empty workflow \u2014 click + below to add the first step.",
+        stepsByNodeId,
+        errorsByNodeId,
+        isTopLevel: true,
+        cachedOutputs: cachedOutputsRef.current,
+        skipSet,
+        onToggleSkip: toggleSkip
       }
-    ))), /* @__PURE__ */ import_react2.default.createElement("div", { style: { width: 400, borderLeft: "1px solid #ececea", background: "#fff", padding: 16, overflow: "auto" } }, selected ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "NODE SETTINGS"), /* @__PURE__ */ import_react2.default.createElement(NodeConfigForm, { node: selected, onChange: rerender })) : /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "WORKFLOW SETTINGS"), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Name" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input, { value: wf.name, onChange: (e) => (setWf({ ...wf, name: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Description" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Input.TextArea, { rows: 3, value: wf.description, onChange: (e) => (setWf({ ...wf, description: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Require confirmation before each run" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Switch, { checked: wf.require_confirm === true, onChange: (v) => (setWf({ ...wf, require_confirm: v }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Daily budget (USD, 0 = unlimited)" }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.InputNumber, { min: 0, step: 0.5, value: Number(wf.daily_budget_usd) || 0, onChange: (v) => (setWf({ ...wf, daily_budget_usd: v != null ? v : 0 }), setDirty(true)) })), /* @__PURE__ */ import_react2.default.createElement(Field, { label: 'Schedule \u2014 "every 15m" \xB7 "every 2h" \xB7 "daily 07:00" (empty = off; runs published version)' }, /* @__PURE__ */ import_react2.default.createElement(
-      import_antd2.Input,
+    ))), /* @__PURE__ */ import_react3.default.createElement("div", { style: { width: 400, borderLeft: "1px solid #ececea", background: "#fff", padding: 16, overflow: "auto" } }, selected ? /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "NODE SETTINGS"), /* @__PURE__ */ import_react3.default.createElement(NodeConfigForm, { node: selected, onChange: rerender })) : /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "WORKFLOW SETTINGS"), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Name" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: wf.name, onChange: (e) => (setWf({ ...wf, name: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Description" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input.TextArea, { rows: 3, value: wf.description, onChange: (e) => (setWf({ ...wf, description: e.target.value }), setDirty(true)) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Require confirmation before each run" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Switch, { checked: wf.require_confirm === true, onChange: (v) => (setWf({ ...wf, require_confirm: v }), setDirty(true)) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Daily budget (USD, 0 = unlimited)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.InputNumber, { min: 0, step: 0.5, value: Number(wf.daily_budget_usd) || 0, onChange: (v) => (setWf({ ...wf, daily_budget_usd: v != null ? v : 0 }), setDirty(true)) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: 'Schedule \u2014 "every 15m" \xB7 "every 2h" \xB7 "daily 07:00" (empty = off; runs published version)' }, /* @__PURE__ */ import_react3.default.createElement(
+      import_antd3.Input,
       {
-        value: (_b = wf.schedule) != null ? _b : "",
+        value: (_c = wf.schedule) != null ? _c : "",
         placeholder: "off",
         onChange: (e) => (setWf({ ...wf, schedule: e.target.value }), setDirty(true))
       }
-    )), /* @__PURE__ */ import_react2.default.createElement(Field, { label: "Schedule input (JSON passed to scheduled runs)" }, /* @__PURE__ */ import_react2.default.createElement(JsonArea, { value: wf.schedule_input, onChange: (v) => (setWf({ ...wf, schedule_input: v != null ? v : null }), setDirty(true)), rows: 3 })), /* @__PURE__ */ import_react2.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "14px 0" } }), /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "RUN"), /* @__PURE__ */ import_react2.default.createElement(TestRunBox, { workflowId: wf.id, currentVersion: Number(wf.current_version) || 0 }), /* @__PURE__ */ import_react2.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "14px 0" } }), /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "VERSIONS"), versions.length === 0 ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No published versions yet.") : /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, versions.map((v) => /* @__PURE__ */ import_react2.default.createElement("div", { key: v.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 } }, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Tag, { color: Number(v.version) === Number(wf.current_version) ? "green" : "default", style: { marginRight: 0 } }, "v", v.version), /* @__PURE__ */ import_react2.default.createElement("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#5c605c" } }, fmtTime(v.createdAt), " \xB7 ", v.published_by || "\u2014", v.notes ? ` \xB7 ${v.notes}` : ""), /* @__PURE__ */ import_react2.default.createElement(
-      import_antd2.Button,
+    )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Schedule input (JSON passed to scheduled runs)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: wf.schedule_input, onChange: (v) => (setWf({ ...wf, schedule_input: v != null ? v : null }), setDirty(true)), rows: 3 })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Run a workflow on failure (key, empty = off)" }, /* @__PURE__ */ import_react3.default.createElement(
+      import_antd3.Input,
+      {
+        value: (_d = wf.on_failure_workflow_key) != null ? _d : "",
+        placeholder: "e.g. notify-admin-of-failure",
+        onChange: (e) => (setWf({ ...wf, on_failure_workflow_key: e.target.value }), setDirty(true))
+      }
+    )), wf.on_failure_workflow_key ? /* @__PURE__ */ import_react3.default.createElement(Field, { label: "On-failure hook input (JSON of templates: {{run.id}}, {{run.error}}, {{input.x}})" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: wf.on_failure_input, onChange: (v) => (setWf({ ...wf, on_failure_input: v != null ? v : null }), setDirty(true)), rows: 3 })) : null, /* @__PURE__ */ import_react3.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "14px 0" } }), /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "RUN"), /* @__PURE__ */ import_react3.default.createElement(
+      TestRunBox,
+      {
+        workflowId: wf.id,
+        currentVersion: Number(wf.current_version) || 0,
+        onStatus: setRunStatus,
+        topLevelNodes: defRef.current.nodes,
+        skipSet,
+        cachedOutputs: cachedOutputsRef.current
+      }
+    ), Number(wf.current_version) > 0 ? /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "14px 0" } }), /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "BATCH RUN"), /* @__PURE__ */ import_react3.default.createElement(BatchRunBox, { workflowId: wf.id })) : null, /* @__PURE__ */ import_react3.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "14px 0" } }), /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 8 } }, "VERSIONS"), versions.length === 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No published versions yet.") : /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 6 } }, versions.map((v) => /* @__PURE__ */ import_react3.default.createElement("div", { key: v.id, style: { display: "flex", alignItems: "center", gap: 8, fontSize: 12.5 } }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Tag, { color: Number(v.version) === Number(wf.current_version) ? "green" : "default", style: { marginRight: 0 } }, "v", v.version), /* @__PURE__ */ import_react3.default.createElement("span", { style: { flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#5c605c" } }, fmtTime(v.createdAt), " \xB7 ", v.published_by || "\u2014", v.notes ? ` \xB7 ${v.notes}` : ""), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { size: "small", onClick: () => setDiffAgainst(v) }, "Diff"), /* @__PURE__ */ import_react3.default.createElement(
+      import_antd3.Button,
       {
         size: "small",
         onClick: () => {
@@ -813,20 +1087,43 @@ function WorkflowEditor(props) {
           defRef.current = JSON.parse(JSON.stringify((_a2 = v.definition) != null ? _a2 : { nodes: [] }));
           setSelectedId(null);
           rerender();
-          import_antd2.message.info(`Version ${v.version} loaded into the draft \u2014 save & publish to make it current`);
+          import_antd3.message.info(`Version ${v.version} loaded into the draft \u2014 save & publish to make it current`);
         }
       },
       "Load as draft"
-    )))))))
+    ))))))),
+    diffAgainst ? /* @__PURE__ */ import_react3.default.createElement(
+      VersionDiffDrawer,
+      {
+        options: [
+          { key: "draft", label: "Current draft", definition: defRef.current },
+          ...versions.map((v) => {
+            var _a2;
+            return { key: `v${v.version}`, label: `v${v.version} (${v.published_by || "\u2014"})`, definition: (_a2 = v.definition) != null ? _a2 : { nodes: [] } };
+          })
+        ],
+        initialLeftKey: "draft",
+        initialRightKey: `v${diffAgainst.version}`,
+        onClose: () => setDiffAgainst(null)
+      }
+    ) : null
   );
 }
 function WorkflowsPanel() {
   const api = (0, import_client.useAPIClient)();
-  const [rows, setRows] = (0, import_react2.useState)([]);
-  const [loading, setLoading] = (0, import_react2.useState)(false);
-  const [editing, setEditing] = (0, import_react2.useState)(null);
-  const [creating, setCreating] = (0, import_react2.useState)(false);
-  const [newName, setNewName] = (0, import_react2.useState)("");
+  const [rows, setRows] = (0, import_react3.useState)([]);
+  const [loading, setLoading] = (0, import_react3.useState)(false);
+  const [editing, setEditing] = (0, import_react3.useState)(null);
+  const [creating, setCreating] = (0, import_react3.useState)(false);
+  const [newName, setNewName] = (0, import_react3.useState)("");
+  const [search, setSearch] = (0, import_react3.useState)("");
+  const filteredRows = (0, import_react3.useMemo)(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (r) => [r.name, r.key, r.description].some((v) => String(v != null ? v : "").toLowerCase().includes(q))
+    );
+  }, [rows, search]);
   const load = async () => {
     var _a;
     setLoading(true);
@@ -834,7 +1131,7 @@ function WorkflowsPanel() {
       const { rows: rows2 } = await listResource(api, "neoai_workflows", { sort: "-id", pageSize: 100 });
       setRows(rows2);
     } catch (err) {
-      import_antd2.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+      import_antd3.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
     } finally {
       setLoading(false);
     }
@@ -844,7 +1141,7 @@ function WorkflowsPanel() {
     var _a;
     const name = newName.trim();
     if (!name) {
-      import_antd2.message.error("Enter a workflow name");
+      import_antd3.message.error("Enter a workflow name");
       return;
     }
     const key = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -860,30 +1157,30 @@ function WorkflowsPanel() {
       setCreating(false);
       setNewName("");
       await load();
-      import_antd2.message.success(`Workflow "${name}" created (disabled draft)`);
+      import_antd3.message.success(`Workflow "${name}" created (disabled draft)`);
     } catch (err) {
-      import_antd2.message.error(`Create failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+      import_antd3.message.error(`Create failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
     }
   };
   const columns = [
     {
       title: "Name",
       dataIndex: "name",
-      render: (v, r) => /* @__PURE__ */ import_react2.default.createElement("a", { style: { fontWeight: 600, color: NEOHOME_GREEN }, onClick: () => setEditing(r) }, v)
+      render: (v, r) => /* @__PURE__ */ import_react3.default.createElement("a", { style: { fontWeight: 600, color: NEOHOME_GREEN }, onClick: () => setEditing(r) }, v)
     },
     {
       title: "Schedule",
       dataIndex: "schedule",
       width: 110,
-      render: (v) => v ? /* @__PURE__ */ import_react2.default.createElement(import_antd2.Tag, { color: "green" }, v) : "\u2014"
+      render: (v) => v ? /* @__PURE__ */ import_react3.default.createElement(import_antd3.Tag, { color: "green" }, v) : "\u2014"
     },
-    { title: "Key", dataIndex: "key", render: (v) => /* @__PURE__ */ import_react2.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "Key", dataIndex: "key", render: (v) => /* @__PURE__ */ import_react3.default.createElement("code", { style: { fontSize: 12 } }, v) },
     {
       title: "Enabled",
       dataIndex: "enabled",
       width: 90,
-      render: (v, r) => /* @__PURE__ */ import_react2.default.createElement(
-        import_antd2.Switch,
+      render: (v, r) => /* @__PURE__ */ import_react3.default.createElement(
+        import_antd3.Switch,
         {
           size: "small",
           checked: v === true,
@@ -894,7 +1191,7 @@ function WorkflowsPanel() {
         }
       )
     },
-    { title: "Version", dataIndex: "current_version", width: 90, render: (v) => v ? `v${v}` : /* @__PURE__ */ import_react2.default.createElement(import_antd2.Tag, null, "draft") },
+    { title: "Version", dataIndex: "current_version", width: 90, render: (v) => v ? `v${v}` : /* @__PURE__ */ import_react3.default.createElement(import_antd3.Tag, null, "draft") },
     { title: "Confirm", dataIndex: "require_confirm", width: 90, render: (v) => v ? "yes" : "no" },
     {
       title: "Budget/day",
@@ -904,8 +1201,17 @@ function WorkflowsPanel() {
     },
     { title: "Updated", dataIndex: "updatedAt", width: 150, render: (v) => fmtTime(v) }
   ];
-  return /* @__PURE__ */ import_react2.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 14, gap: 10 } }, /* @__PURE__ */ import_react2.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, flex: 1 } }, "AI Workflows"), creating ? /* @__PURE__ */ import_react2.default.createElement(import_antd2.Space.Compact, null, /* @__PURE__ */ import_react2.default.createElement(
-    import_antd2.Input,
+  return /* @__PURE__ */ import_react3.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 14, gap: 10, flexWrap: "wrap" } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "AI Workflows"), /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: 1 } }), !creating ? /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Input.Search,
+    {
+      allowClear: true,
+      placeholder: "Search name, key, description",
+      value: search,
+      onChange: (e) => setSearch(e.target.value),
+      style: { width: 240 }
+    }
+  ) : null, creating ? /* @__PURE__ */ import_react3.default.createElement(import_antd3.Space.Compact, null, /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Input,
     {
       autoFocus: true,
       placeholder: "Workflow name",
@@ -914,7 +1220,18 @@ function WorkflowsPanel() {
       onPressEnter: create,
       style: { width: 260 }
     }
-  ), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { type: "primary", onClick: create }, "Create"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { onClick: () => setCreating(false) }, "Cancel")) : /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { onClick: load }, "Refresh"), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Button, { type: "primary", onClick: () => setCreating(true) }, "New workflow"))), /* @__PURE__ */ import_react2.default.createElement(import_antd2.Table, { rowKey: "id", size: "middle", loading, dataSource: rows, columns, pagination: false }), editing ? /* @__PURE__ */ import_react2.default.createElement(
+  ), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { type: "primary", onClick: create }, "Create"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { onClick: () => setCreating(false) }, "Cancel")) : /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { onClick: load }, "Refresh"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { type: "primary", onClick: () => setCreating(true) }, "New workflow"))), /* @__PURE__ */ import_react3.default.createElement(
+    import_antd3.Table,
+    {
+      rowKey: "id",
+      size: "middle",
+      loading,
+      dataSource: filteredRows,
+      columns,
+      pagination: false,
+      locale: { emptyText: rows.length ? "No workflows match this search" : "No workflows yet" }
+    }
+  ), editing ? /* @__PURE__ */ import_react3.default.createElement(
     WorkflowEditor,
     {
       row: editing,
@@ -927,15 +1244,17 @@ function WorkflowsPanel() {
 }
 
 // src/client/console/RunsPanel.tsx
-var import_react3 = __toESM(require("react"));
-var import_antd3 = require("antd");
+var import_react4 = __toESM(require("react"));
+var import_antd4 = require("antd");
 var import_client2 = require("@nocobase/client");
 var TERMINAL = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "rejected"]);
-function RunDetail({ runId, onClose }) {
+function RunDetail({ runId, onClose, onRerun }) {
   var _a, _b, _c;
   const api = (0, import_client2.useAPIClient)();
-  const [data, setData] = (0, import_react3.useState)({});
-  const [comment, setComment] = (0, import_react3.useState)("");
+  const [data, setData] = (0, import_react4.useState)({});
+  const [comment, setComment] = (0, import_react4.useState)("");
+  const [rerunOpen, setRerunOpen] = (0, import_react4.useState)(false);
+  const [rerunText, setRerunText] = (0, import_react4.useState)("");
   const run = data.run;
   const live = !run || !TERMINAL.has(String(run.status));
   usePoll(
@@ -944,7 +1263,7 @@ function RunDetail({ runId, onClose }) {
       try {
         setData(await neoaiAction(api, "runStatus", { runId }));
       } catch (err) {
-        import_antd3.message.error(`Run load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
+        import_antd4.message.error(`Run load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
       }
     },
     2500,
@@ -954,45 +1273,91 @@ function RunDetail({ runId, onClose }) {
     var _a2;
     try {
       const res = await neoaiAction(api, "resumeRun", { runId, approved, comment });
-      if (res.error) import_antd3.message.error(res.error);
-      else import_antd3.message.success(approved ? "Approved \u2014 run continues" : "Rejected");
+      if (res.error) import_antd4.message.error(res.error);
+      else import_antd4.message.success(approved ? "Approved \u2014 run continues" : "Rejected");
     } catch (err) {
-      import_antd3.message.error(String((_a2 = err == null ? void 0 : err.message) != null ? _a2 : err));
+      import_antd4.message.error(String((_a2 = err == null ? void 0 : err.message) != null ? _a2 : err));
     }
   };
   const cancel = async () => {
     var _a2;
     try {
       await neoaiAction(api, "cancelRun", { runId });
-      import_antd3.message.success("Cancel requested");
+      import_antd4.message.success("Cancel requested");
     } catch (err) {
-      import_antd3.message.error(String((_a2 = err == null ? void 0 : err.message) != null ? _a2 : err));
+      import_antd4.message.error(String((_a2 = err == null ? void 0 : err.message) != null ? _a2 : err));
+    }
+  };
+  const openRerun = () => {
+    var _a2;
+    setRerunText(JSON.stringify((_a2 = run == null ? void 0 : run.input) != null ? _a2 : {}, null, 2));
+    setRerunOpen(true);
+  };
+  const submitRerun = async () => {
+    var _a2;
+    let newInput;
+    try {
+      newInput = rerunText.trim() ? JSON.parse(rerunText) : {};
+    } catch (e) {
+      import_antd4.message.error("Input is not valid JSON");
+      return;
+    }
+    try {
+      const res = await neoaiAction(api, "rerunRun", { runId, newInput });
+      if (res.error) {
+        import_antd4.message.error(res.error);
+        return;
+      }
+      import_antd4.message.success(`Re-run started as run #${res.runId}`);
+      setRerunOpen(false);
+      onRerun == null ? void 0 : onRerun(res.runId);
+    } catch (err) {
+      import_antd4.message.error(String((_a2 = err == null ? void 0 : err.message) != null ? _a2 : err));
     }
   };
   const stepColumns = [
     { title: "#", dataIndex: "seq", width: 50 },
     { title: "Node", dataIndex: "title", render: (v, s) => v || s.node_id },
     { title: "Type", dataIndex: "node_type", width: 110 },
-    { title: "Status", dataIndex: "status", width: 110, render: (v) => /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: v }) },
+    { title: "Status", dataIndex: "status", width: 110, render: (v) => /* @__PURE__ */ import_react4.default.createElement(StatusTag, { status: v }) },
     { title: "Duration", dataIndex: "duration_ms", width: 100, render: (v) => fmtDuration(v) },
     { title: "Tokens", key: "tok", width: 130, render: (_, s) => fmtTokens(s.input_tokens, s.output_tokens) },
     { title: "Cost", dataIndex: "cost_usd", width: 90, render: (v) => fmtCost(v) },
     {
       title: "Error",
       dataIndex: "error",
-      render: (v) => v ? /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: "#b02a2a", fontSize: 12 } }, v) : null
+      render: (v) => v ? /* @__PURE__ */ import_react4.default.createElement("span", { style: { color: "#b02a2a", fontSize: 12 } }, v) : null
     }
   ];
-  return /* @__PURE__ */ import_react3.default.createElement(
+  return /* @__PURE__ */ import_react4.default.createElement(
     ConsoleDrawer,
     {
       open: true,
-      title: /* @__PURE__ */ import_react3.default.createElement("span", null, "Run #", runId, " ", run ? /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: run.status }) : null, (run == null ? void 0 : run.function_key) ? /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontWeight: 400, fontSize: 13, color: "#8a8f8a" } }, " \xB7 function ", run.function_key) : null),
-      extra: /* @__PURE__ */ import_react3.default.createElement(import_antd3.Space, null, (run == null ? void 0 : run.status) === "waiting" ? /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { placeholder: "Comment (optional)", value: comment, onChange: (e) => setComment(e.target.value), style: { width: 220 } }), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { type: "primary", onClick: () => decide(true) }, "Approve"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { danger: true, onClick: () => decide(false) }, "Reject")) : null, run && !TERMINAL.has(String(run.status)) ? /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { onClick: cancel }, "Cancel run") : null),
+      title: /* @__PURE__ */ import_react4.default.createElement("span", null, "Run #", runId, " ", run ? /* @__PURE__ */ import_react4.default.createElement(StatusTag, { status: run.status }) : null, (run == null ? void 0 : run.function_key) ? /* @__PURE__ */ import_react4.default.createElement("span", { style: { fontWeight: 400, fontSize: 13, color: "#8a8f8a" } }, " \xB7 function ", run.function_key) : null),
+      extra: /* @__PURE__ */ import_react4.default.createElement(import_antd4.Space, null, (run == null ? void 0 : run.status) === "waiting" ? /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement(import_antd4.Input, { placeholder: "Comment (optional)", value: comment, onChange: (e) => setComment(e.target.value), style: { width: 220 } }), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { type: "primary", onClick: () => decide(true) }, "Approve"), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { danger: true, onClick: () => decide(false) }, "Reject")) : null, run && !TERMINAL.has(String(run.status)) ? /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { onClick: cancel }, "Cancel run") : null, run && TERMINAL.has(String(run.status)) ? /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { onClick: openRerun }, "Re-run") : null),
       onClose
     },
-    /* @__PURE__ */ import_react3.default.createElement("div", { style: { padding: 18, display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200 } }, (run == null ? void 0 : run.status) === "waiting" ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { border: "1px solid #e7d9a8", background: "#fdf7e3", borderRadius: 10, padding: "10px 14px" } }, /* @__PURE__ */ import_react3.default.createElement("b", null, "Waiting for approval:"), " ", run.waiting_message || "\u2014") : null, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13 } }, /* @__PURE__ */ import_react3.default.createElement("span", null, /* @__PURE__ */ import_react3.default.createElement("b", null, "Started:"), " ", fmtTime(run == null ? void 0 : run.started_at)), /* @__PURE__ */ import_react3.default.createElement("span", null, /* @__PURE__ */ import_react3.default.createElement("b", null, "Duration:"), " ", runDuration(run)), /* @__PURE__ */ import_react3.default.createElement("span", null, /* @__PURE__ */ import_react3.default.createElement("b", null, "Tokens:"), " ", fmtTokens(run == null ? void 0 : run.input_tokens, run == null ? void 0 : run.output_tokens)), /* @__PURE__ */ import_react3.default.createElement("span", null, /* @__PURE__ */ import_react3.default.createElement("b", null, "Cost:"), " ", fmtCost(run == null ? void 0 : run.cost_usd)), /* @__PURE__ */ import_react3.default.createElement("span", null, /* @__PURE__ */ import_react3.default.createElement("b", null, "Trigger:"), " ", (_a = run == null ? void 0 : run.trigger) != null ? _a : "\u2014", " (", (_b = run == null ? void 0 : run.triggered_by) != null ? _b : "\u2014", ")"), /* @__PURE__ */ import_react3.default.createElement("span", null, /* @__PURE__ */ import_react3.default.createElement("b", null, "Version:"), " ", (run == null ? void 0 : run.version) ? `v${run.version}` : "draft")), /* @__PURE__ */ import_react3.default.createElement("div", null, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "STEPS"), /* @__PURE__ */ import_react3.default.createElement(
-      import_antd3.Table,
+    /* @__PURE__ */ import_react4.default.createElement(
+      import_antd4.Modal,
+      {
+        open: rerunOpen,
+        title: "Re-run with edited input",
+        onCancel: () => setRerunOpen(false),
+        onOk: submitRerun,
+        okText: "Start re-run"
+      },
+      /* @__PURE__ */ import_react4.default.createElement(
+        import_antd4.Input.TextArea,
+        {
+          rows: 10,
+          value: rerunText,
+          onChange: (e) => setRerunText(e.target.value),
+          style: { fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12 }
+        }
+      )
+    ),
+    /* @__PURE__ */ import_react4.default.createElement("div", { style: { padding: 18, display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200 } }, (run == null ? void 0 : run.status) === "waiting" ? /* @__PURE__ */ import_react4.default.createElement("div", { style: { border: "1px solid #e7d9a8", background: "#fdf7e3", borderRadius: 10, padding: "10px 14px" } }, /* @__PURE__ */ import_react4.default.createElement("b", null, "Waiting for approval:"), " ", run.waiting_message || "\u2014") : null, /* @__PURE__ */ import_react4.default.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13 } }, /* @__PURE__ */ import_react4.default.createElement("span", null, /* @__PURE__ */ import_react4.default.createElement("b", null, "Started:"), " ", fmtTime(run == null ? void 0 : run.started_at)), /* @__PURE__ */ import_react4.default.createElement("span", null, /* @__PURE__ */ import_react4.default.createElement("b", null, "Duration:"), " ", runDuration(run)), /* @__PURE__ */ import_react4.default.createElement("span", null, /* @__PURE__ */ import_react4.default.createElement("b", null, "Tokens:"), " ", fmtTokens(run == null ? void 0 : run.input_tokens, run == null ? void 0 : run.output_tokens)), /* @__PURE__ */ import_react4.default.createElement("span", null, /* @__PURE__ */ import_react4.default.createElement("b", null, "Cost:"), " ", fmtCost(run == null ? void 0 : run.cost_usd)), /* @__PURE__ */ import_react4.default.createElement("span", null, /* @__PURE__ */ import_react4.default.createElement("b", null, "Trigger:"), " ", (_a = run == null ? void 0 : run.trigger) != null ? _a : "\u2014", " (", (_b = run == null ? void 0 : run.triggered_by) != null ? _b : "\u2014", ")"), /* @__PURE__ */ import_react4.default.createElement("span", null, /* @__PURE__ */ import_react4.default.createElement("b", null, "Version:"), " ", (run == null ? void 0 : run.version) ? `v${run.version}` : "draft")), /* @__PURE__ */ import_react4.default.createElement("div", null, /* @__PURE__ */ import_react4.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "STEPS"), /* @__PURE__ */ import_react4.default.createElement(
+      import_antd4.Table,
       {
         rowKey: "id",
         size: "small",
@@ -1000,11 +1365,11 @@ function RunDetail({ runId, onClose }) {
         columns: stepColumns,
         pagination: false,
         expandable: {
-          expandedRowRender: (s) => /* @__PURE__ */ import_react3.default.createElement(JsonBox, { value: s.output, maxHeight: 300 }),
+          expandedRowRender: (s) => /* @__PURE__ */ import_react4.default.createElement(JsonBox, { value: s.output, maxHeight: 300 }),
           rowExpandable: (s) => s.output != null
         }
       }
-    )), /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: "1 1 320px", minWidth: 280 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "INPUT"), /* @__PURE__ */ import_react3.default.createElement(JsonBox, { value: run == null ? void 0 : run.input, maxHeight: 260 })), /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: "1 1 320px", minWidth: 280 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, (run == null ? void 0 : run.status) === "failed" ? "ERROR" : "OUTPUT"), (run == null ? void 0 : run.status) === "failed" ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { color: "#b02a2a", fontSize: 13 } }, run == null ? void 0 : run.error) : /* @__PURE__ */ import_react3.default.createElement(JsonBox, { value: run == null ? void 0 : run.output, maxHeight: 260 }))))
+    )), /* @__PURE__ */ import_react4.default.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { flex: "1 1 320px", minWidth: 280 } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "INPUT"), /* @__PURE__ */ import_react4.default.createElement(JsonBox, { value: run == null ? void 0 : run.input, maxHeight: 260 })), /* @__PURE__ */ import_react4.default.createElement("div", { style: { flex: "1 1 320px", minWidth: 280 } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, (run == null ? void 0 : run.status) === "failed" ? "ERROR" : "OUTPUT"), (run == null ? void 0 : run.status) === "failed" ? /* @__PURE__ */ import_react4.default.createElement("div", { style: { color: "#b02a2a", fontSize: 13 } }, run == null ? void 0 : run.error) : /* @__PURE__ */ import_react4.default.createElement(JsonBox, { value: run == null ? void 0 : run.output, maxHeight: 260 }))))
   );
 }
 var STATUS_OPTIONS = [
@@ -1019,10 +1384,10 @@ var STATUS_OPTIONS = [
 ];
 function RunsPanel() {
   const api = (0, import_client2.useAPIClient)();
-  const [rows, setRows] = (0, import_react3.useState)([]);
-  const [openRun, setOpenRun] = (0, import_react3.useState)(null);
-  const [statusFilter, setStatusFilter] = (0, import_react3.useState)("all");
-  const [search, setSearch] = (0, import_react3.useState)("");
+  const [rows, setRows] = (0, import_react4.useState)([]);
+  const [openRun, setOpenRun] = (0, import_react4.useState)(null);
+  const [statusFilter, setStatusFilter] = (0, import_react4.useState)("all");
+  const [search, setSearch] = (0, import_react4.useState)("");
   usePoll(
     async () => {
       try {
@@ -1034,13 +1399,14 @@ function RunsPanel() {
     3e3,
     openRun == null
   );
-  const filteredRows = (0, import_react3.useMemo)(() => {
+  const filteredRows = (0, import_react4.useMemo)(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
-      var _a, _b;
+      var _a;
       if (statusFilter !== "all" && r.status !== statusFilter) return false;
-      if (q && !String((_b = (_a = r.workflow) == null ? void 0 : _a.name) != null ? _b : "").toLowerCase().includes(q)) return false;
-      return true;
+      if (!q) return true;
+      const haystack = [(_a = r.workflow) == null ? void 0 : _a.name, String(r.id), r.trigger, r.function_key].map((v) => String(v != null ? v : "").toLowerCase());
+      return haystack.some((v) => v.includes(q));
     });
   }, [rows, statusFilter, search]);
   const columns = [
@@ -1048,17 +1414,17 @@ function RunsPanel() {
       title: "Run",
       dataIndex: "id",
       width: 80,
-      render: (v) => /* @__PURE__ */ import_react3.default.createElement("a", { style: { fontWeight: 600, color: NEOHOME_GREEN }, onClick: () => setOpenRun(v) }, "#", v)
+      render: (v) => /* @__PURE__ */ import_react4.default.createElement("a", { style: { fontWeight: 600, color: NEOHOME_GREEN }, onClick: () => setOpenRun(v) }, "#", v)
     },
     { title: "Workflow", key: "wf", render: (_, r) => {
       var _a, _b;
       return (_b = (_a = r.workflow) == null ? void 0 : _a.name) != null ? _b : r.workflow_id;
     } },
-    { title: "Status", dataIndex: "status", width: 110, render: (v) => /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: v }) },
+    { title: "Status", dataIndex: "status", width: 110, render: (v) => /* @__PURE__ */ import_react4.default.createElement(StatusTag, { status: v }) },
     {
       title: "Waiting on",
       dataIndex: "waiting_message",
-      render: (v, r) => r.status === "waiting" && v ? /* @__PURE__ */ import_react3.default.createElement(import_antd3.Popover, { content: v }, /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: "#9a7b00" } }, v.slice(0, 40), "\u2026")) : null
+      render: (v, r) => r.status === "waiting" && v ? /* @__PURE__ */ import_react4.default.createElement(import_antd4.Popover, { content: v }, /* @__PURE__ */ import_react4.default.createElement("span", { style: { color: "#9a7b00" } }, v.slice(0, 40), "\u2026")) : null
     },
     { title: "Trigger", dataIndex: "trigger", width: 90 },
     { title: "Started", dataIndex: "started_at", width: 150, render: (v) => fmtTime(v) },
@@ -1066,17 +1432,17 @@ function RunsPanel() {
     { title: "Tokens", key: "tok", width: 130, render: (_, r) => fmtTokens(r.input_tokens, r.output_tokens) },
     { title: "Cost", dataIndex: "cost_usd", width: 90, render: (v) => fmtCost(v) }
   ];
-  return /* @__PURE__ */ import_react3.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Runs"), /* @__PURE__ */ import_react3.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react3.default.createElement(
-    import_antd3.Input.Search,
+  return /* @__PURE__ */ import_react4.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Runs"), /* @__PURE__ */ import_react4.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react4.default.createElement(
+    import_antd4.Input.Search,
     {
       allowClear: true,
-      placeholder: "Filter by workflow name",
+      placeholder: "Search workflow, run #, trigger, function",
       value: search,
       onChange: (e) => setSearch(e.target.value),
-      style: { width: 220 }
+      style: { width: 260 }
     }
-  ), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Select, { value: statusFilter, onChange: setStatusFilter, options: STATUS_OPTIONS, style: { width: 150 } }), /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "auto-refreshing every 3 s")), /* @__PURE__ */ import_react3.default.createElement(
-    import_antd3.Table,
+  ), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Select, { value: statusFilter, onChange: setStatusFilter, options: STATUS_OPTIONS, style: { width: 150 } }), /* @__PURE__ */ import_react4.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "auto-refreshing every 3 s")), /* @__PURE__ */ import_react4.default.createElement(
+    import_antd4.Table,
     {
       rowKey: "id",
       size: "middle",
@@ -1085,56 +1451,119 @@ function RunsPanel() {
       pagination: { pageSize: 25 },
       locale: { emptyText: rows.length ? "No runs match this filter" : "No runs yet" }
     }
-  ), openRun != null ? /* @__PURE__ */ import_react3.default.createElement(RunDetail, { runId: openRun, onClose: () => setOpenRun(null) }) : null);
+  ), openRun != null ? /* @__PURE__ */ import_react4.default.createElement(RunDetail, { runId: openRun, onClose: () => setOpenRun(null), onRerun: setOpenRun }) : null);
+}
+
+// src/client/console/ApprovalsPanel.tsx
+var import_react5 = __toESM(require("react"));
+var import_antd5 = require("antd");
+var import_client3 = require("@nocobase/client");
+var STALE_WARN_MS = 36e5;
+var STALE_CRITICAL_MS = 864e5;
+function StalenessTag({ startedAt }) {
+  if (!startedAt) return /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, null, "\u2014");
+  const ms = Date.now() - new Date(startedAt).getTime();
+  const hours = ms / 36e5;
+  const label = hours < 1 ? `${Math.max(0, Math.round(ms / 6e4))}m` : hours < 24 ? `${hours.toFixed(1)}h` : `${(hours / 24).toFixed(1)}d`;
+  const color = ms >= STALE_CRITICAL_MS ? "red" : ms >= STALE_WARN_MS ? "gold" : "default";
+  return /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color }, label, " waiting");
+}
+function ApprovalsPanel() {
+  const api = (0, import_client3.useAPIClient)();
+  const [rows, setRows] = (0, import_react5.useState)([]);
+  const [openRun, setOpenRun] = (0, import_react5.useState)(null);
+  usePoll(
+    async () => {
+      try {
+        const { rows: rows2 } = await listResource(api, "neoai_runs", {
+          filter: JSON.stringify({ status: "waiting" }),
+          sort: "started_at",
+          pageSize: 100,
+          appends: "workflow"
+        });
+        setRows(rows2);
+      } catch (e) {
+      }
+    },
+    5e3,
+    openRun == null
+  );
+  const sorted = (0, import_react5.useMemo)(() => [...rows].sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime()), [rows]);
+  const columns = [
+    {
+      title: "Run",
+      dataIndex: "id",
+      width: 80,
+      render: (v) => /* @__PURE__ */ import_react5.default.createElement("a", { style: { fontWeight: 600, color: NEOHOME_GREEN }, onClick: () => setOpenRun(v) }, "#", v)
+    },
+    { title: "Workflow", key: "wf", render: (_, r) => {
+      var _a, _b;
+      return (_b = (_a = r.workflow) == null ? void 0 : _a.name) != null ? _b : r.workflow_id;
+    } },
+    { title: "Waiting on", dataIndex: "waiting_message", ellipsis: true },
+    { title: "Started", dataIndex: "started_at", width: 150, render: (v) => fmtTime(v) },
+    { title: "Elapsed", key: "elapsed", width: 130, render: (_, r) => /* @__PURE__ */ import_react5.default.createElement(StalenessTag, { startedAt: r.started_at }) }
+  ];
+  return /* @__PURE__ */ import_react5.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 14, gap: 10 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Approvals"), /* @__PURE__ */ import_react5.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "runs waiting on a human_gate, oldest first")), /* @__PURE__ */ import_react5.default.createElement(
+    import_antd5.Table,
+    {
+      rowKey: "id",
+      size: "middle",
+      dataSource: sorted,
+      columns,
+      pagination: false,
+      locale: { emptyText: "Nothing waiting on approval right now." }
+    }
+  ), openRun != null ? /* @__PURE__ */ import_react5.default.createElement(RunDetail, { runId: openRun, onClose: () => setOpenRun(null) }) : null);
 }
 
 // src/client/console/FunctionsPanel.tsx
-var import_react4 = __toESM(require("react"));
-var import_antd4 = require("antd");
-var import_client3 = require("@nocobase/client");
+var import_react6 = __toESM(require("react"));
+var import_antd6 = require("antd");
+var import_client4 = require("@nocobase/client");
 function TestDispatchDrawer({ fn, onClose }) {
-  const api = (0, import_client3.useAPIClient)();
-  const [inputText, setInputText] = (0, import_react4.useState)(() => {
+  const api = (0, import_client4.useAPIClient)();
+  const [inputText, setInputText] = (0, import_react6.useState)(() => {
     var _a;
     return JSON.stringify((_a = fn.input_example) != null ? _a : {}, null, 2);
   });
-  const [result, setResult] = (0, import_react4.useState)(null);
-  const [busy, setBusy] = (0, import_react4.useState)(false);
+  const [result, setResult] = (0, import_react6.useState)(null);
+  const [busy, setBusy] = (0, import_react6.useState)(false);
   const dispatch = async () => {
     var _a;
     let input = {};
     try {
       input = inputText.trim() ? JSON.parse(inputText) : {};
     } catch (e) {
-      import_antd4.message.error("Input is not valid JSON");
+      import_antd6.message.error("Input is not valid JSON");
       return;
     }
     setBusy(true);
     try {
       setResult(await neoaiAction(api, "runFunction", { functionKey: fn.key, input, wait: true }));
     } catch (err) {
-      import_antd4.message.error(String((_a = err == null ? void 0 : err.message) != null ? _a : err));
+      import_antd6.message.error(String((_a = err == null ? void 0 : err.message) != null ? _a : err));
     } finally {
       setBusy(false);
     }
   };
-  return /* @__PURE__ */ import_react4.default.createElement(ConsoleDrawer, { open: true, title: /* @__PURE__ */ import_react4.default.createElement("span", null, "Test dispatch \u2014 ", /* @__PURE__ */ import_react4.default.createElement("code", null, fn.key)), onClose }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { padding: 18, maxWidth: 760 } }, /* @__PURE__ */ import_react4.default.createElement("p", { style: { fontSize: 13, color: "#5c605c" } }, "Simulates a host-plugin call: ", /* @__PURE__ */ import_react4.default.createElement("code", null, "pm.get('neoai').runFunction('", fn.key, "', input)"), '. Bound workflow runs and the dispatch waits for the result; no binding \u2192 the "legacy" answer the host plugin would act on.'), /* @__PURE__ */ import_react4.default.createElement(
-    import_antd4.Input.TextArea,
+  return /* @__PURE__ */ import_react6.default.createElement(ConsoleDrawer, { open: true, title: /* @__PURE__ */ import_react6.default.createElement("span", null, "Test dispatch \u2014 ", /* @__PURE__ */ import_react6.default.createElement("code", null, fn.key)), onClose }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { padding: 18, maxWidth: 760 } }, /* @__PURE__ */ import_react6.default.createElement("p", { style: { fontSize: 13, color: "#5c605c" } }, "Simulates a host-plugin call: ", /* @__PURE__ */ import_react6.default.createElement("code", null, "pm.get('neoai').runFunction('", fn.key, "', input)"), '. Bound workflow runs and the dispatch waits for the result; no binding \u2192 the "legacy" answer the host plugin would act on.'), /* @__PURE__ */ import_react6.default.createElement(
+    import_antd6.Input.TextArea,
     {
       rows: 6,
       value: inputText,
       onChange: (e) => setInputText(e.target.value),
       style: { fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12, marginBottom: 10 }
     }
-  ), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { type: "primary", loading: busy, onClick: dispatch }, "Dispatch"), result ? /* @__PURE__ */ import_react4.default.createElement("div", { style: { marginTop: 14 } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 6 } }, "RESULT"), /* @__PURE__ */ import_react4.default.createElement(JsonBox, { value: result, maxHeight: 320 })) : null));
+  ), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", loading: busy, onClick: dispatch }, "Dispatch"), result ? /* @__PURE__ */ import_react6.default.createElement("div", { style: { marginTop: 14 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 6 } }, "RESULT"), /* @__PURE__ */ import_react6.default.createElement(JsonBox, { value: result, maxHeight: 320 })) : null));
 }
 function FunctionsPanel() {
-  const api = (0, import_client3.useAPIClient)();
-  const [rows, setRows] = (0, import_react4.useState)([]);
-  const [workflows, setWorkflows] = (0, import_react4.useState)([]);
-  const [testing, setTesting] = (0, import_react4.useState)(null);
-  const [creating, setCreating] = (0, import_react4.useState)(false);
-  const [draft, setDraft] = (0, import_react4.useState)({ key: "", title: "", plugin: "" });
+  const api = (0, import_client4.useAPIClient)();
+  const [rows, setRows] = (0, import_react6.useState)([]);
+  const [workflows, setWorkflows] = (0, import_react6.useState)([]);
+  const [testing, setTesting] = (0, import_react6.useState)(null);
+  const [creating, setCreating] = (0, import_react6.useState)(false);
+  const [draft, setDraft] = (0, import_react6.useState)({ key: "", title: "", plugin: "" });
   const load = async () => {
     var _a;
     try {
@@ -1145,18 +1574,18 @@ function FunctionsPanel() {
       setRows(f.rows);
       setWorkflows(w.rows);
     } catch (err) {
-      import_antd4.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+      import_antd6.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
     }
   };
   usePoll(load, 3e4, !testing);
   const bind = async (fnRow, workflowId) => {
     await updateResource(api, "neoai_functions", fnRow.id, { workflow_id: workflowId });
     await load();
-    import_antd4.message.success(workflowId ? "Workflow bound" : "Binding cleared \u2014 legacy code path active");
+    import_antd6.message.success(workflowId ? "Workflow bound" : "Binding cleared \u2014 legacy code path active");
   };
   const create = async () => {
     if (!draft.key.trim() || !draft.title.trim()) {
-      import_antd4.message.error("Key and title are required");
+      import_antd6.message.error("Key and title are required");
       return;
     }
     await createResource(api, "neoai_functions", { ...draft, enabled: true });
@@ -1166,17 +1595,17 @@ function FunctionsPanel() {
   };
   const workflowOptions = workflows.filter((w) => Number(w.current_version) > 0).map((w) => ({ value: w.id, label: `${w.name} (v${w.current_version}${w.enabled ? "" : " \xB7 disabled"})` }));
   const columns = [
-    { title: "Function key", dataIndex: "key", render: (v) => /* @__PURE__ */ import_react4.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "Function key", dataIndex: "key", render: (v) => /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 12 } }, v) },
     { title: "Title", dataIndex: "title" },
-    { title: "Plugin", dataIndex: "plugin", width: 130, render: (v) => v ? /* @__PURE__ */ import_react4.default.createElement(import_antd4.Tag, null, v) : "\u2014" },
+    { title: "Plugin", dataIndex: "plugin", width: 130, render: (v) => v ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, null, v) : "\u2014" },
     {
       title: "Bound workflow (empty = legacy path)",
       key: "wf",
       width: 320,
       render: (_, r) => {
         var _a;
-        return /* @__PURE__ */ import_react4.default.createElement(
-          import_antd4.Select,
+        return /* @__PURE__ */ import_react6.default.createElement(
+          import_antd6.Select,
           {
             allowClear: true,
             placeholder: "legacy code path",
@@ -1192,8 +1621,8 @@ function FunctionsPanel() {
       title: "Enabled",
       dataIndex: "enabled",
       width: 90,
-      render: (v, r) => /* @__PURE__ */ import_react4.default.createElement(
-        import_antd4.Switch,
+      render: (v, r) => /* @__PURE__ */ import_react6.default.createElement(
+        import_antd6.Switch,
         {
           size: "small",
           checked: v !== false,
@@ -1205,33 +1634,56 @@ function FunctionsPanel() {
       )
     },
     {
+      title: "Budget/day (USD, 0 = inherit workflow)",
+      dataIndex: "daily_budget_usd",
+      width: 150,
+      render: (v, r) => /* @__PURE__ */ import_react6.default.createElement(
+        import_antd6.InputNumber,
+        {
+          size: "small",
+          min: 0,
+          step: 0.5,
+          value: Number(v) || 0,
+          onChange: async (val) => {
+            await updateResource(api, "neoai_functions", r.id, { daily_budget_usd: val != null ? val : 0 });
+            load();
+          }
+        }
+      )
+    },
+    {
       title: "",
       key: "act",
       width: 130,
-      render: (_, r) => /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { size: "small", onClick: () => setTesting(r) }, "Test dispatch")
+      render: (_, r) => /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { size: "small", onClick: () => setTesting(r) }, "Test dispatch")
     }
   ];
-  return /* @__PURE__ */ import_react4.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 6, gap: 10 } }, /* @__PURE__ */ import_react4.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, flex: 1 } }, "Functions"), creating ? /* @__PURE__ */ import_react4.default.createElement(import_antd4.Space.Compact, null, /* @__PURE__ */ import_react4.default.createElement(import_antd4.Input, { placeholder: "key (e.g. crm.draftReply)", value: draft.key, onChange: (e) => setDraft({ ...draft, key: e.target.value }), style: { width: 220 } }), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Input, { placeholder: "Title", value: draft.title, onChange: (e) => setDraft({ ...draft, title: e.target.value }), style: { width: 180 } }), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Input, { placeholder: "Plugin", value: draft.plugin, onChange: (e) => setDraft({ ...draft, plugin: e.target.value }), style: { width: 140 } }), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { type: "primary", onClick: create }, "Create"), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { onClick: () => setCreating(false) }, "Cancel")) : /* @__PURE__ */ import_react4.default.createElement(import_react4.default.Fragment, null, /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { onClick: load }, "Refresh"), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Button, { type: "primary", onClick: () => setCreating(true) }, "Register function"))), /* @__PURE__ */ import_react4.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 760 } }, "Host plugins (Konfigurator, CRM) register their AI functions here and gain a workflow selector; an empty binding keeps their built-in legacy behaviour. Bindings take effect immediately \u2014 dispatches use the bound workflow's published version."), /* @__PURE__ */ import_react4.default.createElement(import_antd4.Table, { rowKey: "id", size: "middle", dataSource: rows, columns, pagination: false }), testing ? /* @__PURE__ */ import_react4.default.createElement(TestDispatchDrawer, { fn: testing, onClose: () => setTesting(null) }) : null);
+  return /* @__PURE__ */ import_react6.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", alignItems: "center", marginBottom: 6, gap: 10 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, flex: 1 } }, "Functions"), creating ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Space.Compact, null, /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "key (e.g. crm.draftReply)", value: draft.key, onChange: (e) => setDraft({ ...draft, key: e.target.value }), style: { width: 220 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Title", value: draft.title, onChange: (e) => setDraft({ ...draft, title: e.target.value }), style: { width: 180 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Plugin", value: draft.plugin, onChange: (e) => setDraft({ ...draft, plugin: e.target.value }), style: { width: 140 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", onClick: create }, "Create"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: () => setCreating(false) }, "Cancel")) : /* @__PURE__ */ import_react6.default.createElement(import_react6.default.Fragment, null, /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: load }, "Refresh"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", onClick: () => setCreating(true) }, "Register function"))), /* @__PURE__ */ import_react6.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 760 } }, "Host plugins (Konfigurator, CRM) register their AI functions here and gain a workflow selector; an empty binding keeps their built-in legacy behaviour. Bindings take effect immediately \u2014 dispatches use the bound workflow's published version."), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Table, { rowKey: "id", size: "middle", dataSource: rows, columns, pagination: false }), testing ? /* @__PURE__ */ import_react6.default.createElement(TestDispatchDrawer, { fn: testing, onClose: () => setTesting(null) }) : null);
 }
 
 // src/client/console/SettingsPanel.tsx
-var import_react5 = __toESM(require("react"));
-var import_antd5 = require("antd");
-var import_client4 = require("@nocobase/client");
+var import_react7 = __toESM(require("react"));
+var import_antd7 = require("antd");
+var import_client5 = require("@nocobase/client");
 function Field2({ label, children, hint }) {
-  return /* @__PURE__ */ import_react5.default.createElement("div", { style: { marginBottom: 14, maxWidth: 560 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children, hint ? /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginTop: 4 } }, hint) : null);
+  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { marginBottom: 14, maxWidth: 560 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children, hint ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginTop: 4 } }, hint) : null);
 }
 function Section({ title, children }) {
-  return /* @__PURE__ */ import_react5.default.createElement("div", { style: { border: "1px solid #ececea", borderRadius: 10, padding: "16px 18px", marginBottom: 16, maxWidth: 620 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "#191a19", marginBottom: 14 } }, title), children);
+  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { border: "1px solid #ececea", borderRadius: 10, padding: "16px 18px", marginBottom: 16, maxWidth: 620 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12.5, fontWeight: 700, color: "#191a19", marginBottom: 14 } }, title), children);
+}
+function Sparkline({ data }) {
+  const max = Math.max(1e-9, ...data.map((d) => d.value));
+  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 60 } }, data.map((d) => /* @__PURE__ */ import_react7.default.createElement("div", { key: d.label, title: `${d.label}: $${d.value.toFixed(2)}`, style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { width: "100%", height: Math.max(2, d.value / max * 52), background: "#009900", borderRadius: "2px 2px 0 0" } }))));
 }
 function SettingsPanel() {
-  var _a;
-  const api = (0, import_client4.useAPIClient)();
-  const [s, setS] = (0, import_react5.useState)(null);
-  const [key, setKey] = (0, import_react5.useState)("");
-  const [pricesText, setPricesText] = (0, import_react5.useState)("");
-  const [ping, setPing] = (0, import_react5.useState)(null);
-  const [spend, setSpend] = (0, import_react5.useState)(null);
+  var _a, _b, _c, _d, _e, _f;
+  const api = (0, import_client5.useAPIClient)();
+  const [s, setS] = (0, import_react7.useState)(null);
+  const [key, setKey] = (0, import_react7.useState)("");
+  const [pricesText, setPricesText] = (0, import_react7.useState)("");
+  const [ping, setPing] = (0, import_react7.useState)(null);
+  const [spend, setSpend] = (0, import_react7.useState)(null);
+  const [trend, setTrend] = (0, import_react7.useState)(null);
   usePoll(
     async () => {
       var _a2;
@@ -1241,22 +1693,23 @@ function SettingsPanel() {
         setPricesText((prev) => prev ? prev : got.prices ? JSON.stringify(got.prices, null, 2) : "");
         setPing(await neoaiAction(api, "ping", {}));
         setSpend(await neoaiAction(api, "spendToday", {}));
+        setTrend(await neoaiAction(api, "spendTrend", {}));
       } catch (err) {
-        import_antd5.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
+        import_antd7.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
       }
     },
     36e5,
     s == null
   );
-  if (!s) return /* @__PURE__ */ import_react5.default.createElement("div", { style: { padding: 20 } }, "Loading\u2026");
+  if (!s) return /* @__PURE__ */ import_react7.default.createElement("div", { style: { padding: 20 } }, "Loading\u2026");
   const save = async () => {
-    var _a2, _b, _c;
+    var _a2, _b2, _c2;
     let prices;
     if (pricesText.trim()) {
       try {
         prices = JSON.parse(pricesText);
       } catch (e) {
-        import_antd5.message.error("Price table is not valid JSON");
+        import_antd7.message.error("Price table is not valid JSON");
         return;
       }
     }
@@ -1264,126 +1717,153 @@ function SettingsPanel() {
       await neoaiAction(api, "saveSettings", {
         force_mock: s.force_mock === true,
         default_llm_service: (_a2 = s.default_llm_service) != null ? _a2 : "",
-        default_model: (_b = s.default_model) != null ? _b : "gemini-2.5-flash",
+        default_model: (_b2 = s.default_model) != null ? _b2 : "gemini-2.5-flash",
         daily_budget_usd: Number(s.daily_budget_usd) || 0,
         image_price_usd: Number(s.image_price_usd) || 0.04,
+        spend_alert_pct: Number(s.spend_alert_pct) || 80,
         ...prices !== void 0 ? { prices } : {},
         ...key ? { gemini_api_key: key } : {}
       });
       setKey("");
-      import_antd5.message.success("Settings saved");
+      import_antd7.message.success("Settings saved");
     } catch (err) {
-      import_antd5.message.error(`Save failed: ${(_c = err == null ? void 0 : err.message) != null ? _c : err}`);
+      import_antd7.message.error(`Save failed: ${(_c2 = err == null ? void 0 : err.message) != null ? _c2 : err}`);
     }
   };
-  return /* @__PURE__ */ import_react5.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, marginBottom: 16 } }, "Settings"), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Mode" }, /* @__PURE__ */ import_react5.default.createElement(
+  return /* @__PURE__ */ import_react7.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, marginBottom: 16 } }, "Settings"), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Mode" }, /* @__PURE__ */ import_react7.default.createElement(
     Field2,
     {
       label: "Force mock mode",
       hint: "ON: every LLM/image node returns a labelled deterministic mock \u2014 zero spend, even though a real key is configured. For test rounds; turn OFF for real model calls."
     },
-    /* @__PURE__ */ import_react5.default.createElement(import_antd5.Switch, { checked: s.force_mock === true, onChange: (v) => setS({ ...s, force_mock: v }) }),
-    s.force_mock === true ? /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "orange", style: { marginLeft: 10 } }, "mock mode active") : null
-  )), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Model & provider" }, /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Default plugin-ai LLM service", hint: "Name of an llmService configured under Settings \u2192 AI. Empty = plugin-ai default / raw Gemini fallback." }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input, { value: s.default_llm_service, onChange: (e) => setS({ ...s, default_llm_service: e.target.value }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Default model" }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input, { value: s.default_model, placeholder: "gemini-2.5-flash", onChange: (e) => setS({ ...s, default_model: e.target.value }) })), /* @__PURE__ */ import_react5.default.createElement(
+    /* @__PURE__ */ import_react7.default.createElement(import_antd7.Switch, { checked: s.force_mock === true, onChange: (v) => setS({ ...s, force_mock: v }) }),
+    s.force_mock === true ? /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: "orange", style: { marginLeft: 10 } }, "mock mode active") : null
+  )), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Model & provider" }, /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Default plugin-ai LLM service", hint: "Name of an llmService configured under Settings \u2192 AI. Empty = plugin-ai default / raw Gemini fallback." }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input, { value: s.default_llm_service, onChange: (e) => setS({ ...s, default_llm_service: e.target.value }) })), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Default model" }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input, { value: s.default_model, placeholder: "gemini-2.5-flash", onChange: (e) => setS({ ...s, default_model: e.target.value }) })), /* @__PURE__ */ import_react7.default.createElement(
     Field2,
     {
       label: "Gemini API key (raw-path fallback + image nodes)",
       hint: s.geminiKeyFromEnv ? "GEMINI_API_KEY env var is set and wins \u2014 this field is a fallback." : s.geminiKeyConfigured ? "A key is configured. Leave empty to keep it; enter a new value to replace." : "No key configured yet."
     },
-    /* @__PURE__ */ import_react5.default.createElement(import_antd5.Input.Password, { value: key, placeholder: s.geminiKeyConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (configured)" : "AIza\u2026", onChange: (e) => setKey(e.target.value) })
-  )), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Cost management" }, /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Global daily budget (USD, 0 = unlimited)", hint: "Blocks further model calls once today's estimated spend across ALL workflows exceeds this." }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.InputNumber, { min: 0, step: 0.5, value: Number(s.daily_budget_usd) || 0, onChange: (v) => setS({ ...s, daily_budget_usd: v != null ? v : 0 }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Estimated price per generated image (USD)" }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.InputNumber, { min: 0, step: 0.01, value: Number(s.image_price_usd) || 0.04, onChange: (v) => setS({ ...s, image_price_usd: v != null ? v : 0.04 }) })), /* @__PURE__ */ import_react5.default.createElement(Field2, { label: "Price table override (JSON, USD per 1M tokens)", hint: 'Example: { "gemini-2.5-flash": { "in": 0.3, "out": 2.5 } }' }, /* @__PURE__ */ import_react5.default.createElement(
-    import_antd5.Input.TextArea,
+    /* @__PURE__ */ import_react7.default.createElement(import_antd7.Input.Password, { value: key, placeholder: s.geminiKeyConfigured ? "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022  (configured)" : "AIza\u2026", onChange: (e) => setKey(e.target.value) })
+  )), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Cost management" }, /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Global daily budget (USD, 0 = unlimited)", hint: "Blocks further model calls once today's estimated spend across ALL workflows exceeds this." }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.InputNumber, { min: 0, step: 0.5, value: Number(s.daily_budget_usd) || 0, onChange: (v) => setS({ ...s, daily_budget_usd: v != null ? v : 0 }) })), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Estimated price per generated image (USD)" }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.InputNumber, { min: 0, step: 0.01, value: Number(s.image_price_usd) || 0.04, onChange: (v) => setS({ ...s, image_price_usd: v != null ? v : 0.04 }) })), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Price table override (JSON, USD per 1M tokens)", hint: 'Example: { "gemini-2.5-flash": { "in": 0.3, "out": 2.5 } }' }, /* @__PURE__ */ import_react7.default.createElement(
+    import_antd7.Input.TextArea,
     {
       rows: 5,
       value: pricesText,
       onChange: (e) => setPricesText(e.target.value),
       style: { fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12 }
     }
-  ))), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Button, { type: "primary", onClick: save }, "Save settings"), /* @__PURE__ */ import_react5.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "24px 0 16px", maxWidth: 620 } }), /* @__PURE__ */ import_react5.default.createElement(Section, { title: "Plugin health" }, ping ? /* @__PURE__ */ import_react5.default.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: spend ? 14 : 0 } }, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "green" }, ping.plugin, " v", ping.version), /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: ping.pluginAi ? "green" : "orange" }, ping.pluginAi ? "plugin-ai available" : "plugin-ai NOT available (raw Gemini fallback)"), ping.sandbox ? /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color: "orange" }, "sandbox") : null, /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, null, ((_a = ping.collections) != null ? _a : []).length, " collections")) : null, spend ? /* @__PURE__ */ import_react5.default.createElement("div", null, /* @__PURE__ */ import_react5.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginBottom: 4 } }, "Spend today (estimated)"), /* @__PURE__ */ import_react5.default.createElement(JsonBox, { value: spend, maxHeight: 140 })) : null));
+  )), /* @__PURE__ */ import_react7.default.createElement(Field2, { label: "Proactive spend alert threshold (% of daily budget)", hint: "Shows a warning banner in the console once today's global spend crosses this \u2014 the hard block still only ever fires at 100% via the budget itself." }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.InputNumber, { min: 1, max: 100, value: Number(s.spend_alert_pct) || 80, onChange: (v) => setS({ ...s, spend_alert_pct: v != null ? v : 80 }) }))), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Button, { type: "primary", onClick: save }, "Save settings"), /* @__PURE__ */ import_react7.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "24px 0 16px", maxWidth: 620 } }), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Plugin health" }, ping ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: spend ? 14 : 0 } }, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: "green" }, ping.plugin, " v", ping.version), /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: ping.pluginAi ? "green" : "orange" }, ping.pluginAi ? "plugin-ai available" : "plugin-ai NOT available (raw Gemini fallback)"), ping.sandbox ? /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, { color: "orange" }, "sandbox") : null, /* @__PURE__ */ import_react7.default.createElement(import_antd7.Tag, null, ((_a = ping.collections) != null ? _a : []).length, " collections")) : null, spend ? /* @__PURE__ */ import_react7.default.createElement("div", null, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginBottom: 4 } }, "Spend today (estimated)"), /* @__PURE__ */ import_react7.default.createElement(JsonBox, { value: spend, maxHeight: 140 })) : null), /* @__PURE__ */ import_react7.default.createElement(Section, { title: "Spend trend (last 30 days)" }, trend ? /* @__PURE__ */ import_react7.default.createElement(import_react7.default.Fragment, null, /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 6 } }, "By day"), /* @__PURE__ */ import_react7.default.createElement(
+    Sparkline,
+    {
+      data: Object.entries((_b = trend.byDay) != null ? _b : {}).sort(([a], [b]) => a.localeCompare(b)).map(([day, v]) => ({ label: day, value: Number(v) }))
+    }
+  ), /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", margin: "16px 0 6px" } }, "Top workflows"), ((_c = trend.byWorkflow) != null ? _c : []).length === 0 ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No spend recorded yet.") : ((_d = trend.byWorkflow) != null ? _d : []).slice(0, 8).map((w) => /* @__PURE__ */ import_react7.default.createElement("div", { key: w.workflowId, style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0" } }, /* @__PURE__ */ import_react7.default.createElement("span", null, w.name), /* @__PURE__ */ import_react7.default.createElement("b", null, "$", w.totalUsd.toFixed(2)))), /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", margin: "16px 0 6px" } }, "Top functions"), ((_e = trend.byFunction) != null ? _e : []).length === 0 ? /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 12.5, color: "#8a8f8a" } }, "No spend recorded yet.") : ((_f = trend.byFunction) != null ? _f : []).slice(0, 8).map((f) => /* @__PURE__ */ import_react7.default.createElement("div", { key: f.functionKey, style: { display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "3px 0" } }, /* @__PURE__ */ import_react7.default.createElement("code", null, f.functionKey), /* @__PURE__ */ import_react7.default.createElement("b", null, "$", f.totalUsd.toFixed(2))))) : null));
 }
 
 // src/client/console/MemoryPanel.tsx
-var import_react6 = __toESM(require("react"));
-var import_antd6 = require("antd");
-var import_client5 = require("@nocobase/client");
+var import_react8 = __toESM(require("react"));
+var import_antd8 = require("antd");
+var import_client6 = require("@nocobase/client");
 var PENDING_SUFFIX = "__pending";
 function baseKeyOf(key) {
   return key.endsWith(PENDING_SUFFIX) ? key.slice(0, -PENDING_SUFFIX.length) : key;
 }
+function isPendingKey(key) {
+  return String(key != null ? key : "").endsWith(PENDING_SUFFIX);
+}
+var STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1e3;
+var VERY_STALE_AFTER_MS = 30 * 24 * 60 * 60 * 1e3;
+function stalenessBadge(confirmedAt) {
+  if (!confirmedAt) return null;
+  const t = new Date(confirmedAt).getTime();
+  if (Number.isNaN(t)) return null;
+  const ageMs = Date.now() - t;
+  if (ageMs > VERY_STALE_AFTER_MS) return /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "red" }, "very stale");
+  if (ageMs > STALE_AFTER_MS) return /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "orange" }, "stale");
+  return null;
+}
 function MemoryDetail({ row, confirmedSibling, onClose, onSaved }) {
   var _a, _b;
-  const api = (0, import_client5.useAPIClient)();
+  const api = (0, import_client6.useAPIClient)();
   const isPending = String((_a = row.key) != null ? _a : "").endsWith(PENDING_SUFFIX);
-  const [summary, setSummary] = (0, import_react6.useState)(String((_b = row.summary) != null ? _b : ""));
-  const [busy, setBusy] = (0, import_react6.useState)(false);
+  const [summary, setSummary] = (0, import_react8.useState)(String((_b = row.summary) != null ? _b : ""));
+  const [busy, setBusy] = (0, import_react8.useState)(false);
   const confirm = async () => {
     var _a2, _b2;
     setBusy(true);
     try {
       const res = await neoaiAction(api, "memoryConfirm", { id: row.id, editedSummary: summary });
       if (res == null ? void 0 : res.ok) {
-        import_antd6.message.success(isPending ? "Confirmed \u2014 swapped in over the previous version" : "Confirmed");
+        import_antd8.message.success(isPending ? "Confirmed \u2014 swapped in over the previous version" : "Confirmed");
         onSaved();
         onClose();
       } else {
-        import_antd6.message.error((_a2 = res == null ? void 0 : res.reason) != null ? _a2 : "Confirm failed");
+        import_antd8.message.error((_a2 = res == null ? void 0 : res.reason) != null ? _a2 : "Confirm failed");
       }
     } catch (err) {
-      import_antd6.message.error(String((_b2 = err == null ? void 0 : err.message) != null ? _b2 : err));
+      import_antd8.message.error(String((_b2 = err == null ? void 0 : err.message) != null ? _b2 : err));
     } finally {
       setBusy(false);
     }
   };
-  return /* @__PURE__ */ import_react6.default.createElement(
+  return /* @__PURE__ */ import_react8.default.createElement(
     ConsoleDrawer,
     {
       open: true,
-      title: /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 13 } }, row.entity_type), /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 13 } }, row.entity_id), /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), baseKeyOf(row.key), isPending ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "gold", style: { marginLeft: 8 } }, "pending review") : null, !isPending && row.status === "confirmed" ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "green", style: { marginLeft: 8 } }, "confirmed") : null),
+      title: /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 13 } }, row.entity_type), /* @__PURE__ */ import_react8.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 13 } }, row.entity_id), /* @__PURE__ */ import_react8.default.createElement("span", { style: { color: "#8a8f8a" } }, " \xB7 "), baseKeyOf(row.key), isPending ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "gold", style: { marginLeft: 8 } }, "pending review") : null, !isPending && row.status === "confirmed" ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "green", style: { marginLeft: 8 } }, "confirmed") : null),
       onClose,
-      footer: /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: onClose }, "Close"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", loading: busy, onClick: confirm }, isPending ? "Confirm & swap in" : row.status === "confirmed" ? "Save changes" : "Confirm"))
+      footer: /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8 } }, /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { onClick: onClose }, "Close"), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { type: "primary", loading: busy, onClick: confirm }, isPending ? "Confirm & swap in" : row.status === "confirmed" ? "Save changes" : "Confirm"))
     },
-    /* @__PURE__ */ import_react6.default.createElement("div", { style: { padding: 18, display: "flex", flexDirection: "column", gap: 14, maxWidth: 900 } }, isPending && confirmedSibling ? /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "CURRENTLY CONFIRMED (unaffected until you confirm the draft below)"), /* @__PURE__ */ import_react6.default.createElement(JsonBox, { value: confirmedSibling.summary, maxHeight: 140 })) : null, /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, isPending ? "NEW DRAFT \u2014 REVIEW BEFORE CONFIRMING" : "SUMMARY"), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input.TextArea, { rows: 8, value: summary, onChange: (e) => setSummary(e.target.value) })), row.structured ? /* @__PURE__ */ import_react6.default.createElement("div", null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "STRUCTURED (Phase 2 \u2014 informational only, not applied anywhere yet)"), /* @__PURE__ */ import_react6.default.createElement(JsonBox, { value: row.structured, maxHeight: 200 })) : null, /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13, color: "#5c605c" } }, /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("b", null, "Updated by:"), " ", row.updated_by || "\u2014"), /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("b", null, "Confirmed at:"), " ", fmtTime(row.confirmed_at)), /* @__PURE__ */ import_react6.default.createElement("span", null, /* @__PURE__ */ import_react6.default.createElement("b", null, "Source run:"), " ", row.source_run_id ? `#${row.source_run_id}` : "\u2014")))
+    /* @__PURE__ */ import_react8.default.createElement("div", { style: { padding: 18, display: "flex", flexDirection: "column", gap: 14, maxWidth: 900 } }, isPending && confirmedSibling ? /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "CURRENTLY CONFIRMED (unaffected until you confirm the draft below)"), /* @__PURE__ */ import_react8.default.createElement(JsonBox, { value: confirmedSibling.summary, maxHeight: 140 })) : null, /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, isPending ? "NEW DRAFT \u2014 REVIEW BEFORE CONFIRMING" : "SUMMARY"), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input.TextArea, { rows: 8, value: summary, onChange: (e) => setSummary(e.target.value) })), row.structured ? /* @__PURE__ */ import_react8.default.createElement("div", null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 6px" } }, "STRUCTURED (Phase 2 \u2014 informational only, not applied anywhere yet)"), /* @__PURE__ */ import_react8.default.createElement(JsonBox, { value: row.structured, maxHeight: 200 })) : null, /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13, color: "#5c605c" } }, /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("b", null, "Updated by:"), " ", row.updated_by || "\u2014"), /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("b", null, "Confirmed at:"), " ", fmtTime(row.confirmed_at)), /* @__PURE__ */ import_react8.default.createElement("span", null, /* @__PURE__ */ import_react8.default.createElement("b", null, "Source run:"), " ", row.source_run_id ? `#${row.source_run_id}` : "\u2014")))
   );
 }
 function MemoryPanel() {
   var _a, _b, _c;
-  const api = (0, import_client5.useAPIClient)();
-  const [rows, setRows] = (0, import_react6.useState)([]);
-  const [entityType, setEntityType] = (0, import_react6.useState)("");
-  const [entityId, setEntityId] = (0, import_react6.useState)("");
-  const [openId, setOpenId] = (0, import_react6.useState)(null);
+  const api = (0, import_client6.useAPIClient)();
+  const [rows, setRows] = (0, import_react8.useState)([]);
+  const [entityType, setEntityType] = (0, import_react8.useState)("");
+  const [entityId, setEntityId] = (0, import_react8.useState)("");
+  const [pendingOnly, setPendingOnly] = (0, import_react8.useState)(false);
+  const [openId, setOpenId] = (0, import_react8.useState)(null);
   const load = async () => {
     var _a2;
     try {
       const { rows: rows2 } = await listResource(api, "neoai_memories", { sort: "-id", pageSize: 500 });
       setRows(rows2);
     } catch (err) {
-      import_antd6.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
+      import_antd8.message.error(`Load failed: ${(_a2 = err == null ? void 0 : err.message) != null ? _a2 : err}`);
     }
   };
   usePoll(load, 15e3, openId == null);
-  const filteredRows = (0, import_react6.useMemo)(() => {
+  const filteredRows = (0, import_react8.useMemo)(() => {
     const et = entityType.trim().toLowerCase();
     const ei = entityId.trim().toLowerCase();
     return rows.filter((r) => {
       var _a2, _b2;
+      if (pendingOnly && !isPendingKey(r.key)) return false;
       if (et && !String((_a2 = r.entity_type) != null ? _a2 : "").toLowerCase().includes(et)) return false;
       if (ei && !String((_b2 = r.entity_id) != null ? _b2 : "").toLowerCase().includes(ei)) return false;
       return true;
-    });
-  }, [rows, entityType, entityId]);
+    }).map((r, idx) => ({ r, idx })).sort((a, b) => {
+      const pa = isPendingKey(a.r.key) ? 0 : 1;
+      const pb = isPendingKey(b.r.key) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return a.idx - b.idx;
+    }).map(({ r }) => r);
+  }, [rows, entityType, entityId, pendingOnly]);
   const openRow = (_a = rows.find((r) => r.id === openId)) != null ? _a : null;
   const confirmedSibling = openRow && String((_b = openRow.key) != null ? _b : "").endsWith(PENDING_SUFFIX) ? (_c = rows.find(
     (r) => r.entity_type === openRow.entity_type && r.entity_id === openRow.entity_id && r.key === baseKeyOf(openRow.key) && r.status === "confirmed"
   )) != null ? _c : null : null;
   const columns = [
-    { title: "Entity type", dataIndex: "entity_type", width: 180, render: (v) => /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 12 } }, v) },
-    { title: "Entity id", dataIndex: "entity_id", width: 140, render: (v) => /* @__PURE__ */ import_react6.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "Entity type", dataIndex: "entity_type", width: 180, render: (v) => /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 12 } }, v) },
+    { title: "Entity id", dataIndex: "entity_id", width: 140, render: (v) => /* @__PURE__ */ import_react8.default.createElement("code", { style: { fontSize: 12 } }, v) },
     {
       title: "Key",
       dataIndex: "key",
       width: 160,
-      render: (v) => String(v).endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react6.default.createElement("span", null, baseKeyOf(v), " ", /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "gold" }, "pending")) : v
+      render: (v) => String(v).endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react8.default.createElement("span", null, baseKeyOf(v), " ", /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "gold" }, "pending")) : v
     },
     {
       title: "Status",
@@ -1391,21 +1871,26 @@ function MemoryPanel() {
       width: 110,
       render: (v, r) => {
         var _a2;
-        return String((_a2 = r.key) != null ? _a2 : "").endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: "gold" }, "awaiting review") : /* @__PURE__ */ import_react6.default.createElement(import_antd6.Tag, { color: v === "confirmed" ? "green" : "default" }, v);
+        return String((_a2 = r.key) != null ? _a2 : "").endsWith(PENDING_SUFFIX) ? /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: "gold" }, "awaiting review") : /* @__PURE__ */ import_react8.default.createElement(import_antd8.Tag, { color: v === "confirmed" ? "green" : "default" }, v);
       }
     },
-    { title: "Summary", dataIndex: "summary", render: (v) => /* @__PURE__ */ import_react6.default.createElement("span", { style: { color: "#3c4043" } }, (v != null ? v : "").slice(0, 140), (v != null ? v : "").length > 140 ? "\u2026" : "") },
+    { title: "Summary", dataIndex: "summary", render: (v) => /* @__PURE__ */ import_react8.default.createElement("span", { style: { color: "#3c4043" } }, (v != null ? v : "").slice(0, 140), (v != null ? v : "").length > 140 ? "\u2026" : "") },
     { title: "Updated by", dataIndex: "updated_by", width: 160 },
-    { title: "Confirmed at", dataIndex: "confirmed_at", width: 150, render: (v) => fmtTime(v) },
+    {
+      title: "Confirmed at",
+      dataIndex: "confirmed_at",
+      width: 190,
+      render: (v) => /* @__PURE__ */ import_react8.default.createElement("span", null, fmtTime(v), " ", stalenessBadge(v))
+    },
     {
       title: "",
       key: "act",
       width: 90,
-      render: (_, r) => /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { size: "small", onClick: () => setOpenId(r.id) }, "Open")
+      render: (_, r) => /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { size: "small", onClick: () => setOpenId(r.id) }, "Open")
     }
   ];
-  return /* @__PURE__ */ import_react6.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Memory"), /* @__PURE__ */ import_react6.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Filter entity type (e.g. crm.deal)", value: entityType, onChange: (e) => setEntityType(e.target.value), style: { width: 220 }, allowClear: true }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Input, { placeholder: "Filter entity id", value: entityId, onChange: (e) => setEntityId(e.target.value), style: { width: 160 }, allowClear: true }), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { onClick: load }, "Refresh")), /* @__PURE__ */ import_react6.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 820 } }, 'Central, entity-agnostic AI memory: host plugins (CRM, Konfigurator, \u2026) write a draft summary about one of their records here; nothing feeds back into that record until a human opens it and confirms. Once confirmed, a later AI re-draft never overwrites it directly \u2014 it stages as a "pending" row you review and swap in explicitly.'), /* @__PURE__ */ import_react6.default.createElement(
-    import_antd6.Table,
+  return /* @__PURE__ */ import_react8.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Memory"), /* @__PURE__ */ import_react8.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input, { placeholder: "Filter entity type (e.g. crm.deal)", value: entityType, onChange: (e) => setEntityType(e.target.value), style: { width: 220 }, allowClear: true }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Input, { placeholder: "Filter entity id", value: entityId, onChange: (e) => setEntityId(e.target.value), style: { width: 160 }, allowClear: true }), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Checkbox, { checked: pendingOnly, onChange: (e) => setPendingOnly(e.target.checked) }, "Pending review only"), /* @__PURE__ */ import_react8.default.createElement(import_antd8.Button, { onClick: load }, "Refresh")), /* @__PURE__ */ import_react8.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 820 } }, 'Central, entity-agnostic AI memory: host plugins (CRM, Konfigurator, \u2026) write a draft summary about one of their records here; nothing feeds back into that record until a human opens it and confirms. Once confirmed, a later AI re-draft never overwrites it directly \u2014 it stages as a "pending" row you review and swap in explicitly.'), /* @__PURE__ */ import_react8.default.createElement(
+    import_antd8.Table,
     {
       rowKey: "id",
       size: "middle",
@@ -1415,7 +1900,7 @@ function MemoryPanel() {
       locale: { emptyText: rows.length ? "No memory rows match this filter" : "No memory rows yet" },
       onRow: (r) => ({ onClick: () => setOpenId(r.id), style: { cursor: "pointer" } })
     }
-  ), openRow ? /* @__PURE__ */ import_react6.default.createElement(
+  ), openRow ? /* @__PURE__ */ import_react8.default.createElement(
     MemoryDetail,
     {
       row: openRow,
@@ -1430,10 +1915,43 @@ function MemoryPanel() {
 var TABS = [
   { key: "workflows", label: "AI Workflows", icon: "PartitionOutlined" },
   { key: "runs", label: "Runs", icon: "PlayCircleOutlined" },
+  { key: "approvals", label: "Approvals", icon: "CheckSquareOutlined" },
   { key: "functions", label: "Functions", icon: "ApiOutlined" },
   { key: "memory", label: "Memory", icon: "DatabaseOutlined" },
   { key: "settings", label: "Settings", icon: "SettingOutlined" }
 ];
+function SpendAlertBanner() {
+  const api = (0, import_client7.useAPIClient)();
+  const [pct, setPct] = (0, import_react9.useState)(null);
+  const [alertPct, setAlertPct] = (0, import_react9.useState)(80);
+  usePoll(
+    async () => {
+      try {
+        const [settings, spend] = await Promise.all([neoaiAction(api, "getSettings", {}), neoaiAction(api, "spendToday", {})]);
+        setAlertPct(Number(settings == null ? void 0 : settings.spend_alert_pct) || 80);
+        const budget = Number(settings == null ? void 0 : settings.daily_budget_usd) || 0;
+        if (!budget) {
+          setPct(null);
+          return;
+        }
+        setPct((Number(spend == null ? void 0 : spend.global) || 0) / budget * 100);
+      } catch (e) {
+      }
+    },
+    6e4,
+    true
+  );
+  if (pct == null || pct < alertPct) return null;
+  return /* @__PURE__ */ import_react9.default.createElement(
+    import_antd9.Alert,
+    {
+      type: pct >= 100 ? "error" : "warning",
+      showIcon: true,
+      banner: true,
+      message: pct >= 100 ? `Global daily budget exhausted (${pct.toFixed(0)}% of budget) \u2014 further model calls are blocked.` : `Global spend today has crossed ${pct.toFixed(0)}% of the daily budget.`
+    }
+  );
+}
 var CROSS_LINKS = [
   // NocoBase plugin-workflow admin — the business-automation layer stays there,
   // but is reachable from the NeoAI menu (one automation hub).
@@ -1447,7 +1965,7 @@ function activeTabFromPath(pathname) {
   return TABS.some((t) => t.key === key) ? key : "workflows";
 }
 function SideItem(props) {
-  return /* @__PURE__ */ import_react7.default.createElement(
+  return /* @__PURE__ */ import_react9.default.createElement(
     "div",
     {
       onClick: props.onClick,
@@ -1465,12 +1983,12 @@ function SideItem(props) {
         userSelect: "none"
       }
     },
-    /* @__PURE__ */ import_react7.default.createElement(import_client6.Icon, { type: props.icon }),
-    /* @__PURE__ */ import_react7.default.createElement("span", null, props.label)
+    /* @__PURE__ */ import_react9.default.createElement(import_client7.Icon, { type: props.icon }),
+    /* @__PURE__ */ import_react9.default.createElement("span", null, props.label)
   );
 }
 function NeoaiConsolePage() {
-  (0, import_react7.useEffect)(() => {
+  (0, import_react9.useEffect)(() => {
     ensureInterFont();
   }, []);
   const pathname = window.location.pathname;
@@ -1478,10 +1996,10 @@ function NeoaiConsolePage() {
   const prefix = embedded ? "/admin" : "";
   const active = activeTabFromPath(pathname);
   const go = (href) => window.location.assign(href);
-  return /* @__PURE__ */ import_react7.default.createElement(import_antd7.ConfigProvider, { theme: NEOHOME_THEME, getPopupContainer: (n) => {
+  return /* @__PURE__ */ import_react9.default.createElement(import_antd9.ConfigProvider, { theme: NEOHOME_THEME, getPopupContainer: (n) => {
     var _a;
     return (_a = n == null ? void 0 : n.parentElement) != null ? _a : document.body;
-  } }, /* @__PURE__ */ import_react7.default.createElement(
+  } }, /* @__PURE__ */ import_react9.default.createElement(
     "div",
     {
       style: {
@@ -1492,7 +2010,7 @@ function NeoaiConsolePage() {
         color: "#1b1e21"
       }
     },
-    /* @__PURE__ */ import_react7.default.createElement(
+    /* @__PURE__ */ import_react9.default.createElement(
       "aside",
       {
         style: {
@@ -1505,19 +2023,19 @@ function NeoaiConsolePage() {
           flexShrink: 0
         }
       },
-      /* @__PURE__ */ import_react7.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, padding: "2px 8px 12px" } }, /* @__PURE__ */ import_react7.default.createElement("img", { src: NEOMODUL_FAVICON_SRC, alt: "Neomodul", style: { width: 26, height: 26, borderRadius: 7 } }), /* @__PURE__ */ import_react7.default.createElement("span", { style: { fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" } }, "NeoAI")),
-      TABS.map((t) => /* @__PURE__ */ import_react7.default.createElement(SideItem, { key: t.key, icon: t.icon, label: t.label, active: active === t.key, onClick: () => go(`${prefix}/neoai/${t.key}`) })),
-      /* @__PURE__ */ import_react7.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "10px 4px" } }),
-      CROSS_LINKS.map((l) => /* @__PURE__ */ import_react7.default.createElement(SideItem, { key: l.href, icon: l.icon, label: l.label, muted: true, onClick: () => go(l.href) })),
-      /* @__PURE__ */ import_react7.default.createElement("div", { style: { flex: 1 } }),
-      /* @__PURE__ */ import_react7.default.createElement("div", { style: { fontSize: 10.5, color: "#b0b4ba", padding: "0 8px 4px" } }, "Admin-only \xB7 tree workflows \xB7 Gemini via plugin-ai")
+      /* @__PURE__ */ import_react9.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, padding: "2px 8px 12px" } }, /* @__PURE__ */ import_react9.default.createElement("img", { src: NEOMODUL_FAVICON_SRC, alt: "Neomodul", style: { width: 26, height: 26, borderRadius: 7 } }), /* @__PURE__ */ import_react9.default.createElement("span", { style: { fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" } }, "NeoAI")),
+      TABS.map((t) => /* @__PURE__ */ import_react9.default.createElement(SideItem, { key: t.key, icon: t.icon, label: t.label, active: active === t.key, onClick: () => go(`${prefix}/neoai/${t.key}`) })),
+      /* @__PURE__ */ import_react9.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "10px 4px" } }),
+      CROSS_LINKS.map((l) => /* @__PURE__ */ import_react9.default.createElement(SideItem, { key: l.href, icon: l.icon, label: l.label, muted: true, onClick: () => go(l.href) })),
+      /* @__PURE__ */ import_react9.default.createElement("div", { style: { flex: 1 } }),
+      /* @__PURE__ */ import_react9.default.createElement("div", { style: { fontSize: 10.5, color: "#b0b4ba", padding: "0 8px 4px" } }, "Admin-only \xB7 tree workflows \xB7 Gemini via plugin-ai")
     ),
-    /* @__PURE__ */ import_react7.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, active === "workflows" ? /* @__PURE__ */ import_react7.default.createElement(WorkflowsPanel, null) : null, active === "runs" ? /* @__PURE__ */ import_react7.default.createElement(RunsPanel, null) : null, active === "functions" ? /* @__PURE__ */ import_react7.default.createElement(FunctionsPanel, null) : null, active === "memory" ? /* @__PURE__ */ import_react7.default.createElement(MemoryPanel, null) : null, active === "settings" ? /* @__PURE__ */ import_react7.default.createElement(SettingsPanel, null) : null)
+    /* @__PURE__ */ import_react9.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, /* @__PURE__ */ import_react9.default.createElement(SpendAlertBanner, null), active === "workflows" ? /* @__PURE__ */ import_react9.default.createElement(WorkflowsPanel, null) : null, active === "runs" ? /* @__PURE__ */ import_react9.default.createElement(RunsPanel, null) : null, active === "approvals" ? /* @__PURE__ */ import_react9.default.createElement(ApprovalsPanel, null) : null, active === "functions" ? /* @__PURE__ */ import_react9.default.createElement(FunctionsPanel, null) : null, active === "memory" ? /* @__PURE__ */ import_react9.default.createElement(MemoryPanel, null) : null, active === "settings" ? /* @__PURE__ */ import_react9.default.createElement(SettingsPanel, null) : null)
   ));
 }
 
 // src/client/index.tsx
-var NeoaiRunInstruction = class extends import_client8.Instruction {
+var NeoaiRunInstruction = class extends import_client9.Instruction {
   constructor() {
     super(...arguments);
     this.title = "NeoAI workflow";
@@ -1564,7 +2082,7 @@ var NeoaiRunInstruction = class extends import_client8.Instruction {
     };
   }
 };
-var NeoaiClientPlugin = class extends import_client7.Plugin {
+var NeoaiClientPlugin = class extends import_client8.Plugin {
   /**
    * Automation bridge UI: contribute the "neoai-run" node to NocoBase's
    * plugin-workflow editor as a PLAIN instruction object (no import from

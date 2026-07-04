@@ -295,6 +295,22 @@ var NEOAI_EXTRA_FIELDS = [
   { collection: "neoai_workflows", field: str("schedule", "Schedule (empty = off)") },
   { collection: "neoai_workflows", field: json("schedule_input", "Schedule input") },
   { collection: "neoai_workflows", field: dt("last_scheduled_at", "Last scheduled run") },
+  // On-failure hook (item 7): fires the named workflow after THIS one ends
+  // failed, reusing the same startRun path a subworkflow node uses — single
+  // level only, never chains (a hook's own failure never fires another hook).
+  { collection: "neoai_workflows", field: str("on_failure_workflow_key", "On-failure hook: workflow key (empty = off)") },
+  { collection: "neoai_workflows", field: json("on_failure_input", "On-failure hook input (JSON of templates: {{run.id}}, {{run.error}}, {{input.x}})") },
+  // Per-function budget override (item 14): takes precedence over the bound
+  // workflow's own budget when set and >0.
+  { collection: "neoai_functions", field: dbl("daily_budget_usd", "Daily budget override (USD, 0 = use the bound workflow's budget)", 0) },
+  // Proactive spend alerts (item 15): forward-looking warning threshold —
+  // the hard block still only ever comes from daily_budget_usd via checkBudget.
+  { collection: "neoai_settings", field: dbl("spend_alert_pct", "Warn when spend crosses this % of the daily budget", 80) },
+  // Staleness indicator (item 19): stamped on every upsert/confirm write, so
+  // the panel can show "last touched" even before anything is ever confirmed.
+  // The staleness BADGE itself is based on confirmed_at, not this field — see
+  // MemoryPanel.tsx.
+  { collection: "neoai_memories", field: dt("updated_at", "Last updated at") },
   {
     collection: "neoai_workflows",
     field: {
@@ -380,6 +396,10 @@ function checkBudget(opts) {
   const w = opts.workflowDailyBudgetUsd ?? 0;
   if (w > 0 && opts.workflowSpentTodayUsd >= w) {
     return { ok: false, reason: `workflow daily budget exhausted (${opts.workflowSpentTodayUsd.toFixed(2)} / ${w} USD)` };
+  }
+  const f = opts.functionDailyBudgetUsd ?? 0;
+  if (f > 0 && (opts.functionSpentTodayUsd ?? 0) >= f) {
+    return { ok: false, reason: `function daily budget exhausted (${(opts.functionSpentTodayUsd ?? 0).toFixed(2)} / ${f} USD)` };
   }
   return { ok: true };
 }
@@ -906,34 +926,46 @@ function validateDefinition(def) {
   const seen = /* @__PURE__ */ new Set();
   const walk = (nodes, insideParallel) => {
     for (const n of nodes ?? []) {
-      if (!n.id || typeof n.id !== "string") errors.push(`node without id (type ${n.type})`);
-      else if (seen.has(n.id)) errors.push(`duplicate node id "${n.id}"`);
+      if (!n.id || typeof n.id !== "string") errors.push({ message: `node without id (type ${n.type})` });
+      else if (seen.has(n.id)) errors.push({ nodeId: n.id, message: `duplicate node id "${n.id}"` });
       else seen.add(n.id);
-      if (!n.type) errors.push(`node "${n.id}" without type`);
+      if (!n.type) errors.push({ nodeId: n.id, message: `node "${n.id}" without type` });
       if (insideParallel && n.type === "human_gate") {
-        errors.push(`human_gate "${n.id}" inside a parallel block is not supported (v1)`);
+        errors.push({ nodeId: n.id, message: `human_gate "${n.id}" inside a parallel block is not supported (v1)` });
       }
       const branches = n.branches ?? [];
-      if (n.type === "condition" && branches.length < 1) errors.push(`condition "${n.id}" needs branches[0]`);
-      if (n.type === "loop" && branches.length < 1) errors.push(`loop "${n.id}" needs branches[0] (body)`);
-      if (n.type === "parallel" && branches.length < 1) errors.push(`parallel "${n.id}" needs at least one branch`);
+      if (n.type === "condition" && branches.length < 1) errors.push({ nodeId: n.id, message: `condition "${n.id}" needs branches[0]` });
+      if (n.type === "loop" && branches.length < 1) errors.push({ nodeId: n.id, message: `loop "${n.id}" needs branches[0] (body)` });
+      if (n.type === "parallel" && branches.length < 1) errors.push({ nodeId: n.id, message: `parallel "${n.id}" needs at least one branch` });
       for (const b of branches) walk(b ?? [], insideParallel || n.type === "parallel");
     }
   };
   walk(def?.nodes ?? [], false);
-  if (!def?.nodes?.length) errors.push("workflow has no nodes");
+  if (!def?.nodes?.length) errors.push({ message: "workflow has no nodes" });
   return errors;
 }
 var Runner = class _Runner {
   constructor(rt) {
     this.rt = rt;
   }
-  async run(def, input, runMeta) {
+  /**
+   * `seed` lets a draft test-run skip re-executing early, already-verified
+   * TOP-LEVEL nodes: `vars` seeds state.vars with their cached outputs, and
+   * `skipToNodeId` fast-forwards the root frame's index to that node (found
+   * only among top-level `def.nodes` — nested/branch ids are out of scope
+   * for v1). An id that doesn't resolve at the top level is silently
+   * ignored (falls back to a normal from-the-start run) rather than erroring.
+   */
+  async run(def, input, runMeta, seed) {
     const state = {
       frames: [{ kind: "seq", nodes: def.nodes ?? [], idx: 0, path: "" }],
-      vars: {},
+      vars: seed?.vars ? { ...seed.vars } : {},
       output: void 0
     };
+    if (seed?.skipToNodeId) {
+      const idx = (def.nodes ?? []).findIndex((n) => n.id === seed.skipToNodeId);
+      if (idx > 0) state.frames[0].idx = idx;
+    }
     return this.drive(state, input, runMeta);
   }
   /** Continue a suspended run. `approval` becomes the waiting gate's output. */
@@ -1409,7 +1441,9 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
             draft: p.draft === true,
             confirmed: p.confirmed === true,
             trigger: String(p.trigger ?? "manual"),
-            triggeredBy: String(ctx.state?.currentUser?.nickname ?? ctx.state?.currentUser?.username ?? "admin")
+            triggeredBy: String(ctx.state?.currentUser?.nickname ?? ctx.state?.currentUser?.username ?? "admin"),
+            skipToNodeId: p.skipToNodeId,
+            seedVars: p.seedVars
           });
           await next();
         },
@@ -1457,6 +1491,25 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
           });
           await next();
         },
+        rerunRun: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.rerunRun(Number(p.runId), p.newInput ?? {}, {
+            triggeredBy: String(ctx.state?.currentUser?.nickname ?? "admin")
+          });
+          await next();
+        },
+        batchRun: async (ctx, next) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          ctx.body = await this.batchRun({
+            workflowId: p.workflowId,
+            workflowKey: p.workflowKey,
+            items: p.items ?? [],
+            triggeredBy: String(ctx.state?.currentUser?.nickname ?? "admin")
+          });
+          await next();
+        },
         publishWorkflow: async (ctx, next) => {
           requireAdmin(ctx);
           const p = ctx.action.params.values ?? {};
@@ -1465,8 +1518,8 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
           if (!wf) ctx.throw(404, "workflow not found");
           const def = wf.get("definition_draft") ?? {};
           const errors = validateDefinition(def);
-          if (errors.length) {
-            ctx.body = { ok: false, errors };
+          if (errors.length || p.dryRun === true) {
+            ctx.body = { ok: errors.length === 0, errors };
             return next();
           }
           const version = Number(wf.get("current_version") ?? 0) + 1;
@@ -1501,7 +1554,7 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
           const repo = this.db.getRepository("neoai_settings");
           const row = await this.settingsRow();
           const values = {};
-          for (const k of ["default_llm_service", "default_model", "daily_budget_usd", "image_price_usd", "prices", "force_mock"]) {
+          for (const k of ["default_llm_service", "default_model", "daily_budget_usd", "image_price_usd", "prices", "force_mock", "spend_alert_pct"]) {
             if (p[k] !== void 0) values[k] = p[k];
           }
           if (typeof p.gemini_api_key === "string") values.gemini_api_key = p.gemini_api_key.trim();
@@ -1513,6 +1566,11 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
         spendToday: async (ctx, next) => {
           requireAdmin(ctx);
           ctx.body = { global: await this.spentTodayUsd(), byWorkflow: await this.spentTodayByWorkflow() };
+          await next();
+        },
+        spendTrend: async (ctx, next) => {
+          requireAdmin(ctx);
+          ctx.body = await this.spendTrend();
           await next();
         },
         // HTTP surface of the in-process function dispatch — used by the
@@ -1749,7 +1807,8 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       summary: input.summary,
       structured: input.structured ?? null,
       source_run_id: input.sourceRunId ?? null,
-      updated_by: input.updatedBy ?? ""
+      updated_by: input.updatedBy ?? "",
+      updated_at: /* @__PURE__ */ new Date()
     };
     const confirmed = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey, status: "confirmed" } });
     const targetKey = confirmed ? `${baseKey}${_NeoaiPlugin.PENDING_SUFFIX}` : baseKey;
@@ -1779,7 +1838,7 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     if (!isPending) {
       await repo.update({
         filterByTk: id,
-        values: { summary, structured, status: "confirmed", confirmed_at: /* @__PURE__ */ new Date(), updated_by: opts.confirmedBy }
+        values: { summary, structured, status: "confirmed", confirmed_at: /* @__PURE__ */ new Date(), updated_by: opts.confirmedBy, updated_at: /* @__PURE__ */ new Date() }
       });
       return { ok: true };
     }
@@ -1788,7 +1847,15 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     const entity_id = row.get("entity_id");
     const sourceRunId = row.get("source_run_id") ?? null;
     const baseRow = await repo.findOne({ filter: { entity_type, entity_id, key: baseKey } });
-    const baseValues = { summary, structured, status: "confirmed", confirmed_at: /* @__PURE__ */ new Date(), updated_by: opts.confirmedBy, source_run_id: sourceRunId };
+    const baseValues = {
+      summary,
+      structured,
+      status: "confirmed",
+      confirmed_at: /* @__PURE__ */ new Date(),
+      updated_by: opts.confirmedBy,
+      updated_at: /* @__PURE__ */ new Date(),
+      source_run_id: sourceRunId
+    };
     if (baseRow) {
       await repo.update({ filterByTk: baseRow.get("id"), values: baseValues });
     } else {
@@ -1868,10 +1935,67 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       return {};
     }
   }
-  async loadPublishedDefinition(workflowId) {
+  /** Per-function spend today (item 14) — same shape as spentTodayByWorkflow. */
+  async spentTodayByFunction() {
+    try {
+      const repo = this.db.getRepository("neoai_runs");
+      const rows = await repo.find({
+        filter: { started_at: { $gte: this.dayStart() }, function_key: { $ne: "" } },
+        fields: ["function_key", "cost_usd"],
+        limit: 2e3
+      });
+      const out = {};
+      for (const r of rows) {
+        const k = String(r.get("function_key") ?? "");
+        if (!k) continue;
+        out[k] = (out[k] ?? 0) + (Number(r.get("cost_usd")) || 0);
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  }
+  /** 30-day spend trend + per-workflow/per-function leaderboard (item 16). */
+  async spendTrend() {
+    const since = /* @__PURE__ */ new Date();
+    since.setDate(since.getDate() - 30);
+    since.setHours(0, 0, 0, 0);
+    const repo = this.db.getRepository("neoai_runs");
+    const rows = await repo.find({
+      filter: { started_at: { $gte: since } },
+      fields: ["workflow_id", "function_key", "cost_usd", "started_at"],
+      appends: ["workflow"],
+      limit: 2e4
+    });
+    const byDay = {};
+    const byWorkflowMap = /* @__PURE__ */ new Map();
+    const byFunctionMap = /* @__PURE__ */ new Map();
+    for (const r of rows) {
+      const cost = Number(r.get("cost_usd")) || 0;
+      const started = r.get("started_at");
+      const day = started ? new Date(started).toISOString().slice(0, 10) : "unknown";
+      byDay[day] = (byDay[day] ?? 0) + cost;
+      const wfId = String(r.get("workflow_id") ?? "");
+      if (wfId) {
+        const wfName = r.get?.("workflow")?.name ?? wfId;
+        const entry = byWorkflowMap.get(wfId) ?? { name: wfName, totalUsd: 0 };
+        entry.totalUsd += cost;
+        byWorkflowMap.set(wfId, entry);
+      }
+      const fnKey = String(r.get("function_key") ?? "");
+      if (fnKey) byFunctionMap.set(fnKey, (byFunctionMap.get(fnKey) ?? 0) + cost);
+    }
+    return {
+      byDay,
+      byWorkflow: [...byWorkflowMap.entries()].map(([workflowId, v]) => ({ workflowId, ...v })).sort((a, b) => b.totalUsd - a.totalUsd),
+      byFunction: [...byFunctionMap.entries()].map(([functionKey, totalUsd]) => ({ functionKey, totalUsd })).sort((a, b) => b.totalUsd - a.totalUsd)
+    };
+  }
+  /** `versionOverride` re-runs a SPECIFIC historical version (item 8's re-run) instead of always the current published one. */
+  async loadPublishedDefinition(workflowId, versionOverride) {
     const wf = await this.db.getRepository("neoai_workflows").findOne({ filterByTk: workflowId });
     if (!wf) return null;
-    const version = Number(wf.get("current_version") ?? 0);
+    const version = versionOverride ?? Number(wf.get("current_version") ?? 0);
     if (!version) return null;
     const row = await this.db.getRepository("neoai_workflow_versions").findOne({
       filter: { workflow_id: workflowId, version }
@@ -1889,7 +2013,7 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     if (opts.draft) {
       def = wf.get("definition_draft") ?? {};
     } else {
-      const published = await this.loadPublishedDefinition(workflowId);
+      const published = await this.loadPublishedDefinition(workflowId, opts.pinnedVersion);
       if (!published) return { error: "workflow has no published version (publish it first, or run as draft test)" };
       def = published.def;
       version = published.version;
@@ -1898,7 +2022,7 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       }
     }
     const errors = validateDefinition(def);
-    if (errors.length) return { error: `invalid definition: ${errors.join("; ")}` };
+    if (errors.length) return { error: `invalid definition: ${errors.map((e) => e.message).join("; ")}` };
     if (wf.get("require_confirm") === true && opts.confirmed !== true) {
       const counts = countModelNodes(def);
       const settings = await this.settingsRow();
@@ -1930,8 +2054,9 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     const runId = Number(run.get("id"));
     const handle = { cancelled: false, workflowId };
     this.running.set(runId, handle);
+    const seed = opts.draft && opts.skipToNodeId ? { skipToNodeId: opts.skipToNodeId, vars: opts.seedVars } : void 0;
     setImmediate(() => {
-      this.executeRun(runId, def, opts.input, handle, wf).catch((err) => {
+      this.executeRun(runId, def, opts.input, handle, wf, opts.trigger, opts.functionKey, void 0, seed).catch((err) => {
         this.app.logger.error(`[neoai] run ${runId} crashed outside runner: ${err}`);
       });
     });
@@ -1951,18 +2076,68 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     this.running.set(runId, handle);
     const input = run.get("input") ?? {};
     setImmediate(() => {
-      this.executeRun(runId, { nodes: [] }, input, handle, wf, { state, approval }).catch((err) => {
+      this.executeRun(runId, { nodes: [] }, input, handle, wf, String(run.get("trigger") ?? ""), String(run.get("function_key") ?? ""), { state, approval }).catch((err) => {
         this.app.logger.error(`[neoai] resume ${runId} crashed outside runner: ${err}`);
       });
     });
     return { ok: true, runId };
   }
-  async executeRun(runId, def, input, handle, wf, resume) {
+  /**
+   * Re-run a terminal run with (optionally) edited input (item 8). Reproduces
+   * the SAME published version the original run used (falls back to the
+   * current published version if the original was a draft test run, since
+   * draft snapshots aren't retained).
+   */
+  async rerunRun(runId, newInput, opts = {}) {
+    const repo = this.db.getRepository("neoai_runs");
+    const run = await repo.findOne({ filterByTk: runId });
+    if (!run) return { error: `run ${runId} not found` };
+    const workflowId = Number(run.get("workflow_id"));
+    const originalVersion = Number(run.get("version") ?? 0);
+    return this.startRun({
+      workflowId,
+      input: newInput,
+      draft: originalVersion === 0,
+      pinnedVersion: originalVersion || void 0,
+      trigger: "re-run",
+      triggeredBy: opts.triggeredBy ?? `re-run:#${runId}`,
+      confirmed: true
+      // reviewing the input before clicking Re-run IS the confirmation
+    });
+  }
+  /**
+   * Batch/bulk dispatch (item 9): one run per item, sequential enqueue (each
+   * startRun call only queues via setImmediate and returns almost instantly —
+   * sequential keeps a cold budget-cache from being scanned N times at once).
+   */
+  async batchRun(opts) {
+    const items = Array.isArray(opts.items) ? opts.items : [];
+    if (!items.length) return { error: "items array required" };
+    if (items.length > 200) return { error: "batch too large (max 200 \u2014 split into multiple batches)" };
+    const results = [];
+    for (const item of items) {
+      const started = await this.startRun({
+        workflowId: opts.workflowId,
+        workflowKey: opts.workflowKey,
+        input: item,
+        trigger: "batch",
+        triggeredBy: opts.triggeredBy ?? "batch",
+        confirmed: true
+        // batch-dispatching from the console IS the admin's consent
+      });
+      if ("runId" in started) results.push({ runId: started.runId });
+      else results.push({ error: "error" in started ? started.error : "needs confirmation (unexpected for batch)" });
+    }
+    return { started: results };
+  }
+  async executeRun(runId, def, input, handle, wf, trigger, functionKey, resume, seed) {
     const runsRepo = this.db.getRepository("neoai_runs");
     const stepsRepo = this.db.getRepository("neoai_run_steps");
     const settings = await this.settingsRow();
     const prices = { ...DEFAULT_PRICES, ...settings?.get?.("prices") ?? {} };
     const workflowId = Number(wf.get("id"));
+    const fnRow = functionKey ? await this.db.getRepository("neoai_functions")?.findOne({ filter: { key: functionKey } }) : null;
+    const functionDailyBudgetUsd = Number(fnRow?.get?.("daily_budget_usd")) || 0;
     let seq = 0;
     let totalIn = 0;
     let totalOut = 0;
@@ -2042,13 +2217,16 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
         if (!spendCache || now - spendCache.at > 5e3) {
           const byWf = await this.spentTodayByWorkflow();
           const global = Object.values(byWf).reduce((s, v) => s + v, 0);
-          spendCache = { at: now, global, wf: byWf[String(workflowId)] ?? 0 };
+          const byFn = functionKey ? await this.spentTodayByFunction() : {};
+          spendCache = { at: now, global, wf: byWf[String(workflowId)] ?? 0, fn: byFn[String(functionKey)] ?? 0 };
         }
         const check = checkBudget({
           spentTodayUsd: spendCache.global + totalCost,
           workflowSpentTodayUsd: spendCache.wf + totalCost,
           globalDailyBudgetUsd: Number(settings?.get?.("daily_budget_usd")) || 0,
-          workflowDailyBudgetUsd: Number(wf.get("daily_budget_usd")) || 0
+          workflowDailyBudgetUsd: Number(wf.get("daily_budget_usd")) || 0,
+          functionSpentTodayUsd: spendCache.fn + totalCost,
+          functionDailyBudgetUsd
         });
         if (!check.ok) throw new Error(`budget: ${check.reason}`);
       },
@@ -2071,7 +2249,7 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     });
     let outcome;
     try {
-      outcome = resume ? await runner.resume(def, input, resume.state, resume.approval, { id: runId }) : await runner.run(def, input, { id: runId });
+      outcome = resume ? await runner.resume(def, input, resume.state, resume.approval, { id: runId }) : await runner.run(def, input, { id: runId }, seed);
     } catch (err) {
       outcome = { status: "failed", error: String(err?.message ?? err) };
     }
@@ -2118,6 +2296,25 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
             ...this.addTotals(totals, runId)
           }
         });
+        if (!handle.cancelled && trigger !== "failure-hook") {
+          const hookKey = String(wf.get("on_failure_workflow_key") ?? "").trim();
+          if (hookKey) {
+            try {
+              const hookScope = { run: { id: runId, error: outcome.status === "failed" ? outcome.error : null }, input };
+              const hookInput = resolveTemplates(wf.get("on_failure_input") ?? {}, hookScope);
+              await this.startRun({
+                workflowKey: hookKey,
+                input: hookInput,
+                trigger: "failure-hook",
+                triggeredBy: `failure-hook:${workflowId}`,
+                confirmed: true
+                // configuring the hook IS the admin's consent
+              });
+            } catch (err) {
+              this.app.logger.warn(`[neoai] on-failure hook for run ${runId} failed to start (non-fatal): ${err}`);
+            }
+          }
+        }
       }
     } catch (err) {
       this.app.logger.error(`[neoai] run ${runId}: final status persist failed: ${err}`);
