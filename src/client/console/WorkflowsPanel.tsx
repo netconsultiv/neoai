@@ -34,6 +34,7 @@ const NODE_TYPES: Array<{ type: string; label: string; hint: string }> = [
   { type: 'data', label: 'Data', hint: 'Read/write a NocoBase collection' },
   { type: 'transform', label: 'Transform', hint: 'Map values between nodes' },
   { type: 'mcp_tool', label: 'MCP Tool', hint: 'Call a tool on a registered MCP server' },
+  { type: 'agent', label: 'Agent', hint: 'Autonomous bounded tool-use loop (LLM decides each turn)' },
   { type: 'condition', label: 'Condition', hint: 'True/false branches' },
   { type: 'parallel', label: 'Parallel', hint: 'Run branches concurrently' },
   { type: 'loop', label: 'Loop', hint: 'Iterate over an array' },
@@ -49,6 +50,7 @@ const TYPE_COLORS: Record<string, string> = {
   data: 'geekblue',
   transform: 'default',
   mcp_tool: 'volcano',
+  agent: 'red',
   condition: 'orange',
   parallel: 'purple',
   loop: 'magenta',
@@ -71,6 +73,8 @@ function defaultConfig(type: string): any {
       return { map: {} };
     case 'mcp_tool':
       return { serverId: undefined, toolName: '', args: {} };
+    case 'agent':
+      return { systemPrompt: '', goal: '', tools: [], maxTurns: 10 };
     case 'condition':
       return { left: '', op: 'notEmpty', right: '' };
     case 'loop':
@@ -425,15 +429,35 @@ function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => voi
     onChange();
   };
 
-  // mcp_tool (item 11): registered-server picker, fetched lazily only when a
-  // mcp_tool node is selected — avoids an extra request for every other node type.
+  // mcp_tool (item 11) + agent (item 20, MCP-type tool rows): registered-server
+  // picker, fetched lazily only when relevant — avoids an extra request for
+  // every other node type.
   const [mcpServers, setMcpServers] = useState<any[]>([]);
   useEffect(() => {
-    if (node.type !== 'mcp_tool') return;
+    if (node.type !== 'mcp_tool' && node.type !== 'agent') return;
     let cancelled = false;
     listResource(api, 'neoai_mcp_servers', { sort: 'name', pageSize: 100 })
       .then((res) => {
         if (!cancelled) setMcpServers(res.rows ?? []);
+      })
+      .catch(() => {
+        /* best-effort — the Select just shows no options */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.type]);
+
+  // agent (item 20, subworkflow-type tool rows): published-workflow picker so
+  // a subworkflow tool target is chosen from a list, matching the mcp_tool
+  // registered-server picker convention rather than a freehand key input.
+  const [publishedWorkflows, setPublishedWorkflows] = useState<any[]>([]);
+  useEffect(() => {
+    if (node.type !== 'agent') return;
+    let cancelled = false;
+    listResource(api, 'neoai_workflows', { sort: 'name', pageSize: 200, filter: { enabled: true } })
+      .then((res) => {
+        if (!cancelled) setPublishedWorkflows(res.rows ?? []);
       })
       .catch(() => {
         /* best-effort — the Select just shows no options */
@@ -644,6 +668,99 @@ function NodeConfigForm({ node, onChange }: { node: NodeDef; onChange: () => voi
         </>
       );
       break;
+    case 'agent': {
+      // Item 20: repeatable tool-list editor — each row is either an MCP-type
+      // tool (reuses batch F's registered-server picker) or a subworkflow-type
+      // tool (reuses the published-workflow picker); maxTurns is capped at 25
+      // client-side (the server enforces the real ceiling regardless).
+      const tools: any[] = Array.isArray(cfg.tools) ? cfg.tools : [];
+      const setTools = (next: any[]) => set('tools', next);
+      const updateTool = (i: number, patch: any) => {
+        const next = tools.slice();
+        next[i] = { ...next[i], ...patch };
+        setTools(next);
+      };
+      const addTool = () => setTools([...tools, { name: `tool_${tools.length + 1}`, type: 'mcp', description: '' }]);
+      const removeTool = (i: number) => setTools(tools.filter((_, j) => j !== i));
+      body = (
+        <>
+          <Field label="System prompt (optional — default agent framing if empty)">
+            <Input.TextArea rows={3} value={cfg.systemPrompt} onChange={(e) => set('systemPrompt', e.target.value || undefined)} />
+          </Field>
+          <Field label="Goal (templated — what the agent should accomplish)">
+            <Input.TextArea rows={3} value={cfg.goal} onChange={(e) => set('goal', e.target.value)} />
+          </Field>
+          <Field label="Max turns (server hard-caps at 25 regardless)">
+            <InputNumber min={1} max={25} value={cfg.maxTurns ?? 10} onChange={(v) => set('maxTurns', Math.min(Number(v) || 10, 25))} />
+          </Field>
+          <Field label="Tools (at least one required)">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {tools.map((t, i) => (
+                <div key={i} style={{ border: '1px solid #e2e4e1', borderRadius: 8, padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <Input
+                      value={t.name}
+                      placeholder="tool name (as the agent will call it)"
+                      onChange={(e) => updateTool(i, { name: e.target.value })}
+                      style={{ flex: 1 }}
+                    />
+                    <Select
+                      value={t.type ?? 'mcp'}
+                      onChange={(v) => updateTool(i, { type: v })}
+                      options={[
+                        { value: 'mcp', label: 'MCP server' },
+                        { value: 'subworkflow', label: 'Sub-workflow' },
+                      ]}
+                      style={{ width: 160 }}
+                    />
+                    <Button size="small" danger type="text" onClick={() => removeTool(i)} title="Remove tool">
+                      ✕
+                    </Button>
+                  </div>
+                  <Input
+                    value={t.description}
+                    placeholder="Description (helps the agent decide when to use it)"
+                    onChange={(e) => updateTool(i, { description: e.target.value })}
+                  />
+                  {t.type === 'subworkflow' ? (
+                    <Select
+                      showSearch
+                      value={t.workflowKey || undefined}
+                      placeholder="Select a published workflow…"
+                      options={publishedWorkflows.map((w: any) => ({ value: w.key, label: w.name ? `${w.name} (${w.key})` : w.key }))}
+                      filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                      onChange={(v) => updateTool(i, { workflowKey: v })}
+                      notFoundContent="No published workflows found"
+                    />
+                  ) : (
+                    <>
+                      <Select
+                        showSearch
+                        value={t.serverId ?? undefined}
+                        placeholder="Select a registered MCP server…"
+                        options={mcpServers.map((s: any) => ({ value: s.id, label: s.name }))}
+                        filterOption={(input, option) => String(option?.label ?? '').toLowerCase().includes(input.toLowerCase())}
+                        onChange={(v) => updateTool(i, { serverId: v })}
+                        notFoundContent="No MCP servers registered yet"
+                      />
+                      <Input
+                        value={t.toolName}
+                        placeholder="MCP tool name (empty = same as tool name above)"
+                        onChange={(e) => updateTool(i, { toolName: e.target.value || undefined })}
+                      />
+                    </>
+                  )}
+                </div>
+              ))}
+              <Button size="small" onClick={addTool}>
+                + tool
+              </Button>
+            </div>
+          </Field>
+        </>
+      );
+      break;
+    }
     case 'transform':
       body = (
         <Field label="Map (JSON of templates)">

@@ -996,6 +996,56 @@ async function execMcpTool(node, scope, deps) {
   const res = await callMcpTool(serverUrl, toolName, args, authHeader, authValue, { allowPrivate: cfg.allowPrivate === true });
   return { output: res };
 }
+var AGENT_DECIDE_SCHEMA = {
+  type: "object",
+  properties: {
+    action: { type: "string", enum: ["call_tool", "finish"] },
+    tool: { type: "string" },
+    args: { type: "object" },
+    reasoning: { type: "string" },
+    finalOutput: {}
+  },
+  required: ["action", "reasoning"]
+};
+async function execAgentDecide(node, scope, deps) {
+  await deps.guardModelCall();
+  const cfg = node.config ?? {};
+  const goal = String(cfg.goal ?? "");
+  const tools = Array.isArray(cfg.tools) ? cfg.tools : [];
+  const toolsDesc = tools.map((t) => `- ${t.name} (${t.type}): ${t.description || "no description"}`).join("\n");
+  const observations = String(cfg.observations ?? "");
+  const system = String(
+    resolveTemplates(
+      cfg.systemPrompt ?? "You are an autonomous agent. Decide the next action: either call one of the available tools, or finish with a final output. Respond ONLY with the requested JSON.",
+      scope
+    ) ?? ""
+  );
+  const prompt = [
+    `Goal: ${goal}`,
+    tools.length ? `Available tools:
+${toolsDesc}` : "No tools are available.",
+    observations ? `Observations so far:${observations}` : "No observations yet \u2014 this is the first turn.",
+    'Decide the next action. If you have enough information to satisfy the goal, use action "finish" and set finalOutput. Otherwise use action "call_tool", set "tool" to one of the available tool names, and "args" to the arguments object for that tool.'
+  ].join("\n\n");
+  const res = await llmInvoke(deps.app, {
+    service: cfg.service ?? deps.defaultService,
+    model: cfg.model ?? deps.defaultModel,
+    system,
+    prompt,
+    jsonSchema: AGENT_DECIDE_SCHEMA,
+    temperature: cfg.temperature ?? 0.1
+  });
+  const cost = costOf(res.model, res.usage, deps.prices);
+  deps.recordUsage(res.usage, cost);
+  if (res.json === void 0) {
+    throw new Error(`agent_decide node "${node.id}": model returned no parseable JSON`);
+  }
+  return {
+    output: { text: res.text, json: res.json, model: res.model, via: res.via },
+    usage: res.usage,
+    costUsd: cost
+  };
+}
 function execHumanGate(node, scope) {
   const message = String(resolveTemplates(node.config?.message ?? "Approval required", scope) ?? "");
   return { suspend: true, output: { message } };
@@ -1019,6 +1069,8 @@ function execLeafFactory(deps) {
         return execTransform(node, scope);
       case "mcp_tool":
         return execMcpTool(node, scope, deps);
+      case "agent_decide":
+        return execAgentDecide(node, scope, deps);
       case "human_gate":
         return execHumanGate(node, scope);
       case "output":
@@ -1037,7 +1089,8 @@ var CancelledError = class extends Error {
 };
 var MAX_LOOP_ITERATIONS = 100;
 var MAX_SUBWORKFLOW_DEPTH = 3;
-var STRUCTURAL = /* @__PURE__ */ new Set(["condition", "parallel", "loop"]);
+var MAX_AGENT_TURNS = 25;
+var STRUCTURAL = /* @__PURE__ */ new Set(["condition", "parallel", "loop", "agent"]);
 function baseScope(input, vars, runMeta) {
   return { input, nodes: vars, run: runMeta ?? {} };
 }
@@ -1057,6 +1110,14 @@ function validateDefinition(def) {
       if (n.type === "condition" && branches.length < 1) errors.push({ nodeId: n.id, message: `condition "${n.id}" needs branches[0]` });
       if (n.type === "loop" && branches.length < 1) errors.push({ nodeId: n.id, message: `loop "${n.id}" needs branches[0] (body)` });
       if (n.type === "parallel" && branches.length < 1) errors.push({ nodeId: n.id, message: `parallel "${n.id}" needs at least one branch` });
+      if (n.type === "agent") {
+        if (!Array.isArray(n.config?.tools) || n.config.tools.length < 1) {
+          errors.push({ nodeId: n.id, message: `agent "${n.id}" needs at least one tool in config.tools` });
+        }
+        if (!String(n.config?.goal ?? "").trim()) {
+          errors.push({ nodeId: n.id, message: `agent "${n.id}" needs a non-empty goal` });
+        }
+      }
       for (const b of branches) walk(b ?? [], insideParallel || n.type === "parallel");
     }
   };
@@ -1203,6 +1264,158 @@ var Runner = class _Runner {
               title: node.title ?? node.id,
               phase: "done",
               output: { branches: branches.length },
+              path
+            });
+            frame.idx += 1;
+            continue;
+          }
+          if (node.type === "agent") {
+            const maxTurns = Math.max(1, Math.min(Number(node.config?.maxTurns) || MAX_AGENT_TURNS, MAX_AGENT_TURNS));
+            const tools = Array.isArray(node.config?.tools) ? node.config.tools : [];
+            const systemPrompt = node.config?.systemPrompt ?? "";
+            const goal = String(node.config?.goal ?? "");
+            const toolSummaries = tools.map((t) => ({ name: t.name, description: t.description ?? "", type: t.type }));
+            let finished = false;
+            let finalOutput = null;
+            let turnCount = 0;
+            let observations = "";
+            for (let turn = 0; turn < maxTurns; turn++) {
+              if (this.rt.isCancelled()) throw new CancelledError();
+              turnCount = turn + 1;
+              const decideId = `${node.id}::t${turn}::decide`;
+              const decideNode = {
+                id: decideId,
+                type: "agent_decide",
+                title: `${node.title ?? node.id} \u2014 turn ${turn + 1} decide`,
+                config: { systemPrompt, goal, tools: toolSummaries, observations }
+              };
+              await this.rt.onStep({ nodeId: decideId, nodeType: "agent_decide", title: decideNode.title, phase: "start", path });
+              let decision;
+              try {
+                decision = await this.rt.execLeaf(decideNode, scope, path);
+              } catch (err) {
+                if (err instanceof CancelledError) throw err;
+                await this.rt.onStep({
+                  nodeId: decideId,
+                  nodeType: "agent_decide",
+                  title: decideNode.title,
+                  phase: "error",
+                  error: String(err?.message ?? err),
+                  path
+                });
+                return { status: "failed", error: String(err?.message ?? err), nodeId: decideId };
+              }
+              state.vars[decideId] = decision.output ?? {};
+              await this.rt.onStep({
+                nodeId: decideId,
+                nodeType: "agent_decide",
+                title: decideNode.title,
+                phase: "done",
+                output: decision.output,
+                usage: decision.usage,
+                costUsd: decision.costUsd,
+                path
+              });
+              const decided = decision.output?.json ?? decision.output ?? {};
+              const action = String(decided?.action ?? "");
+              if (action === "finish") {
+                finished = true;
+                finalOutput = decided?.finalOutput ?? null;
+                break;
+              }
+              const toolName = String(decided?.tool ?? "");
+              const tool = tools.find((t) => t.name === toolName);
+              if (!tool) {
+                return { status: "failed", error: `agent "${node.id}": decided tool "${toolName}" is not in config.tools`, nodeId: node.id };
+              }
+              const toolArgs = decided?.args ?? {};
+              const toolStepId = `${node.id}::t${turn}::tool::${toolName}`;
+              let toolOutput;
+              if (tool.type === "mcp") {
+                const mcpNode = {
+                  id: toolStepId,
+                  type: "mcp_tool",
+                  title: `${node.title ?? node.id} \u2014 turn ${turn + 1} tool ${toolName}`,
+                  config: { serverId: tool.serverId, toolName: tool.toolName ?? toolName, args: toolArgs, allowPrivate: tool.allowPrivate }
+                };
+                await this.rt.onStep({ nodeId: toolStepId, nodeType: "mcp_tool", title: mcpNode.title, phase: "start", path });
+                try {
+                  const res2 = await this.rt.execLeaf(mcpNode, scope, path);
+                  toolOutput = res2.output;
+                  state.vars[toolStepId] = toolOutput ?? {};
+                  await this.rt.onStep({ nodeId: toolStepId, nodeType: "mcp_tool", title: mcpNode.title, phase: "done", output: toolOutput, path });
+                } catch (err) {
+                  if (err instanceof CancelledError) throw err;
+                  await this.rt.onStep({
+                    nodeId: toolStepId,
+                    nodeType: "mcp_tool",
+                    title: mcpNode.title,
+                    phase: "error",
+                    error: String(err?.message ?? err),
+                    path
+                  });
+                  return { status: "failed", error: String(err?.message ?? err), nodeId: toolStepId };
+                }
+              } else if (tool.type === "subworkflow") {
+                const depth = this.rt.depth ?? 0;
+                if (depth >= MAX_SUBWORKFLOW_DEPTH) {
+                  return { status: "failed", error: `agent "${node.id}": tool "${toolName}": max subworkflow depth ${MAX_SUBWORKFLOW_DEPTH} exceeded`, nodeId: toolStepId };
+                }
+                const key = String(tool.workflowKey ?? "");
+                const child = this.rt.loadWorkflow ? await this.rt.loadWorkflow(key) : null;
+                if (!child) {
+                  return { status: "failed", error: `agent "${node.id}": tool "${toolName}": workflow "${key}" not found/published`, nodeId: toolStepId };
+                }
+                await this.rt.onStep({ nodeId: toolStepId, nodeType: "subworkflow", title: `${node.title ?? node.id} \u2014 turn ${turn + 1} tool ${toolName}`, phase: "start", path });
+                const childRunner = new _Runner({ ...this.rt, depth: depth + 1 });
+                const out = await childRunner.run(child, toolArgs, runMeta);
+                if (out.status === "cancelled") throw new CancelledError();
+                if (out.status === "failed") {
+                  await this.rt.onStep({
+                    nodeId: toolStepId,
+                    nodeType: "subworkflow",
+                    title: `${node.title ?? node.id} \u2014 turn ${turn + 1} tool ${toolName}`,
+                    phase: "error",
+                    error: out.error,
+                    path
+                  });
+                  return { status: "failed", error: `agent "${node.id}": tool "${toolName}": ${out.error}`, nodeId: toolStepId };
+                }
+                if (out.status === "waiting") {
+                  const msg = `agent "${node.id}": tool "${toolName}": human_gate inside subworkflow is not supported (v1)`;
+                  await this.rt.onStep({
+                    nodeId: toolStepId,
+                    nodeType: "subworkflow",
+                    title: `${node.title ?? node.id} \u2014 turn ${turn + 1} tool ${toolName}`,
+                    phase: "error",
+                    error: msg,
+                    path
+                  });
+                  return { status: "failed", error: msg, nodeId: toolStepId };
+                }
+                toolOutput = out.output ?? {};
+                state.vars[toolStepId] = toolOutput;
+                await this.rt.onStep({
+                  nodeId: toolStepId,
+                  nodeType: "subworkflow",
+                  title: `${node.title ?? node.id} \u2014 turn ${turn + 1} tool ${toolName}`,
+                  phase: "done",
+                  output: toolOutput,
+                  path
+                });
+              } else {
+                return { status: "failed", error: `agent "${node.id}": tool "${toolName}" has unknown type "${tool.type}"`, nodeId: toolStepId };
+              }
+              observations += `
+Turn ${turn + 1}: called tool "${toolName}" with args ${JSON.stringify(toolArgs)} \u2192 result ${JSON.stringify(toolOutput).slice(0, 2e3)}`;
+            }
+            state.vars[node.id] = { turnCount, finished, finalOutput };
+            await this.rt.onStep({
+              nodeId: node.id,
+              nodeType: node.type,
+              title: node.title ?? node.id,
+              phase: "done",
+              output: { turnCount, finished, finalOutput },
               path
             });
             frame.idx += 1;
@@ -1543,6 +1756,7 @@ function countModelNodes(def) {
     for (const n of nodes ?? []) {
       if (n.type === "llm") out.llm += 1;
       if (n.type === "image") out.image += 1;
+      if (n.type === "agent") out.llm += Math.max(1, Math.min(Number(n.config?.maxTurns) || 25, 25));
       for (const b of n.branches ?? []) walk(b ?? []);
     }
   };

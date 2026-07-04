@@ -365,6 +365,7 @@ var NODE_TYPES = [
   { type: "data", label: "Data", hint: "Read/write a NocoBase collection" },
   { type: "transform", label: "Transform", hint: "Map values between nodes" },
   { type: "mcp_tool", label: "MCP Tool", hint: "Call a tool on a registered MCP server" },
+  { type: "agent", label: "Agent", hint: "Autonomous bounded tool-use loop (LLM decides each turn)" },
   { type: "condition", label: "Condition", hint: "True/false branches" },
   { type: "parallel", label: "Parallel", hint: "Run branches concurrently" },
   { type: "loop", label: "Loop", hint: "Iterate over an array" },
@@ -379,6 +380,7 @@ var TYPE_COLORS = {
   data: "geekblue",
   transform: "default",
   mcp_tool: "volcano",
+  agent: "red",
   condition: "orange",
   parallel: "purple",
   loop: "magenta",
@@ -400,6 +402,8 @@ function defaultConfig(type) {
       return { map: {} };
     case "mcp_tool":
       return { serverId: void 0, toolName: "", args: {} };
+    case "agent":
+      return { systemPrompt: "", goal: "", tools: [], maxTurns: 10 };
     case "condition":
       return { left: "", op: "notEmpty", right: "" };
     case "loop":
@@ -663,7 +667,7 @@ function NodeList(props) {
   ))), /* @__PURE__ */ import_react3.default.createElement(AddSlot, { onAdd: (t) => insert(nodes.length, t) }));
 }
 function NodeConfigForm({ node, onChange }) {
-  var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+  var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
   const api = (0, import_client.useAPIClient)();
   const cfg = (_a = node.config) != null ? _a : node.config = {};
   const set = (k, v) => {
@@ -672,11 +676,24 @@ function NodeConfigForm({ node, onChange }) {
   };
   const [mcpServers, setMcpServers] = (0, import_react3.useState)([]);
   (0, import_react3.useEffect)(() => {
-    if (node.type !== "mcp_tool") return;
+    if (node.type !== "mcp_tool" && node.type !== "agent") return;
     let cancelled = false;
     listResource(api, "neoai_mcp_servers", { sort: "name", pageSize: 100 }).then((res) => {
       var _a2;
       if (!cancelled) setMcpServers((_a2 = res.rows) != null ? _a2 : []);
+    }).catch(() => {
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [node.type]);
+  const [publishedWorkflows, setPublishedWorkflows] = (0, import_react3.useState)([]);
+  (0, import_react3.useEffect)(() => {
+    if (node.type !== "agent") return;
+    let cancelled = false;
+    listResource(api, "neoai_workflows", { sort: "name", pageSize: 200, filter: { enabled: true } }).then((res) => {
+      var _a2;
+      if (!cancelled) setPublishedWorkflows((_a2 = res.rows) != null ? _a2 : []);
     }).catch(() => {
     });
     return () => {
@@ -789,6 +806,83 @@ function NodeConfigForm({ node, onChange }) {
         }
       )), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Tool name" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.toolName, placeholder: "search_issues", onChange: (e) => set("toolName", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Args (JSON of templates)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.args, onChange: (v) => set("args", v != null ? v : {}), rows: 5, placeholder: '{ "query": "{{input.query}}" }' })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Allow private/internal target" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Checkbox, { checked: cfg.allowPrivate === true, onChange: (e) => set("allowPrivate", e.target.checked) }, "permit calling a private/loopback host (SSRF guard escape hatch)")), retries);
       break;
+    case "agent": {
+      const tools = Array.isArray(cfg.tools) ? cfg.tools : [];
+      const setTools = (next) => set("tools", next);
+      const updateTool = (i, patch) => {
+        const next = tools.slice();
+        next[i] = { ...next[i], ...patch };
+        setTools(next);
+      };
+      const addTool = () => setTools([...tools, { name: `tool_${tools.length + 1}`, type: "mcp", description: "" }]);
+      const removeTool = (i) => setTools(tools.filter((_, j) => j !== i));
+      body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "System prompt (optional \u2014 default agent framing if empty)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input.TextArea, { rows: 3, value: cfg.systemPrompt, onChange: (e) => set("systemPrompt", e.target.value || void 0) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Goal (templated \u2014 what the agent should accomplish)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input.TextArea, { rows: 3, value: cfg.goal, onChange: (e) => set("goal", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Max turns (server hard-caps at 25 regardless)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.InputNumber, { min: 1, max: 25, value: (_i = cfg.maxTurns) != null ? _i : 10, onChange: (v) => set("maxTurns", Math.min(Number(v) || 10, 25)) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Tools (at least one required)" }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", flexDirection: "column", gap: 10 } }, tools.map((t, i) => {
+        var _a2, _b2;
+        return /* @__PURE__ */ import_react3.default.createElement("div", { key: i, style: { border: "1px solid #e2e4e1", borderRadius: 8, padding: 8, display: "flex", flexDirection: "column", gap: 6 } }, /* @__PURE__ */ import_react3.default.createElement("div", { style: { display: "flex", gap: 6, alignItems: "center" } }, /* @__PURE__ */ import_react3.default.createElement(
+          import_antd3.Input,
+          {
+            value: t.name,
+            placeholder: "tool name (as the agent will call it)",
+            onChange: (e) => updateTool(i, { name: e.target.value }),
+            style: { flex: 1 }
+          }
+        ), /* @__PURE__ */ import_react3.default.createElement(
+          import_antd3.Select,
+          {
+            value: (_a2 = t.type) != null ? _a2 : "mcp",
+            onChange: (v) => updateTool(i, { type: v }),
+            options: [
+              { value: "mcp", label: "MCP server" },
+              { value: "subworkflow", label: "Sub-workflow" }
+            ],
+            style: { width: 160 }
+          }
+        ), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { size: "small", danger: true, type: "text", onClick: () => removeTool(i), title: "Remove tool" }, "\u2715")), /* @__PURE__ */ import_react3.default.createElement(
+          import_antd3.Input,
+          {
+            value: t.description,
+            placeholder: "Description (helps the agent decide when to use it)",
+            onChange: (e) => updateTool(i, { description: e.target.value })
+          }
+        ), t.type === "subworkflow" ? /* @__PURE__ */ import_react3.default.createElement(
+          import_antd3.Select,
+          {
+            showSearch: true,
+            value: t.workflowKey || void 0,
+            placeholder: "Select a published workflow\u2026",
+            options: publishedWorkflows.map((w) => ({ value: w.key, label: w.name ? `${w.name} (${w.key})` : w.key })),
+            filterOption: (input, option) => {
+              var _a3;
+              return String((_a3 = option == null ? void 0 : option.label) != null ? _a3 : "").toLowerCase().includes(input.toLowerCase());
+            },
+            onChange: (v) => updateTool(i, { workflowKey: v }),
+            notFoundContent: "No published workflows found"
+          }
+        ) : /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(
+          import_antd3.Select,
+          {
+            showSearch: true,
+            value: (_b2 = t.serverId) != null ? _b2 : void 0,
+            placeholder: "Select a registered MCP server\u2026",
+            options: mcpServers.map((s) => ({ value: s.id, label: s.name })),
+            filterOption: (input, option) => {
+              var _a3;
+              return String((_a3 = option == null ? void 0 : option.label) != null ? _a3 : "").toLowerCase().includes(input.toLowerCase());
+            },
+            onChange: (v) => updateTool(i, { serverId: v }),
+            notFoundContent: "No MCP servers registered yet"
+          }
+        ), /* @__PURE__ */ import_react3.default.createElement(
+          import_antd3.Input,
+          {
+            value: t.toolName,
+            placeholder: "MCP tool name (empty = same as tool name above)",
+            onChange: (e) => updateTool(i, { toolName: e.target.value || void 0 })
+          }
+        )));
+      }), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { size: "small", onClick: addTool }, "+ tool"))));
+      break;
+    }
     case "transform":
       body = /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Map (JSON of templates)" }, /* @__PURE__ */ import_react3.default.createElement(JsonArea, { value: cfg.map, onChange: (v) => set("map", v != null ? v : {}), rows: 8, placeholder: '{ "lat": "{{nodes.geo.body.0.lat}}" }' }));
       break;
@@ -796,7 +890,7 @@ function NodeConfigForm({ node, onChange }) {
       body = /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Left (templated)" }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Input, { value: cfg.left, onChange: (e) => set("left", e.target.value) })), /* @__PURE__ */ import_react3.default.createElement(Field, { label: "Operator" }, /* @__PURE__ */ import_react3.default.createElement(
         import_antd3.Select,
         {
-          value: (_i = cfg.op) != null ? _i : "notEmpty",
+          value: (_j = cfg.op) != null ? _j : "notEmpty",
           onChange: (v) => set("op", v),
           options: ["truthy", "eq", "ne", "gt", "gte", "lt", "lte", "contains", "empty", "notEmpty"].map((o) => ({ value: o, label: o })),
           style: { width: 160 }

@@ -102,7 +102,9 @@ export class CancelledError extends Error {
 
 const MAX_LOOP_ITERATIONS = 100;
 const MAX_SUBWORKFLOW_DEPTH = 3;
-const STRUCTURAL = new Set(['condition', 'parallel', 'loop']);
+/** Hard ceiling regardless of an authored `config.maxTurns` (item 20). */
+const MAX_AGENT_TURNS = 25;
+const STRUCTURAL = new Set(['condition', 'parallel', 'loop', 'agent']);
 
 function baseScope(input: any, vars: Record<string, any>, runMeta: any): Scope {
   return { input, nodes: vars, run: runMeta ?? {} };
@@ -127,6 +129,14 @@ export function validateDefinition(def: WorkflowDef): ValidationError[] {
       if (n.type === 'condition' && branches.length < 1) errors.push({ nodeId: n.id, message: `condition "${n.id}" needs branches[0]` });
       if (n.type === 'loop' && branches.length < 1) errors.push({ nodeId: n.id, message: `loop "${n.id}" needs branches[0] (body)` });
       if (n.type === 'parallel' && branches.length < 1) errors.push({ nodeId: n.id, message: `parallel "${n.id}" needs at least one branch` });
+      if (n.type === 'agent') {
+        if (!Array.isArray(n.config?.tools) || n.config.tools.length < 1) {
+          errors.push({ nodeId: n.id, message: `agent "${n.id}" needs at least one tool in config.tools` });
+        }
+        if (!String(n.config?.goal ?? '').trim()) {
+          errors.push({ nodeId: n.id, message: `agent "${n.id}" needs a non-empty goal` });
+        }
+      }
       for (const b of branches) walk(b ?? [], insideParallel || n.type === 'parallel');
     }
   };
@@ -298,6 +308,176 @@ export class Runner {
               title: node.title ?? node.id,
               phase: 'done',
               output: { branches: branches.length },
+              path,
+            });
+            frame.idx += 1;
+            continue;
+          }
+
+          // agent (item 20) — an autonomous, bounded tool-use loop run INLINE
+          // (no new Frame kind): its own internal `for` loop over turns,
+          // calling this.rt.execLeaf/onStep per turn exactly like every other
+          // node already does — giving true per-turn persisted
+          // neoai_run_steps rows for free. Hard-ceilinged at MAX_AGENT_TURNS
+          // regardless of the authored config.maxTurns.
+          if (node.type === 'agent') {
+            const maxTurns = Math.max(1, Math.min(Number(node.config?.maxTurns) || MAX_AGENT_TURNS, MAX_AGENT_TURNS));
+            const tools: any[] = Array.isArray(node.config?.tools) ? node.config.tools : [];
+            const systemPrompt = node.config?.systemPrompt ?? '';
+            const goal = String(node.config?.goal ?? '');
+            const toolSummaries = tools.map((t) => ({ name: t.name, description: t.description ?? '', type: t.type }));
+
+            let finished = false;
+            let finalOutput: any = null;
+            let turnCount = 0;
+            let observations = '';
+
+            for (let turn = 0; turn < maxTurns; turn++) {
+              if (this.rt.isCancelled()) throw new CancelledError();
+              turnCount = turn + 1;
+              const decideId = `${node.id}::t${turn}::decide`;
+              const decideNode: NodeDef = {
+                id: decideId,
+                type: 'agent_decide',
+                title: `${node.title ?? node.id} — turn ${turn + 1} decide`,
+                config: { systemPrompt, goal, tools: toolSummaries, observations },
+              };
+              await this.rt.onStep({ nodeId: decideId, nodeType: 'agent_decide', title: decideNode.title!, phase: 'start', path });
+              let decision: LeafResult;
+              try {
+                decision = await this.rt.execLeaf(decideNode, scope, path);
+              } catch (err: any) {
+                if (err instanceof CancelledError) throw err;
+                await this.rt.onStep({
+                  nodeId: decideId,
+                  nodeType: 'agent_decide',
+                  title: decideNode.title!,
+                  phase: 'error',
+                  error: String(err?.message ?? err),
+                  path,
+                });
+                return { status: 'failed', error: String(err?.message ?? err), nodeId: decideId };
+              }
+              state.vars[decideId] = decision.output ?? {};
+              await this.rt.onStep({
+                nodeId: decideId,
+                nodeType: 'agent_decide',
+                title: decideNode.title!,
+                phase: 'done',
+                output: decision.output,
+                usage: decision.usage,
+                costUsd: decision.costUsd,
+                path,
+              });
+
+              const decided = decision.output?.json ?? decision.output ?? {};
+              const action = String(decided?.action ?? '');
+
+              if (action === 'finish') {
+                finished = true;
+                finalOutput = decided?.finalOutput ?? null;
+                break;
+              }
+
+              const toolName = String(decided?.tool ?? '');
+              const tool = tools.find((t) => t.name === toolName);
+              if (!tool) {
+                return { status: 'failed', error: `agent "${node.id}": decided tool "${toolName}" is not in config.tools`, nodeId: node.id };
+              }
+              const toolArgs = decided?.args ?? {};
+              const toolStepId = `${node.id}::t${turn}::tool::${toolName}`;
+              let toolOutput: any;
+
+              if (tool.type === 'mcp') {
+                const mcpNode: NodeDef = {
+                  id: toolStepId,
+                  type: 'mcp_tool',
+                  title: `${node.title ?? node.id} — turn ${turn + 1} tool ${toolName}`,
+                  config: { serverId: tool.serverId, toolName: tool.toolName ?? toolName, args: toolArgs, allowPrivate: tool.allowPrivate },
+                };
+                await this.rt.onStep({ nodeId: toolStepId, nodeType: 'mcp_tool', title: mcpNode.title!, phase: 'start', path });
+                try {
+                  const res = await this.rt.execLeaf(mcpNode, scope, path);
+                  toolOutput = res.output;
+                  state.vars[toolStepId] = toolOutput ?? {};
+                  await this.rt.onStep({ nodeId: toolStepId, nodeType: 'mcp_tool', title: mcpNode.title!, phase: 'done', output: toolOutput, path });
+                } catch (err: any) {
+                  if (err instanceof CancelledError) throw err;
+                  await this.rt.onStep({
+                    nodeId: toolStepId,
+                    nodeType: 'mcp_tool',
+                    title: mcpNode.title!,
+                    phase: 'error',
+                    error: String(err?.message ?? err),
+                    path,
+                  });
+                  return { status: 'failed', error: String(err?.message ?? err), nodeId: toolStepId };
+                }
+              } else if (tool.type === 'subworkflow') {
+                // Reuse the EXACT existing inline subworkflow handling — this
+                // means the "human_gate inside subworkflow is not supported"
+                // guard fires automatically for free (no new code needed to
+                // satisfy "no human_gate reachable from inside an agent").
+                const depth = this.rt.depth ?? 0;
+                if (depth >= MAX_SUBWORKFLOW_DEPTH) {
+                  return { status: 'failed', error: `agent "${node.id}": tool "${toolName}": max subworkflow depth ${MAX_SUBWORKFLOW_DEPTH} exceeded`, nodeId: toolStepId };
+                }
+                const key = String(tool.workflowKey ?? '');
+                const child = this.rt.loadWorkflow ? await this.rt.loadWorkflow(key) : null;
+                if (!child) {
+                  return { status: 'failed', error: `agent "${node.id}": tool "${toolName}": workflow "${key}" not found/published`, nodeId: toolStepId };
+                }
+                await this.rt.onStep({ nodeId: toolStepId, nodeType: 'subworkflow', title: `${node.title ?? node.id} — turn ${turn + 1} tool ${toolName}`, phase: 'start', path });
+                const childRunner = new Runner({ ...this.rt, depth: depth + 1 });
+                const out = await childRunner.run(child, toolArgs, runMeta);
+                if (out.status === 'cancelled') throw new CancelledError();
+                if (out.status === 'failed') {
+                  await this.rt.onStep({
+                    nodeId: toolStepId,
+                    nodeType: 'subworkflow',
+                    title: `${node.title ?? node.id} — turn ${turn + 1} tool ${toolName}`,
+                    phase: 'error',
+                    error: out.error,
+                    path,
+                  });
+                  return { status: 'failed', error: `agent "${node.id}": tool "${toolName}": ${out.error}`, nodeId: toolStepId };
+                }
+                if (out.status === 'waiting') {
+                  const msg = `agent "${node.id}": tool "${toolName}": human_gate inside subworkflow is not supported (v1)`;
+                  await this.rt.onStep({
+                    nodeId: toolStepId,
+                    nodeType: 'subworkflow',
+                    title: `${node.title ?? node.id} — turn ${turn + 1} tool ${toolName}`,
+                    phase: 'error',
+                    error: msg,
+                    path,
+                  });
+                  return { status: 'failed', error: msg, nodeId: toolStepId };
+                }
+                toolOutput = out.output ?? {};
+                state.vars[toolStepId] = toolOutput;
+                await this.rt.onStep({
+                  nodeId: toolStepId,
+                  nodeType: 'subworkflow',
+                  title: `${node.title ?? node.id} — turn ${turn + 1} tool ${toolName}`,
+                  phase: 'done',
+                  output: toolOutput,
+                  path,
+                });
+              } else {
+                return { status: 'failed', error: `agent "${node.id}": tool "${toolName}" has unknown type "${tool.type}"`, nodeId: toolStepId };
+              }
+
+              observations += `\nTurn ${turn + 1}: called tool "${toolName}" with args ${JSON.stringify(toolArgs)} → result ${JSON.stringify(toolOutput).slice(0, 2000)}`;
+            }
+
+            state.vars[node.id] = { turnCount, finished, finalOutput };
+            await this.rt.onStep({
+              nodeId: node.id,
+              nodeType: node.type,
+              title: node.title ?? node.id,
+              phase: 'done',
+              output: { turnCount, finished, finalOutput },
               path,
             });
             frame.idx += 1;

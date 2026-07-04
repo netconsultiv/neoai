@@ -38,6 +38,10 @@ function countModelNodes(def: WorkflowDef): { llm: number; image: number } {
     for (const n of nodes ?? []) {
       if (n.type === 'llm') out.llm += 1;
       if (n.type === 'image') out.image += 1;
+      // agent (item 20): each turn's decide step is itself an llm call —
+      // worst-case estimate is its (client-capped) maxTurns, since the exact
+      // turn count is only known once the model starts deciding to finish.
+      if (n.type === 'agent') out.llm += Math.max(1, Math.min(Number(n.config?.maxTurns) || 25, 25));
       for (const b of n.branches ?? []) walk(b ?? []);
     }
   };
