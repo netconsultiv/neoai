@@ -275,6 +275,107 @@ export const NEOAI_COLLECTIONS: any[] = [
       text('description', 'Description'),
     ],
   },
+  // ---- Knowledge Hub (moved out of @neomodul/crm + extended) ----------------
+  // Human-gated knowledge base for both humans and AI: articles/prompts are
+  // plain admin-editable collections (native ACL, admin-only), but AI/workflow
+  // code may NEVER write to neoai_knowledge_articles directly — it can only
+  // create a neoai_knowledge_suggestions row (status:'pending') that a human
+  // reviews via neoai:knowledgeSuggestionApprove/Reject. This is the opposite
+  // write-permission default from neoai_memories (which IS AI-writable via
+  // upsertMemory/confirmMemory) — a deliberately different concept living
+  // alongside it.
+  {
+    name: 'neoai_knowledge_articles',
+    title: 'NeoAI Knowledge Articles',
+    titleField: 'title',
+    fields: [
+      str('title', 'Title', { allowNull: false }),
+      text('body', 'Body'),
+      // Comma-separated, matches CRM knowledge_articles.tags convention.
+      str('tags', 'Tags (comma-separated)'),
+      // Free string (not a fixed select): this now spans multiple plugins'
+      // use cases (CRM, Konfigurator, …), so a closed enum would constantly
+      // need code changes. Sensible defaults are offered in the console UI.
+      str('use_case', 'Use Case'),
+      select('language', 'Language', ['en', 'de', 'pl'], 'en'),
+      bool('active', 'Active', true),
+      // Provenance: 'manual' | 'crm-migration' | 'ai-suggested'.
+      str('source', 'Source', { defaultValue: 'manual' }),
+    ],
+  },
+  {
+    name: 'neoai_prompts',
+    title: 'NeoAI Prompts',
+    titleField: 'title',
+    fields: [
+      str('use_case', 'Use Case Key', { allowNull: false }),
+      str('title', 'Title'),
+      text('system_prompt', 'System Prompt'),
+      str('model_hint', 'Model Hint'),
+      json('settings', 'Generation Settings'),
+      bool('active', 'Active', true),
+      text('notes', 'Notes'),
+    ],
+  },
+  {
+    // Cross-entity links: an article can point at ANY other entity (catalog
+    // items, CRM deals, …) — free entity_type/entity_id strings, same loose-
+    // coupling convention as neoai_memories (no FK into other plugins).
+    name: 'neoai_knowledge_links',
+    title: 'NeoAI Knowledge Links',
+    titleField: 'id',
+    fields: [
+      {
+        name: 'article',
+        type: 'belongsTo',
+        interface: 'm2o',
+        target: 'neoai_knowledge_articles',
+        foreignKey: 'article_id',
+        uiSchema: { title: 'Article', 'x-component': 'AssociationField' },
+      },
+      str('entity_type', 'Entity type (e.g. "konfigurator.catalog_option", "crm.deal")'),
+      // Always a string, even for numeric ids — same convention as
+      // neoai_memories.entity_id.
+      str('entity_id', 'Entity id'),
+      str('label', 'Label (optional human-readable cache)'),
+    ],
+  },
+  {
+    // The ONLY path AI/workflow code may use to affect Knowledge. Never
+    // writes neoai_knowledge_articles directly — a human always approves or
+    // rejects via neoai:knowledgeSuggestionApprove/Reject.
+    name: 'neoai_knowledge_suggestions',
+    title: 'NeoAI Knowledge Suggestions',
+    titleField: 'proposed_title',
+    fields: [
+      {
+        // Null = propose a brand-new article.
+        name: 'target_article',
+        type: 'belongsTo',
+        interface: 'm2o',
+        target: 'neoai_knowledge_articles',
+        foreignKey: 'target_article_id',
+        uiSchema: { title: 'Target article (empty = new article)', 'x-component': 'AssociationField' },
+      },
+      str('proposed_title', 'Proposed title'),
+      text('proposed_body', 'Proposed body'),
+      str('proposed_tags', 'Proposed tags (comma-separated)'),
+      str('proposed_use_case', 'Proposed use case'),
+      select('proposed_language', 'Proposed language', ['en', 'de', 'pl'], 'en'),
+      text('reason', 'Reason (why this was proposed)'),
+      {
+        name: 'source_run',
+        type: 'belongsTo',
+        interface: 'm2o',
+        target: 'neoai_runs',
+        foreignKey: 'source_run_id',
+        uiSchema: { title: 'Source run', 'x-component': 'AssociationField' },
+      },
+      select('status', 'Status', ['pending', 'approved', 'rejected'], 'pending'),
+      str('reviewed_by', 'Reviewed by'),
+      dt('reviewed_at', 'Reviewed at'),
+    ],
+  },
 ];
 
 // Reverse relations + post-P0 field additions — ensured AFTER all collections
@@ -342,4 +443,9 @@ export const NEOAI_EXTRA_FIELDS: Array<{ collection: string; field: any }> = [
 // NocoBase's plugin-workflow admin, per scoping answer Q2/Q9.
 export const MENU_LINKS = [
   { title: 'NeoAI', icon: 'RobotOutlined', href: '/admin/neoai/workflows', legacyHrefs: ['/neoai', '/admin/neoai'], sort: 14 },
+  // Knowledge Hub: OWN top-level menu entry (NOT nested under the "NeoAI"
+  // link/sidebar) — moved out of @neomodul/crm, same sort position (12) so it
+  // visually replaces CRM's old top-level "Knowledge" link. See
+  // src/client/console/KnowledgeConsole.tsx for the console this points at.
+  { title: 'Knowledge', icon: 'ReadOutlined', href: '/admin/neoai-knowledge/articles', legacyHrefs: ['/neoai-knowledge'], sort: 12 },
 ];

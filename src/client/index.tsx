@@ -12,6 +12,7 @@ import { Plugin } from '@nocobase/client';
 // the node must be a real Instruction subclass, same as plugin-ai's LLM node.
 import { Instruction } from '@nocobase/plugin-workflow/client';
 import { NeoaiConsolePage } from './console/NeoaiConsole';
+import { KnowledgeConsolePage } from './console/KnowledgeConsole';
 
 class NeoaiRunInstruction extends Instruction {
   title = 'NeoAI workflow';
@@ -101,6 +102,23 @@ export class NeoaiClientPlugin extends Plugin {
     this.app.router.add('neoai-mcp', { path: '/neoai/mcp', Component: NeoaiConsolePage });
     this.app.router.add('neoai-memory', { path: '/neoai/memory', Component: NeoaiConsolePage });
     this.app.router.add('neoai-settings', { path: '/neoai/settings', Component: NeoaiConsolePage });
+
+    // Knowledge Hub — OWN top-level console (NOT a NeoAI sidebar tab), see
+    // KnowledgeConsole.tsx. Every tab it can navigate to needs its OWN
+    // registered route, both nested (admin.*) and standalone — this plugin
+    // already shipped a live-404 regression once (commit 2feba37) from
+    // forgetting a route for a new tab; do not repeat that here.
+    this.app.router.add('admin.neoaiKnowledge', { path: 'neoai-knowledge', Component: KnowledgeConsolePage });
+    this.app.router.add('admin.neoaiKnowledgeArticles', { path: 'neoai-knowledge/articles', Component: KnowledgeConsolePage });
+    this.app.router.add('admin.neoaiKnowledgePrompts', { path: 'neoai-knowledge/prompts', Component: KnowledgeConsolePage });
+    this.app.router.add('admin.neoaiKnowledgeSuggestions', { path: 'neoai-knowledge/suggestions', Component: KnowledgeConsolePage });
+    this.app.router.add('admin.neoaiKnowledgeRetrieval', { path: 'neoai-knowledge/retrieval', Component: KnowledgeConsolePage });
+    // Standalone aliases.
+    this.app.router.add('neoai-knowledge', { path: '/neoai-knowledge', Component: KnowledgeConsolePage });
+    this.app.router.add('neoai-knowledge-articles', { path: '/neoai-knowledge/articles', Component: KnowledgeConsolePage });
+    this.app.router.add('neoai-knowledge-prompts', { path: '/neoai-knowledge/prompts', Component: KnowledgeConsolePage });
+    this.app.router.add('neoai-knowledge-suggestions', { path: '/neoai-knowledge/suggestions', Component: KnowledgeConsolePage });
+    this.app.router.add('neoai-knowledge-retrieval', { path: '/neoai-knowledge/retrieval', Component: KnowledgeConsolePage });
 
     this.registerAutomationBridgeUI();
   }

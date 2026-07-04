@@ -29,6 +29,7 @@ import { Runner, RunOutcome, StepEvent, WorkflowDef, validateDefinition } from '
 import { isDue, parseSchedule } from './lib/schedule';
 import { decryptSecret, encryptSecret } from './lib/secrets';
 import { resolveTemplates, truncateJson } from './lib/template';
+import { search as searchKnowledge, planApproveSuggestion, planRejectSuggestion } from './lib/knowledgeRetrieval';
 import { ensureSeedWorkflows } from './seed';
 
 /** Count budget-relevant nodes for the confirm-gate estimate. */
@@ -358,6 +359,100 @@ export class NeoaiPlugin extends Plugin {
           ctx.body = { ok: true };
           await next();
         },
+
+        // ---- Knowledge Hub -------------------------------------------------
+        // knowledgeSearch: read-only keyword search over ACTIVE articles.
+        // Gated the same as this plugin's other read actions (spendToday,
+        // memoryList, ping, …) — admin-only, matching NeoAI's existing
+        // convention (CRM's own crm:knowledgeSearch is 'loggedIn'-gated, but
+        // this plugin's rule is requireAdmin everywhere; deliberately not
+        // relaxed just for this action).
+        knowledgeSearch: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = { ...(ctx.action.params.values ?? {}), ...(ctx.action.params ?? {}) };
+          const q = typeof p.q === 'string' ? p.q : '';
+          const useCase = typeof p.useCase === 'string' && p.useCase ? p.useCase : undefined;
+          const requested = Number(p.limit);
+          const limit = Number.isFinite(requested) && requested > 0 ? Math.min(Math.floor(requested), 20) : 5;
+
+          const repo = this.db.getRepository('neoai_knowledge_articles');
+          const rows = repo ? await repo.find({ filter: { active: true } }) : [];
+          const articles = rows.map((r: any) => (typeof r.toJSON === 'function' ? r.toJSON() : r));
+
+          ctx.body = {
+            query: q,
+            useCase: useCase ?? null,
+            results: searchKnowledge(q, articles, { useCase, limit }).map((hit) => ({
+              id: hit.article.id,
+              title: hit.article.title,
+              use_case: hit.article.use_case,
+              language: hit.article.language,
+              tags: hit.article.tags,
+              score: hit.score,
+              snippet: hit.snippet,
+            })),
+          };
+          await next();
+        },
+
+        // knowledgeSuggest: THE ONLY path AI/workflow code (or a human) may
+        // use to affect Knowledge — it only ever creates a pending suggestion
+        // row, NEVER writes neoai_knowledge_articles directly. Reachable both
+        // as a plain admin action and — for workflows — as a "data" node
+        // pointed at neoai_knowledge_suggestions:create (allowWrite:true); no
+        // dedicated node type needed since the generic data node already
+        // expresses this.
+        knowledgeSuggest: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const reason = String(p.reason ?? '').trim();
+          if (!reason) ctx.throw(400, 'reason is required');
+          const repo = this.db.getRepository('neoai_knowledge_suggestions');
+          if (!repo) ctx.throw(500, 'neoai_knowledge_suggestions collection unavailable');
+          const row = await repo.create({
+            values: {
+              target_article_id: p.targetArticleId ? Number(p.targetArticleId) : null,
+              proposed_title: p.proposedTitle ?? '',
+              proposed_body: p.proposedBody ?? '',
+              proposed_tags: p.proposedTags ?? '',
+              proposed_use_case: p.proposedUseCase ?? '',
+              proposed_language: p.proposedLanguage || 'en',
+              reason,
+              source_run_id: p.sourceRunId ? Number(p.sourceRunId) : null,
+              status: 'pending',
+            },
+          });
+          ctx.body = { ok: true, id: row.get('id') };
+          await next();
+        },
+
+        // knowledgeSuggestionApprove / Reject: human-only review gate,
+        // matching confirmMemory's tone/structure — the ONLY paths that ever
+        // turn a suggestion into a live article write.
+        knowledgeSuggestionApprove: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const reviewedBy = String(ctx.state?.currentUser?.nickname ?? ctx.state?.currentUser?.username ?? 'admin');
+          ctx.body = await this.approveKnowledgeSuggestion(Number(p.id), reviewedBy);
+          await next();
+        },
+
+        knowledgeSuggestionReject: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          const p = ctx.action.params.values ?? {};
+          const reviewedBy = String(ctx.state?.currentUser?.nickname ?? ctx.state?.currentUser?.username ?? 'admin');
+          const repo = this.db.getRepository('neoai_knowledge_suggestions');
+          if (!repo) ctx.throw(500, 'neoai_knowledge_suggestions collection unavailable');
+          const id = Number(p.id);
+          const row = await repo.findOne({ filterByTk: id });
+          if (!row) { ctx.body = { ok: false, reason: `suggestion ${id} not found` }; return next(); }
+          const plan = planRejectSuggestion({ id, status: row.get('status') }, reviewedBy);
+          if (!plan.ok) { ctx.body = plan; return next(); }
+          // Reject NEVER touches neoai_knowledge_articles — only the suggestion row's own status.
+          await repo.update({ filterByTk: id, values: plan.suggestionUpdate });
+          ctx.body = { ok: true };
+          await next();
+        },
       },
     });
 
@@ -648,6 +743,53 @@ export class NeoaiPlugin extends Plugin {
     const row = await repo.findOne({ filter: { entity_type: entityType, entity_id: entityId, key, status: 'confirmed' } });
     if (!row) return null;
     return { summary: row.get('summary'), structured: row.get('structured'), confirmedAt: row.get('confirmed_at') };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Knowledge Hub review gate (human-only). The ONLY two paths that ever turn
+  // a neoai_knowledge_suggestions row into a live neoai_knowledge_articles
+  // write — mirrors confirmMemory's tone/structure, but the write-permission
+  // default is the OPPOSITE of memories: articles are never AI-writable
+  // directly, only via this explicit human approval.
+  //
+  //   * target_article_id set   → UPDATE that article with the proposed fields.
+  //   * target_article_id null  → CREATE a new article, source:'ai-suggested'.
+  //   * either way              → suggestion row: status 'approved' + reviewer/timestamp.
+  async approveKnowledgeSuggestion(id: number, reviewedBy: string): Promise<{ ok: true; articleId: number } | { ok: false; reason: string }> {
+    const suggestions = this.db.getRepository('neoai_knowledge_suggestions');
+    const articles = this.db.getRepository('neoai_knowledge_articles');
+    if (!suggestions || !articles) return { ok: false, reason: 'knowledge collections unavailable' };
+    const row = await suggestions.findOne({ filterByTk: id });
+    if (!row) return { ok: false, reason: `suggestion ${id} not found` };
+
+    const plan = planApproveSuggestion(
+      {
+        id,
+        status: row.get('status'),
+        target_article_id: row.get('target_article_id'),
+        proposed_title: row.get('proposed_title'),
+        proposed_body: row.get('proposed_body'),
+        proposed_tags: row.get('proposed_tags'),
+        proposed_use_case: row.get('proposed_use_case'),
+        proposed_language: row.get('proposed_language'),
+      },
+      reviewedBy,
+    );
+    if (!plan.ok) return plan;
+
+    let articleId: number;
+    if (plan.articleWrite.op === 'update') {
+      const existing = await articles.findOne({ filterByTk: plan.articleWrite.articleId });
+      if (!existing) return { ok: false, reason: `target article ${plan.articleWrite.articleId} not found` };
+      await articles.update({ filterByTk: plan.articleWrite.articleId, values: plan.articleWrite.values });
+      articleId = plan.articleWrite.articleId;
+    } else {
+      const created = await articles.create({ values: plan.articleWrite.values });
+      articleId = Number(created.get('id'));
+    }
+
+    await suggestions.update({ filterByTk: id, values: plan.suggestionUpdate });
+    return { ok: true, articleId };
   }
 
   private async waitForRun(runId: number, timeoutMs = 180_000) {
@@ -1224,6 +1366,88 @@ export class NeoaiPlugin extends Plugin {
       await ensureSeedWorkflows(this);
     } catch (err) {
       this.app.logger.warn(`[neoai] seed workflows failed (non-fatal): ${err}`);
+    }
+    try {
+      await this.migrateCrmKnowledge();
+    } catch (err) {
+      this.app.logger.warn(`[neoai] CRM knowledge migration failed (non-fatal): ${err}`);
+    }
+  }
+
+  /**
+   * Best-effort, idempotent, additive-only copy of CRM's legacy Knowledge
+   * data (knowledge_articles / ai_prompts, SAME shared Postgres/NocoBase app)
+   * into this plugin's own collections — dedup by title (articles) / use_case
+   * (prompts), tagging migrated articles source:'crm-migration'. Wrapped in
+   * try/catch at both the outer call site AND here: CRM may not be installed
+   * at all (collections simply don't exist), which must never break NeoAI's
+   * own boot. Never touches CRM's rows — this is a read-only copy out.
+   */
+  private async migrateCrmKnowledge(): Promise<void> {
+    const articlesRepo = this.db.getRepository('neoai_knowledge_articles');
+    const promptsRepo = this.db.getRepository('neoai_prompts');
+    if (!articlesRepo || !promptsRepo) return;
+
+    let crmArticles: any[] = [];
+    try {
+      const crmArticlesRepo = this.db.getRepository('knowledge_articles');
+      if (crmArticlesRepo) crmArticles = await crmArticlesRepo.find();
+    } catch {
+      crmArticles = []; // CRM plugin not installed / collection absent — fine.
+    }
+    for (const row of crmArticles) {
+      try {
+        const a = typeof row.toJSON === 'function' ? row.toJSON() : row;
+        const title = String(a.title ?? '').trim();
+        if (!title) continue;
+        const existing = await articlesRepo.findOne({ filter: { title } });
+        if (existing) continue;
+        await articlesRepo.create({
+          values: {
+            title,
+            body: a.body ?? '',
+            tags: a.tags ?? '',
+            use_case: a.use_case ?? '',
+            language: a.language || 'en',
+            active: a.active !== false,
+            source: 'crm-migration',
+          },
+        });
+        this.app.logger.info(`[neoai] migrated CRM knowledge article "${title}"`);
+      } catch (err) {
+        this.app.logger.warn(`[neoai] failed to migrate one CRM knowledge article (non-fatal): ${err}`);
+      }
+    }
+
+    let crmPrompts: any[] = [];
+    try {
+      const crmPromptsRepo = this.db.getRepository('ai_prompts');
+      if (crmPromptsRepo) crmPrompts = await crmPromptsRepo.find();
+    } catch {
+      crmPrompts = [];
+    }
+    for (const row of crmPrompts) {
+      try {
+        const p = typeof row.toJSON === 'function' ? row.toJSON() : row;
+        const useCase = String(p.use_case ?? '').trim();
+        if (!useCase) continue;
+        const existing = await promptsRepo.findOne({ filter: { use_case: useCase } });
+        if (existing) continue;
+        await promptsRepo.create({
+          values: {
+            use_case: useCase,
+            title: p.title ?? '',
+            system_prompt: p.system_prompt ?? '',
+            model_hint: p.model_hint ?? '',
+            settings: p.settings ?? null,
+            active: p.active !== false,
+            notes: p.notes ?? '',
+          },
+        });
+        this.app.logger.info(`[neoai] migrated CRM AI prompt "${useCase}"`);
+      } catch (err) {
+        this.app.logger.warn(`[neoai] failed to migrate one CRM AI prompt (non-fatal): ${err}`);
+      }
     }
   }
 

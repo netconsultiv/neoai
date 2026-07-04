@@ -67,8 +67,8 @@ __export(client_exports, {
   default: () => client_default
 });
 module.exports = __toCommonJS(client_exports);
-var import_client9 = require("@nocobase/client");
-var import_client10 = require("@nocobase/plugin-workflow/client");
+var import_client10 = require("@nocobase/client");
+var import_client11 = require("@nocobase/plugin-workflow/client");
 
 // src/client/console/NeoaiConsole.tsx
 var import_react10 = __toESM(require("react"));
@@ -2418,8 +2418,582 @@ function NeoaiConsolePage() {
   ));
 }
 
+// src/client/console/KnowledgeConsole.tsx
+var import_react11 = __toESM(require("react"));
+var import_antd11 = require("antd");
+var import_client9 = require("@nocobase/client");
+var TABS2 = [
+  { key: "articles", label: "Articles", icon: "FileTextOutlined" },
+  { key: "prompts", label: "AI Prompts", icon: "RobotOutlined" },
+  { key: "suggestions", label: "Suggestions", icon: "CheckSquareOutlined" },
+  { key: "retrieval", label: "Retrieval test", icon: "ExperimentOutlined" }
+];
+var USE_CASE_SUGGESTIONS = [
+  "general",
+  "whatsapp-reply",
+  "email-draft",
+  "lead-qualification",
+  "project-coordination",
+  "konfigurator.catalog-assist"
+];
+function activeTabFromPath2(pathname) {
+  var _a;
+  const m = pathname.match(/neoai-knowledge\/?([a-z]*)/i);
+  const key = ((_a = m == null ? void 0 : m[1]) != null ? _a : "").toLowerCase();
+  return TABS2.some((t) => t.key === key) ? key : "articles";
+}
+function SideItem2(props) {
+  return /* @__PURE__ */ import_react11.default.createElement(
+    "div",
+    {
+      onClick: props.onClick,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "9px 12px",
+        borderRadius: 9,
+        cursor: "pointer",
+        fontWeight: props.active ? 600 : 500,
+        color: props.active ? NEOHOME_GREEN : props.muted ? "#8a8f8a" : "#3c4043",
+        background: props.active ? "#eaf7ea" : "transparent",
+        fontSize: 13.5,
+        userSelect: "none"
+      }
+    },
+    /* @__PURE__ */ import_react11.default.createElement(import_client9.Icon, { type: props.icon }),
+    /* @__PURE__ */ import_react11.default.createElement("span", null, props.label)
+  );
+}
+function LinkedItemsSection({ articleId }) {
+  const api = (0, import_client9.useAPIClient)();
+  const [rows, setRows] = (0, import_react11.useState)([]);
+  const [loading, setLoading] = (0, import_react11.useState)(false);
+  const [entityType, setEntityType] = (0, import_react11.useState)("");
+  const [entityId, setEntityId] = (0, import_react11.useState)("");
+  const [label, setLabel] = (0, import_react11.useState)("");
+  const [saving, setSaving] = (0, import_react11.useState)(false);
+  const load = async () => {
+    var _a;
+    setLoading(true);
+    try {
+      const { rows: rows2 } = await listResource(api, "neoai_knowledge_links", {
+        filter: JSON.stringify({ article_id: articleId }),
+        sort: "-id",
+        pageSize: 200
+      });
+      setRows(rows2);
+    } catch (err) {
+      import_antd11.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  (0, import_react11.useEffect)(() => {
+    load();
+  }, [articleId]);
+  const addLink = async () => {
+    if (!entityType.trim() || !entityId.trim()) {
+      import_antd11.message.error("Entity type and entity id are required");
+      return;
+    }
+    setSaving(true);
+    try {
+      await createResource(api, "neoai_knowledge_links", {
+        article_id: articleId,
+        entity_type: entityType.trim(),
+        entity_id: entityId.trim(),
+        label: label.trim()
+      });
+      setEntityType("");
+      setEntityId("");
+      setLabel("");
+      await load();
+      import_antd11.message.success("Link added");
+    } catch (err) {
+      import_antd11.message.error((err == null ? void 0 : err.message) || "Failed to add link");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const removeLink = async (id) => {
+    await api.resource("neoai_knowledge_links").destroy({ filterByTk: id });
+    await load();
+  };
+  return /* @__PURE__ */ import_react11.default.createElement("div", { style: { marginTop: 18 } }, /* @__PURE__ */ import_react11.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", margin: "0 0 8px" } }, "LINKED ITEMS \u2014 cross-entity references (catalog options, CRM deals, \u2026)"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Spin, { spinning: loading }, rows.length ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { direction: "vertical", size: 6, style: { width: "100%", marginBottom: 12 } }, rows.map((r) => /* @__PURE__ */ import_react11.default.createElement(
+    "div",
+    {
+      key: r.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "6px 10px",
+        background: "#fafaf8",
+        border: "1px solid #ececea",
+        borderRadius: 8
+      }
+    },
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { code: true, style: { fontSize: 12 } }, r.entity_type),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { code: true, style: { fontSize: 12 } }, r.entity_id),
+    r.label ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { style: { fontSize: 12.5, color: "#5c605c" } }, r.label) : null,
+    /* @__PURE__ */ import_react11.default.createElement("div", { style: { flex: 1 } }),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { size: "small", danger: true, onClick: () => removeLink(r.id) }, "Remove")
+  ))) : /* @__PURE__ */ import_react11.default.createElement(import_antd11.Empty, { image: import_antd11.Empty.PRESENTED_IMAGE_SIMPLE, description: "No linked items yet", style: { padding: 12 } })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { size: 8, wrap: true }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: 'Entity type (e.g. "konfigurator.catalog_option")', value: entityType, onChange: (e) => setEntityType(e.target.value), style: { width: 260 } }), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "Entity id", value: entityId, onChange: (e) => setEntityId(e.target.value), style: { width: 140 } }), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "Label (optional)", value: label, onChange: (e) => setLabel(e.target.value), style: { width: 200 } }), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { type: "primary", loading: saving, onClick: addLink }, "Add link")));
+}
+function ArticleEditorDrawer(props) {
+  var _a, _b;
+  const { editor, onClose, onMutated } = props;
+  const api = (0, import_client9.useAPIClient)();
+  const [saving, setSaving] = (0, import_react11.useState)(false);
+  const [deleting, setDeleting] = (0, import_react11.useState)(false);
+  const open = !!editor;
+  const record = (_a = editor == null ? void 0 : editor.record) != null ? _a : null;
+  const done = (msg) => {
+    import_antd11.message.success(msg);
+    onMutated();
+    onClose();
+  };
+  const onFinish = async (raw) => {
+    var _a2;
+    setSaving(true);
+    try {
+      const values = {
+        title: String(raw.title || "").trim(),
+        use_case: String(raw.use_case || "").trim(),
+        language: raw.language || "en",
+        tags: String(raw.tags || "").trim(),
+        body: (_a2 = raw.body) != null ? _a2 : "",
+        active: !!raw.active
+      };
+      if ((record == null ? void 0 : record.id) != null) {
+        await updateResource(api, "neoai_knowledge_articles", record.id, values);
+        done("Article updated");
+      } else {
+        await createResource(api, "neoai_knowledge_articles", { ...values, source: "manual" });
+        done("Article created");
+      }
+    } catch (e) {
+      import_antd11.message.error((e == null ? void 0 : e.message) || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const onDelete = async () => {
+    if ((record == null ? void 0 : record.id) == null) return;
+    setDeleting(true);
+    try {
+      await api.resource("neoai_knowledge_articles").destroy({ filterByTk: record.id });
+      done("Article deleted");
+    } catch (e) {
+      import_antd11.message.error((e == null ? void 0 : e.message) || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  };
+  return /* @__PURE__ */ import_react11.default.createElement(ConsoleDrawer, { open, onClose, title: record ? String(record.title || `Article #${record.id}`) : "New article" }, open ? /* @__PURE__ */ import_react11.default.createElement("div", { style: { padding: 18, maxWidth: 900 } }, /* @__PURE__ */ import_react11.default.createElement(
+    import_antd11.Form,
+    {
+      key: (_b = record == null ? void 0 : record.id) != null ? _b : "new",
+      layout: "vertical",
+      initialValues: { use_case: "general", language: "en", active: true, ...record || {} },
+      onFinish
+    },
+    record ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Paragraph, { type: "secondary", style: { fontSize: 12, marginBottom: 16 } }, "Created ", fmtTime(record.createdAt), " \xB7 Updated ", fmtTime(record.updatedAt), " \xB7 Source: ", /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, null, record.source || "manual")) : null,
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "title", label: "Title", rules: [{ required: true, whitespace: true, message: "Title is required" }] }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "Article title" })),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "use_case", label: "Use case", extra: "Free text \u2014 spans multiple plugins' use cases (CRM, Konfigurator, \u2026). Suggestions below." }, /* @__PURE__ */ import_react11.default.createElement(
+      import_antd11.Select,
+      {
+        mode: "tags",
+        maxCount: 1,
+        options: USE_CASE_SUGGESTIONS.map((v) => ({ value: v, label: v })),
+        placeholder: "general"
+      }
+    )),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "language", label: "Language" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Select, { options: [{ value: "en", label: "English" }, { value: "de", label: "German" }, { value: "pl", label: "Polish" }] })),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "tags", label: "Tags (comma-separated)" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "plot, financing, timeline" })),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "body", label: "Body" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input.TextArea, { rows: 12, placeholder: "Article body\u2026" })),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "active", label: "Active", valuePropName: "checked", extra: "Inactive articles stay editable but are invisible to retrieval." }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Switch, null)),
+    /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { style: { marginTop: 8, marginBottom: 0 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, null, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { type: "primary", htmlType: "submit", loading: saving }, record ? "Save" : "Create"), record ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Popconfirm, { title: "Delete this article?", okText: "Delete", okButtonProps: { danger: true }, onConfirm: onDelete }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { danger: true, loading: deleting }, "Delete")) : null, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { onClick: onClose, disabled: saving || deleting }, "Cancel")))
+  ), (record == null ? void 0 : record.id) != null ? /* @__PURE__ */ import_react11.default.createElement(LinkedItemsSection, { articleId: record.id }) : null) : null);
+}
+function ArticlesPanel() {
+  const api = (0, import_client9.useAPIClient)();
+  const [rows, setRows] = (0, import_react11.useState)([]);
+  const [loading, setLoading] = (0, import_react11.useState)(false);
+  const [searchText, setSearchText] = (0, import_react11.useState)("");
+  const [query, setQuery] = (0, import_react11.useState)("");
+  const [editor, setEditor] = (0, import_react11.useState)(null);
+  const load = async () => {
+    var _a;
+    setLoading(true);
+    try {
+      const q = query.trim();
+      const { rows: rows2 } = await listResource(api, "neoai_knowledge_articles", {
+        sort: "-updatedAt",
+        pageSize: 200,
+        ...q ? { filter: JSON.stringify({ title: { $includes: q } }) } : {}
+      });
+      setRows(rows2);
+    } catch (err) {
+      import_antd11.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  usePoll(load, 3e4, editor == null);
+  (0, import_react11.useEffect)(() => {
+    load();
+  }, [query]);
+  const columns = [
+    { title: "Title", dataIndex: "title", key: "title", ellipsis: true, render: (v) => /* @__PURE__ */ import_react11.default.createElement("a", null, v || "(untitled)") },
+    { title: "Use case", dataIndex: "use_case", key: "use_case", width: 190, render: (v) => v ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, null, v) : "\u2014" },
+    { title: "Language", dataIndex: "language", key: "language", width: 90 },
+    { title: "Tags", dataIndex: "tags", key: "tags", ellipsis: true, render: (v) => v || "\u2014" },
+    { title: "Active", dataIndex: "active", key: "active", width: 80, align: "center", render: (v) => v ? "\u2713" : "\u2014" },
+    { title: "Source", dataIndex: "source", key: "source", width: 120, render: (v) => /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, { color: v === "ai-suggested" ? "gold" : v === "crm-migration" ? "blue" : "default" }, v || "manual") },
+    { title: "Updated", dataIndex: "updatedAt", key: "updatedAt", width: 150, render: (v) => fmtTime(v) }
+  ];
+  return /* @__PURE__ */ import_react11.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { style: { marginBottom: 16, flexWrap: "wrap" }, size: 12 }, /* @__PURE__ */ import_react11.default.createElement(
+    import_antd11.Input.Search,
+    {
+      allowClear: true,
+      placeholder: "Search by title\u2026",
+      style: { width: 320 },
+      value: searchText,
+      onChange: (e) => setSearchText(e.target.value),
+      onSearch: setQuery
+    }
+  ), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { type: "primary", onClick: () => setEditor({ record: null }) }, "New article"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { onClick: load, loading }, "Refresh"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { type: "secondary" }, rows.length, " article(s)")), /* @__PURE__ */ import_react11.default.createElement(
+    import_antd11.Table,
+    {
+      rowKey: "id",
+      size: "middle",
+      loading,
+      dataSource: rows,
+      columns,
+      pagination: { pageSize: 20 },
+      onRow: (record) => ({ onClick: () => setEditor({ record }), style: { cursor: "pointer" } }),
+      locale: { emptyText: /* @__PURE__ */ import_react11.default.createElement(import_antd11.Empty, { image: import_antd11.Empty.PRESENTED_IMAGE_SIMPLE, description: "No articles yet" }) }
+    }
+  ), /* @__PURE__ */ import_react11.default.createElement(ArticleEditorDrawer, { editor, onClose: () => setEditor(null), onMutated: load }));
+}
+function PromptEditorDrawer(props) {
+  var _a, _b;
+  const { editor, onClose, onMutated } = props;
+  const api = (0, import_client9.useAPIClient)();
+  const [saving, setSaving] = (0, import_react11.useState)(false);
+  const [deleting, setDeleting] = (0, import_react11.useState)(false);
+  const open = !!editor;
+  const record = (_a = editor == null ? void 0 : editor.record) != null ? _a : null;
+  const done = (msg) => {
+    import_antd11.message.success(msg);
+    onMutated();
+    onClose();
+  };
+  const onFinish = async (raw) => {
+    var _a2, _b2;
+    setSaving(true);
+    try {
+      const values = {
+        use_case: String(raw.use_case || "").trim(),
+        title: String(raw.title || "").trim(),
+        system_prompt: (_a2 = raw.system_prompt) != null ? _a2 : "",
+        model_hint: String(raw.model_hint || "").trim(),
+        active: !!raw.active,
+        notes: (_b2 = raw.notes) != null ? _b2 : ""
+      };
+      if ((record == null ? void 0 : record.id) != null) {
+        await updateResource(api, "neoai_prompts", record.id, values);
+        done("Prompt updated");
+      } else {
+        await createResource(api, "neoai_prompts", values);
+        done("Prompt created");
+      }
+    } catch (e) {
+      import_antd11.message.error((e == null ? void 0 : e.message) || "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const onDelete = async () => {
+    if ((record == null ? void 0 : record.id) == null) return;
+    setDeleting(true);
+    try {
+      await api.resource("neoai_prompts").destroy({ filterByTk: record.id });
+      done("Prompt deleted");
+    } catch (e) {
+      import_antd11.message.error((e == null ? void 0 : e.message) || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  };
+  const MONO = 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace';
+  return /* @__PURE__ */ import_react11.default.createElement(ConsoleDrawer, { open, onClose, title: record ? String(record.title || record.use_case || `Prompt #${record.id}`) : "New prompt" }, open ? /* @__PURE__ */ import_react11.default.createElement("div", { style: { padding: 18, maxWidth: 900 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form, { key: (_b = record == null ? void 0 : record.id) != null ? _b : "new", layout: "vertical", initialValues: { active: true, ...record || {} }, onFinish }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "use_case", label: "Use case key", rules: [{ required: true, whitespace: true, message: "Use case key is required" }], extra: "Lookup key \u2014 e.g. crm.leadQualification consumers resolve prompts by this exact key." }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "e.g. lead-qualification" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "title", label: "Title" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "Prompt title" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "system_prompt", label: "System prompt" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input.TextArea, { rows: 14, style: { fontFamily: MONO, fontSize: 12 }, placeholder: "System prompt text\u2026" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "model_hint", label: "Model hint", extra: "Advisory only \u2014 the actual model comes from plugin-ai's LLM service configuration." }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "e.g. gemini-2.5-flash" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "active", label: "Active", valuePropName: "checked" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Switch, null)), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "notes", label: "Notes" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input.TextArea, { rows: 3 })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { style: { marginTop: 8, marginBottom: 0 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, null, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { type: "primary", htmlType: "submit", loading: saving }, record ? "Save" : "Create"), record ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Popconfirm, { title: "Delete this prompt?", okText: "Delete", okButtonProps: { danger: true }, onConfirm: onDelete }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { danger: true, loading: deleting }, "Delete")) : null, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { onClick: onClose, disabled: saving || deleting }, "Cancel"))))) : null);
+}
+function PromptsPanel() {
+  const api = (0, import_client9.useAPIClient)();
+  const [rows, setRows] = (0, import_react11.useState)([]);
+  const [loading, setLoading] = (0, import_react11.useState)(false);
+  const [editor, setEditor] = (0, import_react11.useState)(null);
+  const load = async () => {
+    var _a;
+    setLoading(true);
+    try {
+      const { rows: rows2 } = await listResource(api, "neoai_prompts", { sort: "-updatedAt", pageSize: 200 });
+      setRows(rows2);
+    } catch (err) {
+      import_antd11.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  usePoll(load, 3e4, editor == null);
+  const columns = [
+    { title: "Use case key", dataIndex: "use_case", key: "use_case", width: 220, render: (v) => /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { code: true }, v) },
+    { title: "Title", dataIndex: "title", key: "title", ellipsis: true },
+    { title: "Model hint", dataIndex: "model_hint", key: "model_hint", ellipsis: true, render: (v) => v || "\u2014" },
+    { title: "Active", dataIndex: "active", key: "active", width: 80, align: "center", render: (v) => v ? "\u2713" : "\u2014" },
+    { title: "Updated", dataIndex: "updatedAt", key: "updatedAt", width: 150, render: (v) => fmtTime(v) }
+  ];
+  return /* @__PURE__ */ import_react11.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { style: { marginBottom: 16, flexWrap: "wrap" }, size: 12 }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { type: "primary", onClick: () => setEditor({ record: null }) }, "New prompt"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { onClick: load, loading }, "Refresh"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { type: "secondary" }, rows.length, " prompt(s)")), /* @__PURE__ */ import_react11.default.createElement(
+    import_antd11.Table,
+    {
+      rowKey: "id",
+      size: "middle",
+      loading,
+      dataSource: rows,
+      columns,
+      pagination: { pageSize: 20 },
+      onRow: (record) => ({ onClick: () => setEditor({ record }), style: { cursor: "pointer" } }),
+      locale: { emptyText: /* @__PURE__ */ import_react11.default.createElement(import_antd11.Empty, { image: import_antd11.Empty.PRESENTED_IMAGE_SIMPLE, description: "No prompts yet" }) }
+    }
+  ), /* @__PURE__ */ import_react11.default.createElement(PromptEditorDrawer, { editor, onClose: () => setEditor(null), onMutated: load }));
+}
+function SuggestionsPanel() {
+  const api = (0, import_client9.useAPIClient)();
+  const [rows, setRows] = (0, import_react11.useState)([]);
+  const [loading, setLoading] = (0, import_react11.useState)(false);
+  const [showAll, setShowAll] = (0, import_react11.useState)(false);
+  const [busyId, setBusyId] = (0, import_react11.useState)(null);
+  const load = async () => {
+    var _a;
+    setLoading(true);
+    try {
+      const { rows: rows2 } = await listResource(api, "neoai_knowledge_suggestions", {
+        sort: "-id",
+        pageSize: 200,
+        appends: ["target_article", "source_run"],
+        ...showAll ? {} : { filter: JSON.stringify({ status: "pending" }) }
+      });
+      setRows(rows2);
+    } catch (err) {
+      import_antd11.message.error(`Load failed: ${(_a = err == null ? void 0 : err.message) != null ? _a : err}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  usePoll(load, 15e3, busyId == null);
+  (0, import_react11.useEffect)(() => {
+    load();
+  }, [showAll]);
+  const approve = (row) => {
+    import_antd11.Modal.confirm({
+      title: row.target_article ? `Approve edit to "${row.target_article.title}"?` : "Approve new article?",
+      icon: null,
+      width: 560,
+      okText: "Approve",
+      cancelText: "Cancel",
+      content: /* @__PURE__ */ import_react11.default.createElement("div", { style: { fontSize: 13 } }, /* @__PURE__ */ import_react11.default.createElement("p", { style: { marginBottom: 8 } }, /* @__PURE__ */ import_react11.default.createElement("b", null, "Proposed title:"), " ", row.proposed_title || "\u2014"), /* @__PURE__ */ import_react11.default.createElement("p", { style: { marginBottom: 8, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" } }, /* @__PURE__ */ import_react11.default.createElement("b", null, "Proposed body:"), /* @__PURE__ */ import_react11.default.createElement("br", null), row.proposed_body || "\u2014"), /* @__PURE__ */ import_react11.default.createElement("p", { style: { marginBottom: 0, color: "#8a8f8a" } }, row.target_article ? "This will overwrite the target article with the proposed fields." : "This will create a brand-new article (source: ai-suggested).")),
+      onOk: async () => {
+        var _a;
+        setBusyId(row.id);
+        try {
+          const res = await neoaiAction(api, "knowledgeSuggestionApprove", { id: row.id });
+          if (res == null ? void 0 : res.ok) {
+            import_antd11.message.success("Suggestion approved");
+            await load();
+          } else {
+            import_antd11.message.error((res == null ? void 0 : res.reason) || "Approve failed");
+          }
+        } catch (err) {
+          import_antd11.message.error(String((_a = err == null ? void 0 : err.message) != null ? _a : err));
+        } finally {
+          setBusyId(null);
+        }
+      }
+    });
+  };
+  const reject = (row) => {
+    import_antd11.Modal.confirm({
+      title: "Reject this suggestion?",
+      icon: null,
+      okText: "Reject",
+      okButtonProps: { danger: true },
+      cancelText: "Cancel",
+      content: "The article stays exactly as it is \u2014 nothing is written except this suggestion's own status.",
+      onOk: async () => {
+        var _a;
+        setBusyId(row.id);
+        try {
+          const res = await neoaiAction(api, "knowledgeSuggestionReject", { id: row.id });
+          if (res == null ? void 0 : res.ok) {
+            import_antd11.message.success("Suggestion rejected");
+            await load();
+          } else {
+            import_antd11.message.error((res == null ? void 0 : res.reason) || "Reject failed");
+          }
+        } catch (err) {
+          import_antd11.message.error(String((_a = err == null ? void 0 : err.message) != null ? _a : err));
+        } finally {
+          setBusyId(null);
+        }
+      }
+    });
+  };
+  const columns = [
+    {
+      title: "Target",
+      key: "target",
+      width: 220,
+      render: (_, r) => r.target_article ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, null, r.target_article.title) : /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, { color: "gold" }, "New article")
+    },
+    { title: "Proposed title", dataIndex: "proposed_title", key: "proposed_title", ellipsis: true, render: (v) => v || "\u2014" },
+    { title: "Reason", dataIndex: "reason", key: "reason", ellipsis: true, render: (v) => v || "\u2014" },
+    {
+      title: "Source run",
+      key: "source_run",
+      width: 110,
+      render: (_, r) => r.source_run_id ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { code: true }, "#", r.source_run_id) : "\u2014"
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      width: 110,
+      render: (v) => /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, { color: v === "pending" ? "gold" : v === "approved" ? "green" : "default" }, v)
+    },
+    {
+      title: "",
+      key: "act",
+      width: 190,
+      render: (_, r) => r.status === "pending" ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, null, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { size: "small", type: "primary", loading: busyId === r.id, onClick: () => approve(r) }, "Approve"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { size: "small", danger: true, loading: busyId === r.id, onClick: () => reject(r) }, "Reject")) : /* @__PURE__ */ import_react11.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, r.reviewed_by ? `by ${r.reviewed_by}` : "", " ", r.reviewed_at ? fmtTime(r.reviewed_at) : "")
+    }
+  ];
+  return /* @__PURE__ */ import_react11.default.createElement("div", { style: { padding: 20 } }, /* @__PURE__ */ import_react11.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: 6, flexWrap: "wrap" } }, /* @__PURE__ */ import_react11.default.createElement("div", { style: { fontSize: 18, fontWeight: 800 } }, "Suggestions"), /* @__PURE__ */ import_react11.default.createElement("div", { style: { flex: 1 } }), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Checkbox, { checked: showAll, onChange: (e) => setShowAll(e.target.checked) }, "Show all (not just pending)"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { onClick: load, loading }, "Refresh")), /* @__PURE__ */ import_react11.default.createElement("p", { style: { fontSize: 12.5, color: "#8a8f8a", margin: "0 0 12px", maxWidth: 820 } }, "The ONLY way AI/workflow code can affect Knowledge: every suggestion below waits for a human decision here. Approving either updates the target article or creates a new one (source: ai-suggested); rejecting never touches any article."), /* @__PURE__ */ import_react11.default.createElement(
+    import_antd11.Table,
+    {
+      rowKey: "id",
+      size: "middle",
+      loading,
+      dataSource: rows,
+      columns,
+      pagination: { pageSize: 20 },
+      locale: { emptyText: showAll ? "No suggestions yet" : "Nothing pending review right now" }
+    }
+  ));
+}
+var fmtScore = (v) => Number.isFinite(Number(v)) ? String(Math.round(Number(v) * 10) / 10) : "?";
+function RetrievalPanel() {
+  const api = (0, import_client9.useAPIClient)();
+  const [searchText, setSearchText] = (0, import_react11.useState)("");
+  const [useCase, setUseCase] = (0, import_react11.useState)("");
+  const [limit, setLimit] = (0, import_react11.useState)(8);
+  const [loading, setLoading] = (0, import_react11.useState)(false);
+  const [ran, setRan] = (0, import_react11.useState)(null);
+  const run = async (raw) => {
+    const q = (raw || "").trim();
+    if (!q) {
+      setRan(null);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await neoaiAction(api, "knowledgeSearch", { q, useCase: useCase || void 0, limit: limit || 8 });
+      setRan({ q, hits: Array.isArray(data == null ? void 0 : data.results) ? data.results : [] });
+    } catch (e) {
+      import_antd11.message.error((e == null ? void 0 : e.message) || "Search failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+  return /* @__PURE__ */ import_react11.default.createElement("div", { style: { padding: 20, maxWidth: 900 } }, /* @__PURE__ */ import_react11.default.createElement("div", { style: { fontSize: 18, fontWeight: 800, marginBottom: 6 } }, "Retrieval test"), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Paragraph, { type: "secondary", style: { marginBottom: 16 } }, "Runs the exact keyword scorer (neoai:knowledgeSearch) used by AI context assembly \u2014 tune tags/wording here and see which snippets a draft/workflow would receive."), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { size: 12, wrap: true, style: { marginBottom: 16 } }, /* @__PURE__ */ import_react11.default.createElement(
+    import_antd11.Input.Search,
+    {
+      allowClear: true,
+      enterButton: "Search",
+      placeholder: "Search knowledge\u2026",
+      style: { width: 460 },
+      value: searchText,
+      onChange: (e) => setSearchText(e.target.value),
+      onSearch: run,
+      loading
+    }
+  ), /* @__PURE__ */ import_react11.default.createElement(
+    import_antd11.Select,
+    {
+      allowClear: true,
+      value: useCase || void 0,
+      onChange: (v) => setUseCase(v != null ? v : ""),
+      style: { width: 220 },
+      placeholder: "Any use case",
+      options: USE_CASE_SUGGESTIONS.map((v) => ({ value: v, label: v }))
+    }
+  ), /* @__PURE__ */ import_react11.default.createElement(import_antd11.InputNumber, { min: 1, max: 20, precision: 0, addonBefore: "Limit", style: { width: 140 }, value: limit, onChange: (v) => setLimit(v) })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Spin, { spinning: loading }, !ran ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Empty, { image: import_antd11.Empty.PRESENTED_IMAGE_SIMPLE, style: { padding: 48 }, description: "Type a query and press search" }) : ran.hits.length === 0 ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Empty, { style: { padding: 48 }, description: `No hits for "${ran.q}"` }) : /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { direction: "vertical", size: 12, style: { width: "100%" } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { type: "secondary" }, ran.hits.length, ' hit(s) for "', ran.q, '"'), ran.hits.map((hit, i) => {
+    var _a, _b;
+    return /* @__PURE__ */ import_react11.default.createElement(import_antd11.Card, { key: (_a = hit.id) != null ? _a : i, size: "small" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { size: 8, wrap: true, style: { marginBottom: 8 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { strong: true }, hit.title || `Article #${(_b = hit.id) != null ? _b : "?"}`), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, { color: NEOHOME_GREEN }, "score ", fmtScore(hit.score)), hit.use_case ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, null, hit.use_case) : null), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Paragraph, { type: "secondary", style: { marginBottom: 0, whiteSpace: "pre-wrap" } }, hit.snippet || "\u2014"));
+  }))));
+}
+function KnowledgeConsolePage() {
+  (0, import_react11.useEffect)(() => {
+    ensureInterFont();
+  }, []);
+  const pathname = window.location.pathname;
+  const embedded = pathname.startsWith("/admin");
+  const prefix = embedded ? "/admin" : "";
+  const active = activeTabFromPath2(pathname);
+  const go = (href) => window.location.assign(href);
+  return /* @__PURE__ */ import_react11.default.createElement(import_antd11.ConfigProvider, { theme: NEOHOME_THEME, getPopupContainer: (n) => {
+    var _a;
+    return (_a = n == null ? void 0 : n.parentElement) != null ? _a : document.body;
+  } }, /* @__PURE__ */ import_react11.default.createElement(
+    "div",
+    {
+      style: {
+        display: "flex",
+        height: embedded ? "calc(100vh - 46px)" : "100vh",
+        background: "#fff",
+        fontFamily: "'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif",
+        color: "#1b1e21"
+      }
+    },
+    /* @__PURE__ */ import_react11.default.createElement(
+      "aside",
+      {
+        style: {
+          width: 216,
+          borderRight: "1px solid #ececea",
+          padding: "14px 10px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          flexShrink: 0
+        }
+      },
+      /* @__PURE__ */ import_react11.default.createElement("div", { style: { display: "flex", alignItems: "center", gap: 9, padding: "2px 8px 12px" } }, /* @__PURE__ */ import_react11.default.createElement("img", { src: NEOMODUL_FAVICON_SRC, alt: "Neomodul", style: { width: 26, height: 26, borderRadius: 7 } }), /* @__PURE__ */ import_react11.default.createElement("span", { style: { fontWeight: 800, fontSize: 15, letterSpacing: "-.01em" } }, "Knowledge")),
+      TABS2.map((t) => /* @__PURE__ */ import_react11.default.createElement(SideItem2, { key: t.key, icon: t.icon, label: t.label, active: active === t.key, onClick: () => go(`${prefix}/neoai-knowledge/${t.key}`) })),
+      /* @__PURE__ */ import_react11.default.createElement("div", { style: { borderTop: "1px solid #ececea", margin: "10px 4px" } }),
+      /* @__PURE__ */ import_react11.default.createElement(SideItem2, { icon: "RobotOutlined", label: "NeoAI", muted: true, onClick: () => go(`${prefix}/neoai/workflows`) }),
+      /* @__PURE__ */ import_react11.default.createElement(SideItem2, { icon: "HomeOutlined", label: "Admin", muted: true, onClick: () => go("/admin") }),
+      /* @__PURE__ */ import_react11.default.createElement("div", { style: { flex: 1 } }),
+      /* @__PURE__ */ import_react11.default.createElement("div", { style: { fontSize: 10.5, color: "#b0b4ba", padding: "0 8px 4px" } }, "Human-gated \xB7 AI can only suggest")
+    ),
+    /* @__PURE__ */ import_react11.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, active === "articles" ? /* @__PURE__ */ import_react11.default.createElement(ArticlesPanel, null) : null, active === "prompts" ? /* @__PURE__ */ import_react11.default.createElement(PromptsPanel, null) : null, active === "suggestions" ? /* @__PURE__ */ import_react11.default.createElement(SuggestionsPanel, null) : null, active === "retrieval" ? /* @__PURE__ */ import_react11.default.createElement(RetrievalPanel, null) : null)
+  ));
+}
+
 // src/client/index.tsx
-var NeoaiRunInstruction = class extends import_client10.Instruction {
+var NeoaiRunInstruction = class extends import_client11.Instruction {
   constructor() {
     super(...arguments);
     this.title = "NeoAI workflow";
@@ -2466,7 +3040,7 @@ var NeoaiRunInstruction = class extends import_client10.Instruction {
     };
   }
 };
-var NeoaiClientPlugin = class extends import_client9.Plugin {
+var NeoaiClientPlugin = class extends import_client10.Plugin {
   /**
    * Automation bridge UI: contribute the "neoai-run" node to NocoBase's
    * plugin-workflow editor as a PLAIN instruction object (no import from
@@ -2505,6 +3079,16 @@ var NeoaiClientPlugin = class extends import_client9.Plugin {
     this.app.router.add("neoai-mcp", { path: "/neoai/mcp", Component: NeoaiConsolePage });
     this.app.router.add("neoai-memory", { path: "/neoai/memory", Component: NeoaiConsolePage });
     this.app.router.add("neoai-settings", { path: "/neoai/settings", Component: NeoaiConsolePage });
+    this.app.router.add("admin.neoaiKnowledge", { path: "neoai-knowledge", Component: KnowledgeConsolePage });
+    this.app.router.add("admin.neoaiKnowledgeArticles", { path: "neoai-knowledge/articles", Component: KnowledgeConsolePage });
+    this.app.router.add("admin.neoaiKnowledgePrompts", { path: "neoai-knowledge/prompts", Component: KnowledgeConsolePage });
+    this.app.router.add("admin.neoaiKnowledgeSuggestions", { path: "neoai-knowledge/suggestions", Component: KnowledgeConsolePage });
+    this.app.router.add("admin.neoaiKnowledgeRetrieval", { path: "neoai-knowledge/retrieval", Component: KnowledgeConsolePage });
+    this.app.router.add("neoai-knowledge", { path: "/neoai-knowledge", Component: KnowledgeConsolePage });
+    this.app.router.add("neoai-knowledge-articles", { path: "/neoai-knowledge/articles", Component: KnowledgeConsolePage });
+    this.app.router.add("neoai-knowledge-prompts", { path: "/neoai-knowledge/prompts", Component: KnowledgeConsolePage });
+    this.app.router.add("neoai-knowledge-suggestions", { path: "/neoai-knowledge/suggestions", Component: KnowledgeConsolePage });
+    this.app.router.add("neoai-knowledge-retrieval", { path: "/neoai-knowledge/retrieval", Component: KnowledgeConsolePage });
     this.registerAutomationBridgeUI();
   }
 };
