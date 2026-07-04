@@ -48,13 +48,17 @@ export type BudgetCheck = { ok: boolean; reason?: string };
 /**
  * Enforce the configurable daily budgets BEFORE a model call is made.
  * spentTodayUsd = global spend today, workflowSpentTodayUsd = this workflow's.
- * A limit of null/0/undefined means "no limit".
+ * A limit of null/0/undefined means "no limit". A function-level budget
+ * (item 14) is the MOST specific and is checked in addition to the other two
+ * — whichever limit is hit first blocks the call.
  */
 export function checkBudget(opts: {
   spentTodayUsd: number;
   workflowSpentTodayUsd: number;
   globalDailyBudgetUsd?: number | null;
   workflowDailyBudgetUsd?: number | null;
+  functionSpentTodayUsd?: number;
+  functionDailyBudgetUsd?: number | null;
 }): BudgetCheck {
   const g = opts.globalDailyBudgetUsd ?? 0;
   if (g > 0 && opts.spentTodayUsd >= g) {
@@ -63,6 +67,10 @@ export function checkBudget(opts: {
   const w = opts.workflowDailyBudgetUsd ?? 0;
   if (w > 0 && opts.workflowSpentTodayUsd >= w) {
     return { ok: false, reason: `workflow daily budget exhausted (${opts.workflowSpentTodayUsd.toFixed(2)} / ${w} USD)` };
+  }
+  const f = opts.functionDailyBudgetUsd ?? 0;
+  if (f > 0 && (opts.functionSpentTodayUsd ?? 0) >= f) {
+    return { ok: false, reason: `function daily budget exhausted (${(opts.functionSpentTodayUsd ?? 0).toFixed(2)} / ${f} USD)` };
   }
   return { ok: true };
 }

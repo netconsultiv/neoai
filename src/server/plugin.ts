@@ -226,7 +226,7 @@ export class NeoaiPlugin extends Plugin {
           const repo = this.db.getRepository('neoai_settings');
           const row = await this.settingsRow();
           const values: any = {};
-          for (const k of ['default_llm_service', 'default_model', 'daily_budget_usd', 'image_price_usd', 'prices', 'force_mock']) {
+          for (const k of ['default_llm_service', 'default_model', 'daily_budget_usd', 'image_price_usd', 'prices', 'force_mock', 'spend_alert_pct']) {
             if (p[k] !== undefined) values[k] = p[k];
           }
           // Key is write-only: set when a non-empty string arrives, clear on ''.
@@ -240,6 +240,12 @@ export class NeoaiPlugin extends Plugin {
         spendToday: async (ctx: any, next: any) => {
           requireAdmin(ctx);
           ctx.body = { global: await this.spentTodayUsd(), byWorkflow: await this.spentTodayByWorkflow() };
+          await next();
+        },
+
+        spendTrend: async (ctx: any, next: any) => {
+          requireAdmin(ctx);
+          ctx.body = await this.spendTrend();
           await next();
         },
 
@@ -642,6 +648,64 @@ export class NeoaiPlugin extends Plugin {
     }
   }
 
+  /** Per-function spend today (item 14) — same shape as spentTodayByWorkflow. */
+  private async spentTodayByFunction(): Promise<Record<string, number>> {
+    try {
+      const repo = this.db.getRepository('neoai_runs');
+      const rows = await repo.find({
+        filter: { started_at: { $gte: this.dayStart() }, function_key: { $ne: '' } },
+        fields: ['function_key', 'cost_usd'],
+        limit: 2000,
+      });
+      const out: Record<string, number> = {};
+      for (const r of rows) {
+        const k = String(r.get('function_key') ?? '');
+        if (!k) continue;
+        out[k] = (out[k] ?? 0) + (Number(r.get('cost_usd')) || 0);
+      }
+      return out;
+    } catch {
+      return {};
+    }
+  }
+
+  /** 30-day spend trend + per-workflow/per-function leaderboard (item 16). */
+  async spendTrend(): Promise<{ byDay: Record<string, number>; byWorkflow: Array<{ workflowId: string; name: string; totalUsd: number }>; byFunction: Array<{ functionKey: string; totalUsd: number }> }> {
+    const since = new Date();
+    since.setDate(since.getDate() - 30);
+    since.setHours(0, 0, 0, 0);
+    const repo = this.db.getRepository('neoai_runs');
+    const rows = await repo.find({
+      filter: { started_at: { $gte: since } },
+      fields: ['workflow_id', 'function_key', 'cost_usd', 'started_at'],
+      appends: ['workflow'],
+      limit: 20_000,
+    });
+    const byDay: Record<string, number> = {};
+    const byWorkflowMap = new Map<string, { name: string; totalUsd: number }>();
+    const byFunctionMap = new Map<string, number>();
+    for (const r of rows) {
+      const cost = Number(r.get('cost_usd')) || 0;
+      const started = r.get('started_at');
+      const day = started ? new Date(started).toISOString().slice(0, 10) : 'unknown';
+      byDay[day] = (byDay[day] ?? 0) + cost;
+      const wfId = String(r.get('workflow_id') ?? '');
+      if (wfId) {
+        const wfName = (r as any).get?.('workflow')?.name ?? wfId;
+        const entry = byWorkflowMap.get(wfId) ?? { name: wfName, totalUsd: 0 };
+        entry.totalUsd += cost;
+        byWorkflowMap.set(wfId, entry);
+      }
+      const fnKey = String(r.get('function_key') ?? '');
+      if (fnKey) byFunctionMap.set(fnKey, (byFunctionMap.get(fnKey) ?? 0) + cost);
+    }
+    return {
+      byDay,
+      byWorkflow: [...byWorkflowMap.entries()].map(([workflowId, v]) => ({ workflowId, ...v })).sort((a, b) => b.totalUsd - a.totalUsd),
+      byFunction: [...byFunctionMap.entries()].map(([functionKey, totalUsd]) => ({ functionKey, totalUsd })).sort((a, b) => b.totalUsd - a.totalUsd),
+    };
+  }
+
   /** `versionOverride` re-runs a SPECIFIC historical version (item 8's re-run) instead of always the current published one. */
   private async loadPublishedDefinition(workflowId: number, versionOverride?: number): Promise<{ def: WorkflowDef; version: number } | null> {
     const wf = await this.db.getRepository('neoai_workflows').findOne({ filterByTk: workflowId });
@@ -730,7 +794,7 @@ export class NeoaiPlugin extends Plugin {
 
     const seed = opts.draft && opts.skipToNodeId ? { skipToNodeId: opts.skipToNodeId, vars: opts.seedVars } : undefined;
     setImmediate(() => {
-      this.executeRun(runId, def, opts.input, handle, wf, opts.trigger, undefined, seed).catch((err) => {
+      this.executeRun(runId, def, opts.input, handle, wf, opts.trigger, opts.functionKey, undefined, seed).catch((err) => {
         this.app.logger.error(`[neoai] run ${runId} crashed outside runner: ${err}`);
       });
     });
@@ -754,7 +818,7 @@ export class NeoaiPlugin extends Plugin {
     const input = run.get('input') ?? {};
 
     setImmediate(() => {
-      this.executeRun(runId, { nodes: [] }, input, handle, wf, String(run.get('trigger') ?? ''), { state, approval }).catch((err) => {
+      this.executeRun(runId, { nodes: [] }, input, handle, wf, String(run.get('trigger') ?? ''), String(run.get('function_key') ?? ''), { state, approval }).catch((err) => {
         this.app.logger.error(`[neoai] resume ${runId} crashed outside runner: ${err}`);
       });
     });
@@ -816,6 +880,7 @@ export class NeoaiPlugin extends Plugin {
     handle: RunHandle,
     wf: any,
     trigger: string,
+    functionKey?: string,
     resume?: { state: any; approval: any },
     seed?: { skipToNodeId?: string; vars?: Record<string, any> },
   ) {
@@ -824,12 +889,14 @@ export class NeoaiPlugin extends Plugin {
     const settings = await this.settingsRow();
     const prices = { ...DEFAULT_PRICES, ...((settings?.get?.('prices') as any) ?? {}) };
     const workflowId = Number(wf.get('id'));
+    const fnRow = functionKey ? await this.db.getRepository('neoai_functions')?.findOne({ filter: { key: functionKey } }) : null;
+    const functionDailyBudgetUsd = Number(fnRow?.get?.('daily_budget_usd')) || 0;
 
     let seq = 0;
     let totalIn = 0;
     let totalOut = 0;
     let totalCost = 0;
-    let spendCache: { at: number; global: number; wf: number } | null = null;
+    let spendCache: { at: number; global: number; wf: number; fn: number } | null = null;
     // start-row correlation: last open step row per path|nodeId
     const openSteps = new Map<string, { id: number; startedAt: number }>();
 
@@ -906,19 +973,22 @@ export class NeoaiPlugin extends Plugin {
       defaultModel: String(settings?.get?.('default_model') || 'gemini-2.5-flash'),
       defaultService: String(settings?.get?.('default_llm_service') || ''),
       guardModelCall: async () => {
-        // One DB scan feeds BOTH budget checks; cached 5s so multi-LLM
+        // One DB scan feeds ALL THREE budget checks; cached 5s so multi-LLM
         // workflows don't re-scan runs on every node.
         const now = Date.now();
         if (!spendCache || now - spendCache.at > 5000) {
           const byWf = await this.spentTodayByWorkflow();
           const global = Object.values(byWf).reduce((s, v) => s + v, 0);
-          spendCache = { at: now, global, wf: byWf[String(workflowId)] ?? 0 };
+          const byFn = functionKey ? await this.spentTodayByFunction() : {};
+          spendCache = { at: now, global, wf: byWf[String(workflowId)] ?? 0, fn: byFn[String(functionKey)] ?? 0 };
         }
         const check = checkBudget({
           spentTodayUsd: spendCache.global + totalCost,
           workflowSpentTodayUsd: spendCache.wf + totalCost,
           globalDailyBudgetUsd: Number(settings?.get?.('daily_budget_usd')) || 0,
           workflowDailyBudgetUsd: Number(wf.get('daily_budget_usd')) || 0,
+          functionSpentTodayUsd: spendCache.fn + totalCost,
+          functionDailyBudgetUsd,
         });
         if (!check.ok) throw new Error(`budget: ${check.reason}`);
       },

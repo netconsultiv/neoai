@@ -6,13 +6,15 @@
 // home. One component serves every sub-path — the active tab is derived from
 // the pathname (CatalogPage pattern), navigation is plain href assignment.
 
-import React, { useEffect } from 'react';
-import { ConfigProvider } from 'antd';
-import { Icon } from '@nocobase/client';
+import React, { useEffect, useState } from 'react';
+import { Alert, ConfigProvider } from 'antd';
+import { Icon, useAPIClient } from '@nocobase/client';
 import { NEOHOME_GREEN, NEOHOME_THEME, ensureInterFont } from '../theme';
 import { NEOMODUL_FAVICON_SRC } from '../logo';
+import { neoaiAction, usePoll } from './shared';
 import { WorkflowsPanel } from './WorkflowsPanel';
 import { RunsPanel } from './RunsPanel';
+import { ApprovalsPanel } from './ApprovalsPanel';
 import { FunctionsPanel } from './FunctionsPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { MemoryPanel } from './MemoryPanel';
@@ -20,10 +22,49 @@ import { MemoryPanel } from './MemoryPanel';
 const TABS: Array<{ key: string; label: string; icon: string }> = [
   { key: 'workflows', label: 'AI Workflows', icon: 'PartitionOutlined' },
   { key: 'runs', label: 'Runs', icon: 'PlayCircleOutlined' },
+  { key: 'approvals', label: 'Approvals', icon: 'CheckSquareOutlined' },
   { key: 'functions', label: 'Functions', icon: 'ApiOutlined' },
   { key: 'memory', label: 'Memory', icon: 'DatabaseOutlined' },
   { key: 'settings', label: 'Settings', icon: 'SettingOutlined' },
 ];
+
+/** Proactive spend alert (item 15) — forward-looking; the hard block is still checkBudget's job. */
+function SpendAlertBanner() {
+  const api = useAPIClient();
+  const [pct, setPct] = useState<number | null>(null);
+  const [alertPct, setAlertPct] = useState(80);
+  usePoll(
+    async () => {
+      try {
+        const [settings, spend] = await Promise.all([neoaiAction(api, 'getSettings', {}), neoaiAction(api, 'spendToday', {})]);
+        setAlertPct(Number(settings?.spend_alert_pct) || 80);
+        const budget = Number(settings?.daily_budget_usd) || 0;
+        if (!budget) {
+          setPct(null);
+          return;
+        }
+        setPct((Number(spend?.global) || 0) / budget * 100);
+      } catch {
+        /* best-effort */
+      }
+    },
+    60_000,
+    true,
+  );
+  if (pct == null || pct < alertPct) return null;
+  return (
+    <Alert
+      type={pct >= 100 ? 'error' : 'warning'}
+      showIcon
+      banner
+      message={
+        pct >= 100
+          ? `Global daily budget exhausted (${pct.toFixed(0)}% of budget) — further model calls are blocked.`
+          : `Global spend today has crossed ${pct.toFixed(0)}% of the daily budget.`
+      }
+    />
+  );
+}
 
 const CROSS_LINKS: Array<{ label: string; icon: string; href: string; hint?: string }> = [
   // NocoBase plugin-workflow admin — the business-automation layer stays there,
@@ -109,8 +150,10 @@ export function NeoaiConsolePage() {
           <div style={{ fontSize: 10.5, color: '#b0b4ba', padding: '0 8px 4px' }}>Admin-only · tree workflows · Gemini via plugin-ai</div>
         </aside>
         <main style={{ flex: 1, overflow: 'auto', minWidth: 0, background: '#fff' }}>
+          <SpendAlertBanner />
           {active === 'workflows' ? <WorkflowsPanel /> : null}
           {active === 'runs' ? <RunsPanel /> : null}
+          {active === 'approvals' ? <ApprovalsPanel /> : null}
           {active === 'functions' ? <FunctionsPanel /> : null}
           {active === 'memory' ? <MemoryPanel /> : null}
           {active === 'settings' ? <SettingsPanel /> : null}

@@ -255,6 +255,12 @@ export const NEOAI_EXTRA_FIELDS: Array<{ collection: string; field: any }> = [
   // level only, never chains (a hook's own failure never fires another hook).
   { collection: 'neoai_workflows', field: str('on_failure_workflow_key', 'On-failure hook: workflow key (empty = off)') },
   { collection: 'neoai_workflows', field: json('on_failure_input', 'On-failure hook input (JSON of templates: {{run.id}}, {{run.error}}, {{input.x}})') },
+  // Per-function budget override (item 14): takes precedence over the bound
+  // workflow's own budget when set and >0.
+  { collection: 'neoai_functions', field: dbl('daily_budget_usd', 'Daily budget override (USD, 0 = use the bound workflow\'s budget)', 0) },
+  // Proactive spend alerts (item 15): forward-looking warning threshold —
+  // the hard block still only ever comes from daily_budget_usd via checkBudget.
+  { collection: 'neoai_settings', field: dbl('spend_alert_pct', 'Warn when spend crosses this % of the daily budget', 80) },
   {
     collection: 'neoai_workflows',
     field: {

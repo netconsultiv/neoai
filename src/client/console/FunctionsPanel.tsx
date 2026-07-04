@@ -7,7 +7,7 @@
 // dispatch exercises exactly the same service the host plugins will call.
 
 import React, { useState } from 'react';
-import { Button, Input, Select, Switch, Table, Tag, message, Space } from 'antd';
+import { Button, Input, InputNumber, Select, Switch, Table, Tag, message, Space } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import { ConsoleDrawer, JsonBox, createResource, listResource, neoaiAction, updateResource, usePoll } from './shared';
 import { NEOHOME_GREEN } from '../theme';
@@ -133,6 +133,23 @@ export function FunctionsPanel() {
           checked={v !== false}
           onChange={async (val) => {
             await updateResource(api, 'neoai_functions', r.id, { enabled: val });
+            load();
+          }}
+        />
+      ),
+    },
+    {
+      title: 'Budget/day (USD, 0 = inherit workflow)',
+      dataIndex: 'daily_budget_usd',
+      width: 150,
+      render: (v: number, r: any) => (
+        <InputNumber
+          size="small"
+          min={0}
+          step={0.5}
+          value={Number(v) || 0}
+          onChange={async (val) => {
+            await updateResource(api, 'neoai_functions', r.id, { daily_budget_usd: val ?? 0 });
             load();
           }}
         />

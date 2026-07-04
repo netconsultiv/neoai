@@ -30,6 +30,20 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/** Plain CSS-bar sparkline — no charting library exists in this codebase; keep it that way for one panel. */
+function Sparkline({ data }: { data: Array<{ label: string; value: number }> }) {
+  const max = Math.max(1e-9, ...data.map((d) => d.value));
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60 }}>
+      {data.map((d) => (
+        <div key={d.label} title={`${d.label}: $${d.value.toFixed(2)}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: '100%', height: Math.max(2, (d.value / max) * 52), background: '#009900', borderRadius: '2px 2px 0 0' }} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function SettingsPanel() {
   const api = useAPIClient();
   const [s, setS] = useState<any>(null);
@@ -37,6 +51,7 @@ export function SettingsPanel() {
   const [pricesText, setPricesText] = useState('');
   const [ping, setPing] = useState<any>(null);
   const [spend, setSpend] = useState<any>(null);
+  const [trend, setTrend] = useState<any>(null);
 
   usePoll(
     async () => {
@@ -46,6 +61,7 @@ export function SettingsPanel() {
         setPricesText((prev) => (prev ? prev : got.prices ? JSON.stringify(got.prices, null, 2) : ''));
         setPing(await neoaiAction(api, 'ping', {}));
         setSpend(await neoaiAction(api, 'spendToday', {}));
+        setTrend(await neoaiAction(api, 'spendTrend', {}));
       } catch (err: any) {
         message.error(`Load failed: ${err?.message ?? err}`);
       }
@@ -73,6 +89,7 @@ export function SettingsPanel() {
         default_model: s.default_model ?? 'gemini-2.5-flash',
         daily_budget_usd: Number(s.daily_budget_usd) || 0,
         image_price_usd: Number(s.image_price_usd) || 0.04,
+        spend_alert_pct: Number(s.spend_alert_pct) || 80,
         ...(prices !== undefined ? { prices } : {}),
         ...(key ? { gemini_api_key: key } : {}),
       });
@@ -133,6 +150,9 @@ export function SettingsPanel() {
             style={{ fontFamily: 'ui-monospace, Consolas, monospace', fontSize: 12 }}
           />
         </Field>
+        <Field label="Proactive spend alert threshold (% of daily budget)" hint="Shows a warning banner in the console once today's global spend crosses this — the hard block still only ever fires at 100% via the budget itself.">
+          <InputNumber min={1} max={100} value={Number(s.spend_alert_pct) || 80} onChange={(v) => setS({ ...s, spend_alert_pct: v ?? 80 })} />
+        </Field>
       </Section>
 
       <Button type="primary" onClick={save}>
@@ -156,6 +176,47 @@ export function SettingsPanel() {
             <div style={{ fontSize: 12, color: '#8a8f8a', marginBottom: 4 }}>Spend today (estimated)</div>
             <JsonBox value={spend} maxHeight={140} />
           </div>
+        ) : null}
+      </Section>
+
+      <Section title="Spend trend (last 30 days)">
+        {trend ? (
+          <>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: '#8a8f8a', marginBottom: 6 }}>
+              By day
+            </div>
+            <Sparkline
+              data={Object.entries(trend.byDay ?? {})
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([day, v]) => ({ label: day, value: Number(v) }))}
+            />
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: '#8a8f8a', margin: '16px 0 6px' }}>
+              Top workflows
+            </div>
+            {(trend.byWorkflow ?? []).length === 0 ? (
+              <div style={{ fontSize: 12.5, color: '#8a8f8a' }}>No spend recorded yet.</div>
+            ) : (
+              (trend.byWorkflow ?? []).slice(0, 8).map((w: any) => (
+                <div key={w.workflowId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '3px 0' }}>
+                  <span>{w.name}</span>
+                  <b>${w.totalUsd.toFixed(2)}</b>
+                </div>
+              ))
+            )}
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: '#8a8f8a', margin: '16px 0 6px' }}>
+              Top functions
+            </div>
+            {(trend.byFunction ?? []).length === 0 ? (
+              <div style={{ fontSize: 12.5, color: '#8a8f8a' }}>No spend recorded yet.</div>
+            ) : (
+              (trend.byFunction ?? []).slice(0, 8).map((f: any) => (
+                <div key={f.functionKey} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, padding: '3px 0' }}>
+                  <code>{f.functionKey}</code>
+                  <b>${f.totalUsd.toFixed(2)}</b>
+                </div>
+              ))
+            )}
+          </>
         ) : null}
       </Section>
     </div>
