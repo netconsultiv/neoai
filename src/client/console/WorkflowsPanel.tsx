@@ -22,6 +22,7 @@ import {
   usePoll,
 } from './shared';
 import { NEOHOME_GREEN } from '../theme';
+import { VersionDiffDrawer } from './VersionDiffDrawer';
 
 type NodeDef = { id: string; type: string; title?: string; config?: any; branches?: NodeDef[][] };
 type WorkflowDef = { nodes: NodeDef[] };
@@ -210,8 +211,11 @@ function NodeCard(props: {
   children?: React.ReactNode;
   runStep?: any;
   errorMessages?: string[];
+  cached?: boolean;
+  skip?: boolean;
+  onToggleSkip?: () => void;
 }) {
-  const { node, selected, runStep, errorMessages } = props;
+  const { node, selected, runStep, errorMessages, cached, onToggleSkip } = props;
   const label = NODE_TYPES.find((t) => t.type === node.type)?.label ?? node.type;
   const hasErrors = !!errorMessages?.length;
   return (
@@ -247,6 +251,16 @@ function NodeCard(props: {
           </span>
         ) : null}
         {runStep ? <StatusTag status={runStep.status} /> : null}
+        {cached && onToggleSkip ? (
+          <Checkbox
+            checked={props.skip === true}
+            onClick={(e) => e.stopPropagation()}
+            onChange={onToggleSkip}
+            title="Skip this node on the next draft test run — reuse its last cached output"
+          >
+            <span style={{ fontSize: 11.5, color: '#8a8f8a' }}>skip (cached)</span>
+          </Checkbox>
+        ) : null}
         <span style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
           <Button size="small" type="text" onClick={() => props.onMove(-1)} title="Move up">
             ↑
@@ -273,8 +287,13 @@ function NodeList(props: {
   emptyHint?: string;
   stepsByNodeId?: Map<string, any>;
   errorsByNodeId?: Map<string, string[]>;
+  /** Cached-test-data skip UI (item 2) only ever renders at the TOP level — never inside a branch. */
+  isTopLevel?: boolean;
+  cachedOutputs?: Record<string, any>;
+  skipSet?: Set<string>;
+  onToggleSkip?: (id: string) => void;
 }) {
-  const { nodes, def, stepsByNodeId, errorsByNodeId } = props;
+  const { nodes, def, stepsByNodeId, errorsByNodeId, isTopLevel, cachedOutputs, skipSet, onToggleSkip } = props;
   const insert = (index: number, type: string) => {
     nodes.splice(index, 0, makeNode(type, def));
     props.onChange();
@@ -320,6 +339,9 @@ function NodeList(props: {
             onMove={(dir) => move(i, dir)}
             runStep={stepsByNodeId?.get(node.id)}
             errorMessages={errorsByNodeId?.get(node.id)}
+            cached={isTopLevel === true && cachedOutputs?.[node.id] !== undefined}
+            skip={skipSet?.has(node.id) === true}
+            onToggleSkip={isTopLevel === true && cachedOutputs?.[node.id] !== undefined ? () => onToggleSkip?.(node.id) : undefined}
           >
             {node.branches && node.branches.length > 0 ? (
               <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'stretch', overflowX: 'auto' }}>
@@ -648,11 +670,20 @@ function TestRunBox({
   currentVersion,
   exampleInput,
   onStatus,
+  topLevelNodes,
+  skipSet,
+  cachedOutputs,
 }: {
   workflowId: number;
   currentVersion: number;
   exampleInput?: any;
   onStatus?: (data: { run?: any; steps?: any[] }) => void;
+  /** Cached test-data (item 2) — a contiguous PREFIX of skipSet-marked top-level
+   * nodes gets skipped, seeded from cachedOutputs; a gap in the prefix just
+   * stops the skip there (only the from-the-start run is supported in v1). */
+  topLevelNodes?: NodeDef[];
+  skipSet?: Set<string>;
+  cachedOutputs?: Record<string, any>;
 }) {
   const api = useAPIClient();
   const [inputText, setInputText] = useState(() => JSON.stringify(exampleInput ?? {}, null, 2));
@@ -675,6 +706,20 @@ function TestRunBox({
     2000,
     !!runId && active,
   );
+  /** Earliest gap-free run of skipSet-marked nodes from the start of the top-level list. */
+  const computeSeed = (): { skipToNodeId?: string; seedVars?: Record<string, any> } => {
+    const nodes = topLevelNodes ?? [];
+    if (!skipSet?.size || !nodes.length) return {};
+    let firstRunIndex = 0;
+    while (firstRunIndex < nodes.length && skipSet.has(nodes[firstRunIndex].id)) firstRunIndex += 1;
+    if (firstRunIndex === 0 || firstRunIndex >= nodes.length) return {};
+    const seedVars: Record<string, any> = {};
+    for (let i = 0; i < firstRunIndex; i++) {
+      const id = nodes[i].id;
+      if (cachedOutputs?.[id] !== undefined) seedVars[id] = cachedOutputs[id];
+    }
+    return { skipToNodeId: nodes[firstRunIndex].id, seedVars };
+  };
   const start = async (draft: boolean) => {
     let input: any = {};
     try {
@@ -684,7 +729,8 @@ function TestRunBox({
       return;
     }
     try {
-      let res = await neoaiAction(api, 'run', { workflowId, input, draft, confirmed: draft, trigger: draft ? 'test' : 'manual' });
+      const seed = draft ? computeSeed() : {};
+      let res = await neoaiAction(api, 'run', { workflowId, input, draft, confirmed: draft, trigger: draft ? 'test' : 'manual', ...seed });
       if (res.needsConfirm) {
         // Honest confirm gate (Q15): model-call counts + today's spend vs budgets.
         const ok = await confirmRun(res.estimate);
@@ -786,6 +832,23 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
     for (const s of runStatus.steps ?? []) m.set(s.node_id, s);
     return m;
   }, [runStatus]);
+
+  // Cached test-data (item 2): a completed step's output is remembered for the
+  // life of this editor session so a later draft test run can skip re-running
+  // it. Client-side only, dies with the tab — a debugging aid, not durable data.
+  const cachedOutputsRef = useRef<Record<string, any>>({});
+  const [skipSet, setSkipSet] = useState<Set<string>>(new Set());
+  for (const s of runStatus.steps ?? []) {
+    if (s.status === 'done' && s.output !== undefined) cachedOutputsRef.current[s.node_id] = s.output;
+  }
+  const toggleSkip = (nodeId: string) => {
+    setSkipSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  };
   const errorsByNodeId = useMemo(() => {
     const m = new Map<string, string[]>();
     for (const e of validationErrors) {
@@ -832,6 +895,7 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
   );
 
   const [versions, setVersions] = useState<any[]>([]);
+  const [diffAgainst, setDiffAgainst] = useState<any | null>(null);
   const loadVersions = async () => {
     try {
       const { rows } = await listResource(api, 'neoai_workflow_versions', {
@@ -919,6 +983,10 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
               emptyHint="Empty workflow — click + below to add the first step."
               stepsByNodeId={stepsByNodeId}
               errorsByNodeId={errorsByNodeId}
+              isTopLevel
+              cachedOutputs={cachedOutputsRef.current}
+              skipSet={skipSet}
+              onToggleSkip={toggleSkip}
             />
           </div>
         </div>
@@ -955,7 +1023,14 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
               </Field>
               <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>RUN</div>
-              <TestRunBox workflowId={wf.id} currentVersion={Number(wf.current_version) || 0} onStatus={setRunStatus} />
+              <TestRunBox
+                workflowId={wf.id}
+                currentVersion={Number(wf.current_version) || 0}
+                onStatus={setRunStatus}
+                topLevelNodes={defRef.current.nodes}
+                skipSet={skipSet}
+                cachedOutputs={cachedOutputsRef.current}
+              />
               <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>VERSIONS</div>
               {versions.length === 0 ? (
@@ -971,6 +1046,9 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
                         {fmtTime(v.createdAt)} · {v.published_by || '—'}
                         {v.notes ? ` · ${v.notes}` : ''}
                       </span>
+                      <Button size="small" onClick={() => setDiffAgainst(v)}>
+                        Diff
+                      </Button>
                       <Button
                         size="small"
                         onClick={() => {
@@ -990,6 +1068,17 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
           )}
         </div>
       </div>
+      {diffAgainst ? (
+        <VersionDiffDrawer
+          options={[
+            { key: 'draft', label: 'Current draft', definition: defRef.current },
+            ...versions.map((v) => ({ key: `v${v.version}`, label: `v${v.version} (${v.published_by || '—'})`, definition: v.definition ?? { nodes: [] } })),
+          ]}
+          initialLeftKey="draft"
+          initialRightKey={`v${diffAgainst.version}`}
+          onClose={() => setDiffAgainst(null)}
+        />
+      ) : null}
     </ConsoleDrawer>
   );
 }

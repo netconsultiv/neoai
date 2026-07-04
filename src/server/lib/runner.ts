@@ -142,12 +142,29 @@ export class Runner {
     this.rt = rt;
   }
 
-  async run(def: WorkflowDef, input: any, runMeta?: any): Promise<RunOutcome> {
+  /**
+   * `seed` lets a draft test-run skip re-executing early, already-verified
+   * TOP-LEVEL nodes: `vars` seeds state.vars with their cached outputs, and
+   * `skipToNodeId` fast-forwards the root frame's index to that node (found
+   * only among top-level `def.nodes` — nested/branch ids are out of scope
+   * for v1). An id that doesn't resolve at the top level is silently
+   * ignored (falls back to a normal from-the-start run) rather than erroring.
+   */
+  async run(
+    def: WorkflowDef,
+    input: any,
+    runMeta?: any,
+    seed?: { skipToNodeId?: string; vars?: Record<string, any> },
+  ): Promise<RunOutcome> {
     const state: RunState = {
       frames: [{ kind: 'seq', nodes: def.nodes ?? [], idx: 0, path: '' }],
-      vars: {},
+      vars: seed?.vars ? { ...seed.vars } : {},
       output: undefined,
     };
+    if (seed?.skipToNodeId) {
+      const idx = (def.nodes ?? []).findIndex((n) => n.id === seed.skipToNodeId);
+      if (idx > 0) state.frames[0].idx = idx;
+    }
     return this.drive(state, input, runMeta);
   }
 

@@ -104,6 +104,8 @@ export class NeoaiPlugin extends Plugin {
             confirmed: p.confirmed === true,
             trigger: String(p.trigger ?? 'manual'),
             triggeredBy: String(ctx.state?.currentUser?.nickname ?? ctx.state?.currentUser?.username ?? 'admin'),
+            skipToNodeId: p.skipToNodeId,
+            seedVars: p.seedVars,
           });
           await next();
         },
@@ -640,6 +642,9 @@ export class NeoaiPlugin extends Plugin {
     confirmed?: boolean;
     trigger: string;
     triggeredBy: string;
+    /** Draft-test-run only (never used for real triggers): skip already-known-good top-level nodes. */
+    skipToNodeId?: string;
+    seedVars?: Record<string, any>;
   }): Promise<{ runId: number } | { needsConfirm: true; workflowId: number } | { error: string }> {
     const wfRepo = this.db.getRepository('neoai_workflows');
     const wf = opts.workflowId
@@ -699,8 +704,9 @@ export class NeoaiPlugin extends Plugin {
     const handle: RunHandle = { cancelled: false, workflowId };
     this.running.set(runId, handle);
 
+    const seed = opts.draft && opts.skipToNodeId ? { skipToNodeId: opts.skipToNodeId, vars: opts.seedVars } : undefined;
     setImmediate(() => {
-      this.executeRun(runId, def, opts.input, handle, wf).catch((err) => {
+      this.executeRun(runId, def, opts.input, handle, wf, undefined, seed).catch((err) => {
         this.app.logger.error(`[neoai] run ${runId} crashed outside runner: ${err}`);
       });
     });
@@ -738,6 +744,7 @@ export class NeoaiPlugin extends Plugin {
     handle: RunHandle,
     wf: any,
     resume?: { state: any; approval: any },
+    seed?: { skipToNodeId?: string; vars?: Record<string, any> },
   ) {
     const runsRepo = this.db.getRepository('neoai_runs');
     const stepsRepo = this.db.getRepository('neoai_run_steps');
@@ -865,7 +872,7 @@ export class NeoaiPlugin extends Plugin {
     try {
       outcome = resume
         ? await runner.resume(def, input, resume.state, resume.approval, { id: runId })
-        : await runner.run(def, input, { id: runId });
+        : await runner.run(def, input, { id: runId }, seed);
     } catch (err: any) {
       outcome = { status: 'failed', error: String(err?.message ?? err) };
     }

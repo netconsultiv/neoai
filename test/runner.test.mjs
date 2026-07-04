@@ -277,3 +277,42 @@ test('output with end stops early', async () => {
   assert.equal(out.status, 'succeeded');
   assert.equal(out.output.early, true);
 });
+
+test('seed skips already-cached top-level nodes and reuses their vars', async () => {
+  let aRan = false;
+  const { rt } = makeRuntime({
+    execLeaf: async (node, scope) => {
+      if (node.type === 'val') {
+        if (node.id === 'a') aRan = true;
+        return { output: resolveTemplates(node.config?.value, scope) };
+      }
+      if (node.type === 'output') return { output: resolveTemplates(node.config?.map, scope) };
+      throw new Error(`unknown ${node.type}`);
+    },
+  });
+  const def = {
+    nodes: [
+      { id: 'a', type: 'val', config: { value: 'fresh-a' } },
+      { id: 'b', type: 'val', config: { value: '{{nodes.a}}-b' } },
+      { id: 'o', type: 'output', config: { map: { a: '{{nodes.a}}', b: '{{nodes.b}}' } } },
+    ],
+  };
+  const out = await new Runner(rt).run(def, {}, undefined, { skipToNodeId: 'b', vars: { a: 'cached-a' } });
+  assert.equal(out.status, 'succeeded');
+  assert.equal(aRan, false, 'node a must not re-execute when skipped');
+  assert.equal(out.output.a, 'cached-a');
+  assert.equal(out.output.b, 'cached-a-b');
+});
+
+test('seed with an unresolvable skipToNodeId falls back to a normal run', async () => {
+  const { rt } = makeRuntime();
+  const def = {
+    nodes: [
+      { id: 'a', type: 'val', config: { value: 'ran' } },
+      { id: 'o', type: 'output', config: { map: { a: '{{nodes.a}}' } } },
+    ],
+  };
+  const out = await new Runner(rt).run(def, {}, undefined, { skipToNodeId: 'nested-or-missing-id' });
+  assert.equal(out.status, 'succeeded');
+  assert.equal(out.output.a, 'ran');
+});
