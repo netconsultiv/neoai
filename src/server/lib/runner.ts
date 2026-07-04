@@ -108,28 +108,30 @@ function baseScope(input: any, vars: Record<string, any>, runMeta: any): Scope {
   return { input, nodes: vars, run: runMeta ?? {} };
 }
 
+export type ValidationError = { nodeId?: string; message: string };
+
 /** Validate structural constraints at publish time (and defensively at run time). */
-export function validateDefinition(def: WorkflowDef): string[] {
-  const errors: string[] = [];
+export function validateDefinition(def: WorkflowDef): ValidationError[] {
+  const errors: ValidationError[] = [];
   const seen = new Set<string>();
   const walk = (nodes: NodeDef[], insideParallel: boolean) => {
     for (const n of nodes ?? []) {
-      if (!n.id || typeof n.id !== 'string') errors.push(`node without id (type ${n.type})`);
-      else if (seen.has(n.id)) errors.push(`duplicate node id "${n.id}"`);
+      if (!n.id || typeof n.id !== 'string') errors.push({ message: `node without id (type ${n.type})` });
+      else if (seen.has(n.id)) errors.push({ nodeId: n.id, message: `duplicate node id "${n.id}"` });
       else seen.add(n.id);
-      if (!n.type) errors.push(`node "${n.id}" without type`);
+      if (!n.type) errors.push({ nodeId: n.id, message: `node "${n.id}" without type` });
       if (insideParallel && n.type === 'human_gate') {
-        errors.push(`human_gate "${n.id}" inside a parallel block is not supported (v1)`);
+        errors.push({ nodeId: n.id, message: `human_gate "${n.id}" inside a parallel block is not supported (v1)` });
       }
       const branches = n.branches ?? [];
-      if (n.type === 'condition' && branches.length < 1) errors.push(`condition "${n.id}" needs branches[0]`);
-      if (n.type === 'loop' && branches.length < 1) errors.push(`loop "${n.id}" needs branches[0] (body)`);
-      if (n.type === 'parallel' && branches.length < 1) errors.push(`parallel "${n.id}" needs at least one branch`);
+      if (n.type === 'condition' && branches.length < 1) errors.push({ nodeId: n.id, message: `condition "${n.id}" needs branches[0]` });
+      if (n.type === 'loop' && branches.length < 1) errors.push({ nodeId: n.id, message: `loop "${n.id}" needs branches[0] (body)` });
+      if (n.type === 'parallel' && branches.length < 1) errors.push({ nodeId: n.id, message: `parallel "${n.id}" needs at least one branch` });
       for (const b of branches) walk(b ?? [], insideParallel || n.type === 'parallel');
     }
   };
   walk(def?.nodes ?? [], false);
-  if (!def?.nodes?.length) errors.push('workflow has no nodes');
+  if (!def?.nodes?.length) errors.push({ message: 'workflow has no nodes' });
   return errors;
 }
 

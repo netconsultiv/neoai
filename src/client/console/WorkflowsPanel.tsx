@@ -5,7 +5,7 @@
 // branch columns (condition/parallel/loop), a config side panel per node, a
 // draft/publish lifecycle and an inline draft test-run with live step trace.
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Dropdown, Input, InputNumber, Select, Switch, Table, Checkbox, message, Modal, Space, Tag } from 'antd';
 import { useAPIClient } from '@nocobase/client';
 import {
@@ -208,9 +208,12 @@ function NodeCard(props: {
   onDelete: () => void;
   onMove: (dir: -1 | 1) => void;
   children?: React.ReactNode;
+  runStep?: any;
+  errorMessages?: string[];
 }) {
-  const { node, selected } = props;
+  const { node, selected, runStep, errorMessages } = props;
   const label = NODE_TYPES.find((t) => t.type === node.type)?.label ?? node.type;
+  const hasErrors = !!errorMessages?.length;
   return (
     <div
       onClick={(e) => {
@@ -218,7 +221,7 @@ function NodeCard(props: {
         props.onSelect();
       }}
       style={{
-        border: `1.5px solid ${selected ? NEOHOME_GREEN : '#e2e4e1'}`,
+        border: `1.5px solid ${hasErrors ? '#d4380d' : selected ? NEOHOME_GREEN : '#e2e4e1'}`,
         borderRadius: 10,
         background: '#fff',
         padding: '8px 10px',
@@ -236,6 +239,14 @@ function NodeCard(props: {
         >
           {node.title || node.id}
         </span>
+        {hasErrors ? (
+          <span title={errorMessages!.join(' · ')} style={{ display: 'inline-flex' }}>
+            <Tag color="error" style={{ marginRight: 0, fontSize: 11 }}>
+              !
+            </Tag>
+          </span>
+        ) : null}
+        {runStep ? <StatusTag status={runStep.status} /> : null}
         <span style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
           <Button size="small" type="text" onClick={() => props.onMove(-1)} title="Move up">
             ↑
@@ -260,8 +271,10 @@ function NodeList(props: {
   onChange: () => void;
   def: WorkflowDef;
   emptyHint?: string;
+  stepsByNodeId?: Map<string, any>;
+  errorsByNodeId?: Map<string, string[]>;
 }) {
-  const { nodes, def } = props;
+  const { nodes, def, stepsByNodeId, errorsByNodeId } = props;
   const insert = (index: number, type: string) => {
     nodes.splice(index, 0, makeNode(type, def));
     props.onChange();
@@ -305,6 +318,8 @@ function NodeList(props: {
             onSelect={() => props.onSelect(node.id)}
             onDelete={() => del(i)}
             onMove={(dir) => move(i, dir)}
+            runStep={stepsByNodeId?.get(node.id)}
+            errorMessages={errorsByNodeId?.get(node.id)}
           >
             {node.branches && node.branches.length > 0 ? (
               <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'stretch', overflowX: 'auto' }}>
@@ -340,7 +355,15 @@ function NodeList(props: {
                         </Button>
                       ) : null}
                     </div>
-                    <NodeList nodes={branch} selectedId={props.selectedId} onSelect={props.onSelect} onChange={props.onChange} def={def} />
+                    <NodeList
+                      nodes={branch}
+                      selectedId={props.selectedId}
+                      onSelect={props.onSelect}
+                      onChange={props.onChange}
+                      def={def}
+                      stepsByNodeId={stepsByNodeId}
+                      errorsByNodeId={errorsByNodeId}
+                    />
                   </div>
                 ))}
                 {node.type === 'parallel' ? (
@@ -620,17 +643,31 @@ function confirmRun(estimate: any): Promise<boolean> {
 
 // --- draft test run ---------------------------------------------------------------
 
-function TestRunBox({ workflowId, currentVersion, exampleInput }: { workflowId: number; currentVersion: number; exampleInput?: any }) {
+function TestRunBox({
+  workflowId,
+  currentVersion,
+  exampleInput,
+  onStatus,
+}: {
+  workflowId: number;
+  currentVersion: number;
+  exampleInput?: any;
+  onStatus?: (data: { run?: any; steps?: any[] }) => void;
+}) {
   const api = useAPIClient();
   const [inputText, setInputText] = useState(() => JSON.stringify(exampleInput ?? {}, null, 2));
   const [runId, setRunId] = useState<number | null>(null);
   const [data, setData] = useState<{ run?: any; steps?: any[] }>({});
   const active = !!runId && !['succeeded', 'failed', 'cancelled', 'rejected'].includes(String(data.run?.status ?? ''));
+  const onStatusRef = useRef(onStatus);
+  onStatusRef.current = onStatus;
   usePoll(
     async () => {
       if (!runId) return;
       try {
-        setData(await neoaiAction(api, 'runStatus', { runId }));
+        const d = await neoaiAction(api, 'runStatus', { runId });
+        setData(d);
+        onStatusRef.current?.(d);
       } catch {
         /* keep last */
       }
@@ -660,6 +697,7 @@ function TestRunBox({ workflowId, currentVersion, exampleInput }: { workflowId: 
       }
       setRunId(res.runId);
       setData({});
+      onStatusRef.current?.({});
     } catch (err: any) {
       message.error(String(err?.message ?? err));
     }
@@ -721,15 +759,77 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [, setTick] = useState(0);
+  const [runStatus, setRunStatus] = useState<{ run?: any; steps?: any[] }>({});
+  const [validationErrors, setValidationErrors] = useState<Array<{ nodeId?: string; message: string }>>([]);
+  const validateTimer = useRef<any>(null);
   const rerender = () => {
     setDirty(true);
     setTick((n) => n + 1);
+    if (validateTimer.current) clearTimeout(validateTimer.current);
+    validateTimer.current = setTimeout(async () => {
+      try {
+        const res = await neoaiAction(api, 'publishWorkflow', { workflowId: wf.id, dryRun: true });
+        setValidationErrors(res.errors ?? []);
+      } catch {
+        /* live-validation is best-effort — never blocks editing */
+      }
+    }, 500);
   };
   const selected = selectedId ? findNode(defRef.current.nodes, selectedId) : null;
   if (selectedId && !selected && selectedId !== null) {
     // node was deleted
     setSelectedId(null);
   }
+
+  const stepsByNodeId = useMemo(() => {
+    const m = new Map<string, any>();
+    for (const s of runStatus.steps ?? []) m.set(s.node_id, s);
+    return m;
+  }, [runStatus]);
+  const errorsByNodeId = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const e of validationErrors) {
+      if (!e.nodeId) continue;
+      const arr = m.get(e.nodeId) ?? [];
+      arr.push(e.message);
+      m.set(e.nodeId, arr);
+    }
+    return m;
+  }, [validationErrors]);
+  const generalErrors = validationErrors.filter((e) => !e.nodeId);
+
+  // Validate once on open (not via rerender(), which would wrongly mark a
+  // freshly opened editor as having unsaved changes).
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await neoaiAction(api, 'publishWorkflow', { workflowId: wf.id, dryRun: true });
+        setValidationErrors(res.errors ?? []);
+      } catch {
+        /* best-effort */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reattach to a run already in flight if the editor was reopened mid-run —
+  // TestRunBox only tracks runs it itself started this mount.
+  usePoll(
+    async () => {
+      try {
+        const { rows } = await listResource(api, 'neoai_runs', {
+          filter: JSON.stringify({ workflow_id: wf.id, status: { $in: ['queued', 'running', 'waiting'] } }),
+          sort: '-id',
+          pageSize: 1,
+        });
+        if (rows[0]) setRunStatus(await neoaiAction(api, 'runStatus', { runId: rows[0].id }));
+      } catch {
+        /* best-effort */
+      }
+    },
+    5000,
+    stepsByNodeId.size === 0 && !runStatus.run,
+  );
 
   const [versions, setVersions] = useState<any[]>([]);
   const loadVersions = async () => {
@@ -775,7 +875,8 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
         setWf({ ...wf, current_version: res.version });
         loadVersions();
       } else {
-        message.error(`Not publishable: ${(res.errors ?? []).join(' · ')}`);
+        setValidationErrors(res.errors ?? []);
+        message.error(`Not publishable: ${(res.errors ?? []).map((e: any) => e.message).join(' · ')}`);
       }
     } catch (err: any) {
       message.error(`Publish failed: ${err?.message ?? err}`);
@@ -806,6 +907,9 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
         <div style={{ flex: 1, padding: 18, minWidth: 0 }}>
           <div style={{ maxWidth: 860 }}>
             <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', margin: '0 0 6px' }}>WORKFLOW TREE</div>
+            {generalErrors.length > 0 ? (
+              <div style={{ marginBottom: 10, fontSize: 12.5, color: '#b02a2a' }}>{generalErrors.map((e) => e.message).join(' · ')}</div>
+            ) : null}
             <NodeList
               nodes={defRef.current.nodes}
               selectedId={selectedId}
@@ -813,6 +917,8 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
               onChange={rerender}
               def={defRef.current}
               emptyHint="Empty workflow — click + below to add the first step."
+              stepsByNodeId={stepsByNodeId}
+              errorsByNodeId={errorsByNodeId}
             />
           </div>
         </div>
@@ -849,7 +955,7 @@ function WorkflowEditor(props: { row: any; onClose: (changed: boolean) => void }
               </Field>
               <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>RUN</div>
-              <TestRunBox workflowId={wf.id} currentVersion={Number(wf.current_version) || 0} />
+              <TestRunBox workflowId={wf.id} currentVersion={Number(wf.current_version) || 0} onStatus={setRunStatus} />
               <div style={{ borderTop: '1px solid #ececea', margin: '14px 0' }} />
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', color: '#8a8f8a', marginBottom: 8 }}>VERSIONS</div>
               {versions.length === 0 ? (
@@ -897,6 +1003,15 @@ export function WorkflowsPanel() {
   const [editing, setEditing] = useState<any | null>(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
+  const [search, setSearch] = useState('');
+
+  const filteredRows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [r.name, r.key, r.description].some((v) => String(v ?? '').toLowerCase().includes(q)),
+    );
+  }, [rows, search]);
 
   const load = async () => {
     setLoading(true);
@@ -984,8 +1099,18 @@ export function WorkflowsPanel() {
 
   return (
     <div style={{ padding: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14, gap: 10 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, flex: 1 }}>AI Workflows</div>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14, gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>AI Workflows</div>
+        <div style={{ flex: 1 }} />
+        {!creating ? (
+          <Input.Search
+            allowClear
+            placeholder="Search name, key, description"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 240 }}
+          />
+        ) : null}
         {creating ? (
           <Space.Compact>
             <Input
@@ -1010,7 +1135,15 @@ export function WorkflowsPanel() {
           </>
         )}
       </div>
-      <Table rowKey="id" size="middle" loading={loading} dataSource={rows} columns={columns as any} pagination={false} />
+      <Table
+        rowKey="id"
+        size="middle"
+        loading={loading}
+        dataSource={filteredRows}
+        columns={columns as any}
+        pagination={false}
+        locale={{ emptyText: rows.length ? 'No workflows match this search' : 'No workflows yet' }}
+      />
       {editing ? (
         <WorkflowEditor
           row={editing}

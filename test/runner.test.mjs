@@ -189,9 +189,10 @@ test('validateDefinition catches structural errors', () => {
       { id: 'c', type: 'condition' },
     ],
   });
-  assert.ok(errs.some((e) => e.includes('human_gate')));
-  assert.ok(errs.some((e) => e.includes('duplicate')));
-  assert.ok(errs.some((e) => e.includes('condition')));
+  assert.ok(errs.some((e) => e.message.includes('human_gate')));
+  assert.ok(errs.some((e) => e.message.includes('duplicate')));
+  assert.ok(errs.some((e) => e.message.includes('condition')));
+  assert.ok(errs.some((e) => e.nodeId === 'g'));
 });
 
 test('gate inside a loop suspends and resumes mid-iteration', async () => {

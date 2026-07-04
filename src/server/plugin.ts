@@ -163,8 +163,10 @@ export class NeoaiPlugin extends Plugin {
           if (!wf) ctx.throw(404, 'workflow not found');
           const def = (wf.get('definition_draft') ?? {}) as WorkflowDef;
           const errors = validateDefinition(def);
-          if (errors.length) {
-            ctx.body = { ok: false, errors };
+          // dryRun: live-editing validation only — never creates a version or
+          // bumps current_version, just reports the same errors publish would.
+          if (errors.length || p.dryRun === true) {
+            ctx.body = { ok: errors.length === 0, errors };
             return next();
           }
           const version = Number(wf.get('current_version') ?? 0) + 1;
@@ -660,7 +662,7 @@ export class NeoaiPlugin extends Plugin {
       }
     }
     const errors = validateDefinition(def);
-    if (errors.length) return { error: `invalid definition: ${errors.join('; ')}` };
+    if (errors.length) return { error: `invalid definition: ${errors.map((e) => e.message).join('; ')}` };
 
     if (wf.get('require_confirm') === true && opts.confirmed !== true) {
       // Confirm gate with an honest estimate: model-call counts + today's spend

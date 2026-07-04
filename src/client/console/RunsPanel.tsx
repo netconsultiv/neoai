@@ -199,8 +199,10 @@ export function RunsPanel() {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
-      if (q && !String(r.workflow?.name ?? '').toLowerCase().includes(q)) return false;
-      return true;
+      if (!q) return true;
+      const haystack = [r.workflow?.name, String(r.id), r.trigger, r.function_key]
+        .map((v) => String(v ?? '').toLowerCase());
+      return haystack.some((v) => v.includes(q));
     });
   }, [rows, statusFilter, search]);
 
@@ -241,10 +243,10 @@ export function RunsPanel() {
         <div style={{ flex: 1 }} />
         <Input.Search
           allowClear
-          placeholder="Filter by workflow name"
+          placeholder="Search workflow, run #, trigger, function"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ width: 220 }}
+          style={{ width: 260 }}
         />
         <Select value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} style={{ width: 150 }} />
         <span style={{ fontSize: 12, color: '#8a8f8a' }}>auto-refreshing every 3 s</span>
