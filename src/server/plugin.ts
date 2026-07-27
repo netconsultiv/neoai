@@ -11,10 +11,19 @@
 //     run id immediately), every node materialises a neoai_run_steps row, the
 //     run row carries totals (tokens/cost) + suspended state for human gates.
 //   * In-process service for host plugins (function registry + dispatch):
-//       const neoai = app.pm.get('neoai');
+//       const neoai = app.pm.get('@neomodul/neoai');   // SCOPED name — see below
 //       await neoai.registerFunction({ key, title, plugin, ... });
 //       const r = await neoai.runFunction('crm.draftReply', input, { user });
 //     — returns null when no workflow is bound (caller keeps its legacy path).
+//     LOOK UP BY THE SCOPED PACKAGE NAME. NocoBase aliases a plugin under `options.name`
+//     AND `options.packageName` (PluginManager.addOrThrow); for a scoped third-party
+//     plugin both are '@neomodul/neoai', so `pm.get('neoai')` NEVER resolves. Core
+//     plugins mislead here — `@nocobase/plugin-ai` carries the short name 'ai' as a real
+//     alias, so `pm.get('ai')` does work. This comment previously advertised the short
+//     form; every consumer copied it, `neoai_functions` stayed EMPTY, and konfigurator +
+//     crm ran their legacy paths while logging a friendly "neoai not installed".
+//     Consumers should wrap this in their own `getNeoai(app)` helper (konfigurator and
+//     crm each have one in their neoaiBridge) rather than repeat the lookup inline.
 //
 // RESILIENCE: setup() runs on install AND afterEnable (idempotent). Menu links
 // and seeds are best-effort. On app start, runs stuck in 'running' (process

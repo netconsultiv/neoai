@@ -1,7 +1,7 @@
 // src/client/console/FunctionsPanel.tsx
 // -----------------------------------------------------------------------------
 // The NeoAI half of the per-function "workflow selector": host plugins register
-// their AI functions here (pm.get('neoai').registerFunction — or rows created
+// their AI functions here (pm.get('@neomodul/neoai').registerFunction — or rows created
 // manually), and an admin binds each function to a published workflow. Empty
 // binding = the host plugin keeps its LEGACY code path (scoping Q4). The test
 // dispatch exercises exactly the same service the host plugins will call.
@@ -38,7 +38,7 @@ function TestDispatchDrawer({ fn, onClose }: { fn: any; onClose: () => void }) {
     <ConsoleDrawer open title={<span>Test dispatch — <code>{fn.key}</code></span>} onClose={onClose}>
       <div style={{ padding: 18, maxWidth: 760 }}>
         <p style={{ fontSize: 13, color: '#5c605c' }}>
-          Simulates a host-plugin call: <code>pm.get('neoai').runFunction('{fn.key}', input)</code>. Bound workflow runs and
+          Simulates a host-plugin call: <code>pm.get('@neomodul/neoai').runFunction('{fn.key}', input)</code>. Bound workflow runs and
           the dispatch waits for the result; no binding → the "legacy" answer the host plugin would act on.
         </p>
         <Input.TextArea
