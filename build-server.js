@@ -13,6 +13,16 @@ esbuild
   .build({
     entryPoints: [path.resolve(__dirname, 'src/server/index.ts')],
     outfile: path.resolve(__dirname, 'dist/server/index.js'),
+    // Pin the build to the plugin root. esbuild writes module locations into the
+    // bundle -- as `// <path>` header comments and as the string keys of its CJS
+    // registry -- RELATIVE TO THE WORKING DIRECTORY. Without this, the same source
+    // built one directory up produces a different (but behaviourally identical)
+    // bundle, i.e. the shipped artefact depends on where the checkout happens to
+    // sit. This plugin HAS its own tsconfig.json, so esbuild stops walking up
+    // there and no tsconfigRaw pin is needed (unlike saved-filters/unified-search,
+    // where the HOST APP's tsconfig leaked in). See ./sandbox.sh dist-check in the
+    // neobase repo.
+    absWorkingDir: __dirname,
     bundle: true,
     platform: 'node',
     target: 'node18',
