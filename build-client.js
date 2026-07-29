@@ -44,6 +44,11 @@ const ARG_NAMES = [
 async function main() {
   const result = await esbuild.build({
     entryPoints: [path.resolve(__dirname, 'src/client/index.tsx')],
+    // Pin the build to the plugin root -- see build-server.js for the full
+    // rationale. Short version: esbuild bakes module locations into the bundle
+    // relative to the WORKING DIRECTORY, so without this the shipped artefact
+    // depends on where the checkout happens to sit.
+    absWorkingDir: __dirname,
     bundle: true,
     write: false, // we post-process the output string into the UMD wrapper
     platform: 'browser',
