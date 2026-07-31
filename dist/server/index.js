@@ -43,14 +43,15 @@ var require_package = __commonJS({
       homepage: "https://github.com/netconsultiv/neoai",
       scripts: {
         build: "node build-server.js && node build-client.js",
-        test: "node --experimental-strip-types --test test/*.test.mjs"
+        test: 'node scripts/run-unit-tests.mjs --experimental-strip-types "test/*.test.mjs" "test/*/*.test.mjs"',
+        "test:unit": 'node scripts/run-unit-tests.mjs --experimental-strip-types "test/*.test.mjs" "test/*/*.test.mjs"'
       },
       peerDependencies: {
         "@nocobase/client": "2.x",
         "@nocobase/server": "2.x"
       },
       devDependencies: {
-        esbuild: "^0.21.5"
+        esbuild: "0.21.5"
       },
       keywords: [
         "nocobase",
