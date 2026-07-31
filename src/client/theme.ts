@@ -41,17 +41,21 @@ export const NEOHOME_THEME = {
   },
 };
 
-// Inter webfont (same URL the Konfigurator's V3 shell injects). The antd theme
-// falls back to system fonts until it loads.
-export const INTER_FONT_LINK =
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap';
-
+// Inter kommt aus @neomodul/branding, nicht mehr von Google (2026-07-31, Ticket 5296c4aa).
+//
+// Hier stand bis dahin ein `<link>` auf fonts.googleapis.com, mit dem Kommentar "same URL
+// the Konfigurator's V3 shell injects" — und genau das war das Problem: DREI Plugins hielten
+// unabhängig voneinander eine eigene Kopie derselben Fremdreferenz, und keines wusste von den
+// anderen. Gefunden wurde sie auf den anonymen Kundenflächen; diese hier liegt hinter der
+// Anmeldung, ist also rechtlich entspannter — aber es ist derselbe Defekt, und ihn beim
+// selben Durchgang stehen zu lassen hieße nur, ihn später ein zweites Mal zu suchen.
+//
+// @neomodul/branding deklariert die Schrift per @font-face aus seinem eigenen
+// dist/client/fonts/ (Achse 100–900, font-display: swap) und lädt in derselben SPA wie diese
+// Konsole. `ensureInterFont()` bleibt als NO-OP bestehen, damit die beiden Aufrufer
+// (NeoaiConsole, KnowledgeConsole) nicht angefasst werden müssen und niemand versucht ist,
+// die Einbindung "wiederherzustellen" — die Begründung steht damit an der Stelle, an der
+// jemand sie suchen würde.
 export function ensureInterFont() {
-  const id = 'neoai-inter-font';
-  if (typeof document === 'undefined' || document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = INTER_FONT_LINK;
-  document.head.appendChild(link);
+  // absichtlich leer, siehe oben
 }

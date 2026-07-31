@@ -110,15 +110,7 @@ var NEOHOME_THEME = {
     Menu: { itemBorderRadius: 9, itemSelectedBg: "#eaf7ea", itemSelectedColor: NEOHOME_GREEN, itemActiveBg: "#f3fbf3" }
   }
 };
-var INTER_FONT_LINK = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap";
 function ensureInterFont() {
-  const id = "neoai-inter-font";
-  if (typeof document === "undefined" || document.getElementById(id)) return;
-  const link = document.createElement("link");
-  link.id = id;
-  link.rel = "stylesheet";
-  link.href = INTER_FONT_LINK;
-  document.head.appendChild(link);
 }
 
 // src/client/logo.ts
