@@ -17,7 +17,7 @@
     "@nocobase/server": "2.x"
   },
   "devDependencies": {
-    "esbuild": "^0.21.5"
+    "esbuild": "0.21.5"
   },
   "keywords": [
     "nocobase",
