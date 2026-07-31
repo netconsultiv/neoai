@@ -33,6 +33,7 @@ import { Icon, useAPIClient } from '@nocobase/client';
 import { NEOHOME_GREEN, NEOHOME_THEME, ensureInterFont } from '../theme';
 import { NEOMODUL_FAVICON_SRC } from '../logo';
 import {
+  ConsoleAccessGate,
   ConsoleDrawer,
   createResource,
   fmtTime,
@@ -813,7 +814,21 @@ function RetrievalPanel() {
 
 // ---- the console page -------------------------------------------------------------
 
-export function KnowledgeConsolePage() {
+/**
+ * Only ever mounted behind `ConsoleAccessGate` — see `KnowledgeConsolePage` below.
+ *
+ * FOUND BY CLICKING, not by reading (Bündel B). While verifying the NeoAI console's new refusal
+ * state, the same walk was done here as `member` and this console did the OLD thing: the article
+ * table rendered "No articles yet" — the EMPTY state, not a refusal — with two repeating
+ * "Load failed: Request failed with status code 403" toasts beside it, and a "New article" button
+ * the caller may not use. Same defect class as ticket 7466a838, one console over, and the reason
+ * it was missed is that the ticket named "the eight areas of the NeoAI console" and this is a
+ * sibling with its own route tree.
+ *
+ * Every action behind this surface is gated by `requireAdmin`, and since Bündel B its collections
+ * are snippet-only too — so the verdict is the same one `neoai:access` already answers.
+ */
+function KnowledgeConsoleBody() {
   useEffect(() => {
     ensureInterFont();
   }, []);
@@ -866,5 +881,19 @@ export function KnowledgeConsolePage() {
         </main>
       </div>
     </ConfigProvider>
+  );
+}
+
+/**
+ * What the router mounts. One access question, asked once, before the article table exists.
+ *
+ * Wrapping the PAGE rather than branching inside the body is what makes "no polling after a 403"
+ * true by construction: `usePoll` fires on mount, so a body that mounts has already asked.
+ */
+export function KnowledgeConsolePage() {
+  return (
+    <ConsoleAccessGate area="The Knowledge hub">
+      <KnowledgeConsoleBody />
+    </ConsoleAccessGate>
   );
 }
