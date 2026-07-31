@@ -1,0 +1,9 @@
+
+# Generierte Bundles werden NIE gemergt, sondern nach jedem Merge neu gebaut.
+# Ohne "-merge" fuehrt git zwei minifizierte Bundles konfliktfrei zeilenweise
+# zusammen. Das Ergebnis ist der Build von keiner Quelle: gemessen 2026-07-30 in
+# einem crm-Task-Branch wich der textuell gemergte Stand um ~47.000 Zeilen von
+# einem echten Build derselben gemergten Quelle ab, ohne dass git einen Konflikt
+# meldete. "-merge" erzwingt stattdessen den Konflikt. Die Aufloesung ist immer:
+# Quelle mergen, dist neu bauen.
+dist/** -merge
