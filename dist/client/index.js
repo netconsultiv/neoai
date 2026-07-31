@@ -2977,7 +2977,7 @@ function RetrievalPanel() {
     return /* @__PURE__ */ import_react11.default.createElement(import_antd11.Card, { key: (_a = hit.id) != null ? _a : i, size: "small" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, { size: 8, wrap: true, style: { marginBottom: 8 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Text, { strong: true }, hit.title || `Article #${(_b = hit.id) != null ? _b : "?"}`), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, { color: NEOHOME_GREEN }, "score ", fmtScore(hit.score)), hit.use_case ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Tag, null, hit.use_case) : null), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Typography.Paragraph, { type: "secondary", style: { marginBottom: 0, whiteSpace: "pre-wrap" } }, hit.snippet || "\u2014"));
   }))));
 }
-function KnowledgeConsolePage() {
+function KnowledgeConsoleBody() {
   (0, import_react11.useEffect)(() => {
     ensureInterFont();
   }, []);
@@ -3023,6 +3023,9 @@ function KnowledgeConsolePage() {
     ),
     /* @__PURE__ */ import_react11.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, active === "articles" ? /* @__PURE__ */ import_react11.default.createElement(ArticlesPanel, null) : null, active === "prompts" ? /* @__PURE__ */ import_react11.default.createElement(PromptsPanel, null) : null, active === "suggestions" ? /* @__PURE__ */ import_react11.default.createElement(SuggestionsPanel, null) : null, active === "retrieval" ? /* @__PURE__ */ import_react11.default.createElement(RetrievalPanel, null) : null)
   ));
+}
+function KnowledgeConsolePage() {
+  return /* @__PURE__ */ import_react11.default.createElement(ConsoleAccessGate, { area: "The Knowledge hub" }, /* @__PURE__ */ import_react11.default.createElement(KnowledgeConsoleBody, null));
 }
 
 // src/client/index.tsx

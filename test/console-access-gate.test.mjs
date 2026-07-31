@@ -245,6 +245,22 @@ test('the console shell is gated ONCE, not eight times inside the panels', () =>
     'anything that polls must sit INSIDE the gated body');
 });
 
+test('the KNOWLEDGE console is gated the same way — found by clicking, not by reading', () => {
+  // Bündel B. While verifying the NeoAI console's new refusal as `member`, the same walk was done
+  // on the sibling Knowledge console and it did the OLD thing: the article table rendered
+  // "No articles yet" — the EMPTY state, not a refusal — with two repeating
+  // "Load failed: Request failed with status code 403" toasts beside it and a "New article" button
+  // the caller may not use. Ticket 7466a838 named "the eight areas of the NeoAI console"; this is a
+  // sibling with its own route tree, and that is exactly why the ticket list missed it.
+  const knowledge = read('client/console/KnowledgeConsole.tsx');
+  assert.match(knowledge, /export function KnowledgeConsolePage\(\) \{[\s\S]{0,400}<ConsoleAccessGate/);
+  assert.match(knowledge, /function KnowledgeConsoleBody\(\)/,
+    'the body must be its own component so it can be left unmounted');
+  const bodyAt = knowledge.indexOf('function KnowledgeConsoleBody()');
+  const pageAt = knowledge.indexOf('export function KnowledgeConsolePage()');
+  assert.ok(pageAt > bodyAt, 'the gate wraps the body, not the other way round');
+});
+
 test('a refusal is a named state — not a spinner, not an empty list', () => {
   const shared = read('client/console/shared.tsx');
   assert.match(shared, /export function NoAccessPanel/);
