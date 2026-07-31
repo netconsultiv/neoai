@@ -539,6 +539,63 @@ function isAdminCtx(acl, ctx) {
   }
   return false;
 }
+var NEOAI_OPEN_ACTIONS = ["access"];
+function isOpenNeoaiAction(action) {
+  return typeof action === "string" && NEOAI_OPEN_ACTIONS.includes(action);
+}
+function mayOperateNeoai(acl, ctx) {
+  return isAdminCtx(acl, { ...ctx, state: ctx?.state, action: { actionName: "*" } });
+}
+function neoaiGateMiddleware(acl) {
+  return async function neoaiAdminGate(ctx, next) {
+    if (ctx?.action?.resourceName !== "neoai") return next();
+    if (isOpenNeoaiAction(ctx?.action?.actionName)) return next();
+    if (!isAdminCtx(acl, ctx)) ctx.throw(403, "NeoAI is admin-only for now");
+    return next();
+  };
+}
+function blanketNeoaiGrants(acl) {
+  const actions = acl?.allowManager?.skipActions?.get?.("neoai");
+  if (!actions || typeof actions.forEach !== "function") return [];
+  const found = [];
+  actions.forEach((_condition, action) => {
+    if (isOpenNeoaiAction(action)) return;
+    found.push(`neoai:${action}`);
+  });
+  return found;
+}
+
+// src/server/lib/neoaiConfigCollections.ts
+var NEOAI_GATED_COLLECTIONS = [
+  "neoai_workflows",
+  "neoai_workflow_versions",
+  "neoai_functions",
+  "neoai_runs",
+  "neoai_run_steps",
+  "neoai_settings",
+  "neoai_memories",
+  "neoai_secrets",
+  "neoai_mcp_servers",
+  "neoai_knowledge_articles",
+  "neoai_prompts",
+  "neoai_knowledge_links",
+  "neoai_knowledge_suggestions"
+];
+function neoaiSnippetActions() {
+  return ["neoai:*", ...NEOAI_GATED_COLLECTIONS.map((name) => `${name}:*`)];
+}
+function detachNeoaiCollectionsFromStrategy(app) {
+  const acl = app?.acl;
+  if (!acl || !acl.strategyResources || typeof acl.removeStrategyResource !== "function") return 0;
+  let removed = 0;
+  for (const name of NEOAI_GATED_COLLECTIONS) {
+    if (acl.strategyResources.has(name)) {
+      acl.removeStrategyResource(name);
+      removed++;
+    }
+  }
+  return removed;
+}
 
 // src/server/lib/cost.ts
 var DEFAULT_PRICES = {
@@ -2042,14 +2099,46 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     await this.setup();
   }
   async load() {
-    this.app.acl.registerSnippet({ name: NEOAI_ADMIN_SNIPPET, actions: ["neoai:*"] });
-    this.app.acl.allow("neoai", "*", "loggedIn");
+    this.app.acl.registerSnippet({ name: NEOAI_ADMIN_SNIPPET, actions: neoaiSnippetActions() });
+    this.app.acl.allow("neoai", [...NEOAI_OPEN_ACTIONS], "loggedIn");
+    const blanket = blanketNeoaiGrants(this.app.acl);
+    if (blanket.length) {
+      throw new Error(
+        `[neoai] these grants bypass the ACL for the neoai resource and would reopen the console to every logged-in user: ${blanket.join(", ")}. Only ${NEOAI_OPEN_ACTIONS.join(", ")} may be open. See src/server/lib/roleContext.ts.`
+      );
+    }
+    this.app.resourceManager.use(neoaiGateMiddleware(this.app.acl), {
+      tag: "neoai-admin-gate",
+      after: "acl"
+    });
     const requireAdmin = (ctx) => {
       if (!isAdminCtx(this.app.acl, ctx)) ctx.throw(403, "NeoAI is admin-only for now");
     };
     this.app.resourceManager.define({
       name: "neoai",
       actions: {
+        /**
+         * "May I open this console?" — the one action that answers instead of refusing.
+         *
+         * Tickets b4f8730e and 7466a838, which are the same defect from both ends. NeoAI's console
+         * is mounted as nested admin routes, not through `pluginSettingsManager`, so NocoBase's
+         * `/admin/settings/**` gate never covered it: every logged-in user could open
+         * `/admin/neoai` — and on this deployment `member` and `sales` have the menu entry, so it
+         * was not even "whoever knows the URL". What they got was not a refusal but a console that
+         * mounted, fired eight requests, collected eight 403s and then sat on "Loading…" forever.
+         *
+         * There is no way for the client to work this out for itself: the answer lives in the role
+         * SNIPPET, which the browser cannot evaluate (it would need the whole snippet registry).
+         * So the server says it, from the same `isAdminCtx` that refuses everything else. The
+         * console reads this ONCE and renders either itself or a named refusal.
+         *
+         * Deliberately open to every logged-in caller (NEOAI_OPEN_ACTIONS): one boolean about the
+         * asker, which they would learn anyway by clicking.
+         */
+        access: async (ctx, next) => {
+          ctx.body = { console: mayOperateNeoai(this.app.acl, ctx) };
+          await next();
+        },
         ping: async (ctx, next) => {
           requireAdmin(ctx);
           const names = NEOAI_COLLECTIONS.map((c) => c.name);
@@ -2402,7 +2491,19 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       }
     });
     this.registerAutomationBridge();
+    const detach = (where) => {
+      try {
+        const removed = detachNeoaiCollectionsFromStrategy(this.app);
+        if (removed) this.app.logger.info(`[neoai] ${removed} collection(s) detached from acl.strategyResources (${where})`);
+      } catch (err) {
+        this.app.logger.error(`[neoai] strategy detachment failed at ${where}: ${err}`);
+      }
+    };
+    detach("load");
+    this.db.on("afterDefineCollection", () => detach("afterDefineCollection"));
+    this.db.on("afterUpdateCollection", () => detach("afterUpdateCollection"));
     this.app.on("afterStart", async () => {
+      detach("afterStart");
       try {
         const repo = this.db.getRepository("neoai_runs");
         if (!repo) return;

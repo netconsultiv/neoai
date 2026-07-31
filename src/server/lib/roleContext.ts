@@ -123,3 +123,102 @@ export function isAdminCtx(acl: any, ctx: any): boolean {
   }
   return false;
 }
+
+// ── The gate, as a layer instead of 23 first lines (tickets b4f8730e / 7466a838) ────────────────
+//
+// Until now every one of the 23 handlers opened with `requireAdmin(ctx)` and the ACL layer let
+// EVERYTHING through (`acl.allow('neoai', '*', 'loggedIn')` sets `permission.skip`, which
+// short-circuits `can()` entirely — project memory `nocobase-acl-snippets-und-strategy` §1). That
+// held, because all 23 really did call it. It held by COUNTING, though: action #24 written on a
+// Friday is open, and nothing says so.
+//
+// design-studio hit exactly this and answered it with two layers (§12). NeoAI now has the same
+// shape: the blanket grant is gone, so the SNIPPET is the gate; and this middleware is the second
+// layer that does not care whether `strategyResources` happens to be a Set or `null`. The
+// per-handler `requireAdmin` stays as well — three cheap lines of defence in depth, so dropping the
+// middleware registration by accident cannot silently open the surface.
+
+/**
+ * The actions that are open to every logged-in caller, and the ONLY ones.
+ *
+ * `access` publishes this plugin's own verdict about the CALLER — one boolean, nothing else. It
+ * exists because a surface that cannot ask "may I?" has to guess, and NeoAI's console guessed by
+ * rendering itself for everyone and then showing "Loading…" forever when the answer turned out to
+ * be 403 (ticket 7466a838).
+ *
+ * Anything not on this list is gated. That default is the point: a new action is refused unless
+ * someone deliberately writes its name here.
+ */
+export const NEOAI_OPEN_ACTIONS = ['access'] as const;
+
+export function isOpenNeoaiAction(action: unknown): boolean {
+  return typeof action === 'string' && (NEOAI_OPEN_ACTIONS as readonly string[]).includes(action);
+}
+
+/**
+ * May this caller operate the NeoAI console AT ALL?
+ *
+ * The same question `isAdminCtx` answers, asked about the snippet's own wildcard rather than about
+ * whichever action happens to be in flight — because the caller of THIS one is `access`, and
+ * "may I open the console" is not "may I call access".
+ */
+export function mayOperateNeoai(acl: any, ctx: any): boolean {
+  return isAdminCtx(acl, { ...ctx, state: ctx?.state, action: { actionName: '*' } });
+}
+
+/**
+ * Refuse every gated `neoai:` action that this caller does not carry the snippet for.
+ *
+ * Register with `{ after: 'acl' }` — `ctx.state.currentRoles` is written by the ACL middleware, and
+ * a `before` middleware would see no roles at all and therefore refuse everyone (§5).
+ */
+export function neoaiGateMiddleware(acl: any) {
+  return async function neoaiAdminGate(ctx: any, next: any) {
+    if (ctx?.action?.resourceName !== 'neoai') return next();
+    if (isOpenNeoaiAction(ctx?.action?.actionName)) return next();
+    if (!isAdminCtx(acl, ctx)) ctx.throw(403, 'NeoAI is admin-only for now');
+    return next();
+  };
+}
+
+/**
+ * The boot guard: which `neoai` actions has someone waved past the ACL?
+ *
+ * `acl.allowManager.skipActions` is a `Map<resource, Map<action, condition>>`, and an entry in it
+ * means `permission.skip` — `can()` is never consulted for that action. This reads the map back and
+ * returns every `neoai` entry beyond `NEOAI_OPEN_ACTIONS`, which is exactly how the hole looked
+ * before this ticket (`neoai:*`).
+ *
+ * Returning a list rather than throwing keeps the module import-free and testable; `plugin.ts`
+ * turns a non-empty list into a refusal to start. A surface that quietly reopens is worse than a
+ * plugin that will not boot — the same call design-studio made for its token surface.
+ *
+ * ⚠ IT LOOKS AT THE `neoai` RESOURCE ONLY, AND THAT IS NOT AN OVERSIGHT.
+ *
+ * The first version of this function also treated the `'*'` resource as a finding, on the
+ * reasoning that `getAllowedConditions` consults `['*', resource]` and so a global grant covers
+ * `neoai` too. That reasoning is correct and the guard would still have been WRONG — measured in
+ * the running container before it ever shipped:
+ *
+ *     @nocobase/plugin-acl/dist/server/server.js:456
+ *       this.app.acl.allow("*", "*", (ctx) => ctx.state.currentRoles?.includes("root"));
+ *     @nocobase/plugin-action-import/dist/server/index.js:81
+ *       dataSource.acl.allow("*", "downloadXlsxTemplate", "loggedIn");
+ *
+ * The framework registers `*:*` on EVERY boot — it is how `root` short-circuits — so a guard that
+ * called that a finding would have thrown on every start and taken the whole application down. A
+ * plugin may refuse to boot over ITS OWN surface being reopened; it may not refuse to boot over the
+ * framework doing its job, and it has no business policing another plugin's grants. Those entries
+ * carry a function condition, not a blanket `loggedIn`, and the root short-circuit is the same one
+ * `isAdminCtx` mirrors deliberately.
+ */
+export function blanketNeoaiGrants(acl: any): string[] {
+  const actions = acl?.allowManager?.skipActions?.get?.('neoai');
+  if (!actions || typeof actions.forEach !== 'function') return [];
+  const found: string[] = [];
+  actions.forEach((_condition: unknown, action: string) => {
+    if (isOpenNeoaiAction(action)) return;
+    found.push(`neoai:${action}`);
+  });
+  return found;
+}
