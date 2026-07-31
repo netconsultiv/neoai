@@ -505,12 +505,39 @@ function isSandbox(env = process.env) {
   const v = String(env.NEOAI_SANDBOX ?? "").trim().toLowerCase();
   return v === "1" || v === "true" || v === "yes" || v === "on";
 }
-var ADMIN_ROLES = /* @__PURE__ */ new Set(["root", "admin"]);
-function isAdminCtx(ctx) {
-  const role = String(ctx?.state?.currentRole ?? "");
-  if (ADMIN_ROLES.has(role)) return true;
-  const roles = ctx?.state?.currentUser?.roles ?? [];
-  return roles.some((r) => ADMIN_ROLES.has(String(r?.name ?? r)));
+
+// src/server/lib/roleContext.ts
+var NEOAI_ADMIN_SNIPPET = "pm.neoai.settings";
+function rolesOfContext(ctx) {
+  const raw = ctx?.state?.currentRoles;
+  const list = Array.isArray(raw) && raw.length ? raw : [ctx?.state?.currentRole];
+  const names = [];
+  for (const entry of list) {
+    const name = typeof entry === "string" ? entry : entry?.name ?? entry?.role;
+    const trimmed = typeof name === "string" ? name.trim() : "";
+    if (!trimmed || trimmed === "__union__") continue;
+    if (!names.includes(trimmed)) names.push(trimmed);
+  }
+  return names;
+}
+function neoaiActionPath(ctx) {
+  const action = ctx?.action?.actionName;
+  return `neoai:${typeof action === "string" && action.trim() ? action.trim() : "*"}`;
+}
+function isAdminCtx(acl, ctx) {
+  if (!acl || typeof acl.getRole !== "function") return false;
+  const actionPath = neoaiActionPath(ctx);
+  for (const role of rolesOfContext(ctx)) {
+    if (role === "root") return true;
+    let verdict = null;
+    try {
+      verdict = acl.getRole(role)?.snippetAllowed?.(actionPath);
+    } catch {
+      verdict = null;
+    }
+    if (verdict === true) return true;
+  }
+  return false;
 }
 
 // src/server/lib/cost.ts
@@ -2015,10 +2042,10 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     await this.setup();
   }
   async load() {
-    this.app.acl.registerSnippet({ name: "pm.neoai.settings", actions: ["neoai:*"] });
+    this.app.acl.registerSnippet({ name: NEOAI_ADMIN_SNIPPET, actions: ["neoai:*"] });
     this.app.acl.allow("neoai", "*", "loggedIn");
     const requireAdmin = (ctx) => {
-      if (!isAdminCtx(ctx)) ctx.throw(403, "NeoAI is admin-only for now");
+      if (!isAdminCtx(this.app.acl, ctx)) ctx.throw(403, "NeoAI is admin-only for now");
     };
     this.app.resourceManager.define({
       name: "neoai",
