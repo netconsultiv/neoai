@@ -31,7 +31,8 @@
 
 import { Plugin } from '@nocobase/server';
 import { MENU_LINKS, NEOAI_COLLECTIONS, NEOAI_EXTRA_FIELDS } from './collections';
-import { isAdminCtx, isSandbox } from './lib/env';
+import { isSandbox } from './lib/env';
+import { NEOAI_ADMIN_SNIPPET, isAdminCtx } from './lib/roleContext';
 import { DEFAULT_IMAGE_PRICE_USD, DEFAULT_PRICES, checkBudget } from './lib/cost';
 import { execLeafFactory } from './lib/nodes';
 import { Runner, RunOutcome, StepEvent, WorkflowDef, validateDefinition } from './lib/runner';
@@ -78,14 +79,20 @@ export class NeoaiPlugin extends Plugin {
 
   async load() {
     // Settings-page gate (client pluginSettingsManager aclSnippet must match).
-    this.app.acl.registerSnippet({ name: 'pm.neoai.settings', actions: ['neoai:*'] });
+    this.app.acl.registerSnippet({ name: NEOAI_ADMIN_SNIPPET, actions: ['neoai:*'] });
     // Actions are reachable for logged-in users at the ACL layer, but EVERY
-    // handler re-gates on admin/root (defense in depth; collections stay
-    // internal-by-default under native ACL anyway).
+    // handler re-gates below (defense in depth; collections stay
+    // internal-by-default under native ACL anyway). `loggedIn` sets
+    // `permission.skip`, which short-circuits `can()` — so the snippet
+    // registered above is NOT what refuses anyone here; requireAdmin is.
     this.app.acl.allow('neoai', '*', 'loggedIn');
 
+    // Ticket 13c027fa: asks the ACL which roles carry NEOAI_ADMIN_SNIPPET, and asks it about the
+    // role the caller is ACTING AS. It used to compare ctx.state.currentUser.roles — the account's
+    // whole membership list — against a hardcoded {root, admin}, so switching to a non-admin role
+    // left a multi-role account fully privileged. See ./lib/roleContext.
     const requireAdmin = (ctx: any) => {
-      if (!isAdminCtx(ctx)) ctx.throw(403, 'NeoAI is admin-only for now');
+      if (!isAdminCtx(this.app.acl, ctx)) ctx.throw(403, 'NeoAI is admin-only for now');
     };
 
     this.app.resourceManager.define({

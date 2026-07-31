@@ -10,13 +10,8 @@ export function isSandbox(env: Record<string, string | undefined> = process.env)
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';
 }
 
-/** Roles allowed into the NeoAI console/actions for now (owner: "admin only"). */
-export const ADMIN_ROLES = new Set(['root', 'admin']);
-
-export function isAdminCtx(ctx: any): boolean {
-  const role = String(ctx?.state?.currentRole ?? '');
-  if (ADMIN_ROLES.has(role)) return true;
-  // Fallback: some auth paths populate roles on the user instead.
-  const roles: any[] = ctx?.state?.currentUser?.roles ?? [];
-  return roles.some((r: any) => ADMIN_ROLES.has(String(r?.name ?? r)));
-}
+// The admin gate used to live here as `isAdminCtx` + a hardcoded `ADMIN_ROLES` set. Both moved to
+// `./roleContext` in ticket 13c027fa: it read the account's whole role list instead of the ACTIVE
+// role (so switching roles did nothing), and it decided in code a policy the ACL already owned.
+// Nothing is re-exported from here on purpose — a stale import must fail the build, not silently
+// resolve to something that no longer exists.
