@@ -32,7 +32,18 @@
 import { Plugin } from '@nocobase/server';
 import { MENU_LINKS, NEOAI_COLLECTIONS, NEOAI_EXTRA_FIELDS } from './collections';
 import { isSandbox } from './lib/env';
-import { NEOAI_ADMIN_SNIPPET, isAdminCtx } from './lib/roleContext';
+import {
+  NEOAI_ADMIN_SNIPPET,
+  NEOAI_OPEN_ACTIONS,
+  blanketNeoaiGrants,
+  isAdminCtx,
+  mayOperateNeoai,
+  neoaiGateMiddleware,
+} from './lib/roleContext';
+import {
+  detachNeoaiCollectionsFromStrategy,
+  neoaiSnippetActions,
+} from './lib/neoaiConfigCollections';
 import { DEFAULT_IMAGE_PRICE_USD, DEFAULT_PRICES, checkBudget } from './lib/cost';
 import { execLeafFactory } from './lib/nodes';
 import { Runner, RunOutcome, StepEvent, WorkflowDef, validateDefinition } from './lib/runner';
@@ -78,19 +89,57 @@ export class NeoaiPlugin extends Plugin {
   }
 
   async load() {
-    // Settings-page gate (client pluginSettingsManager aclSnippet must match).
-    this.app.acl.registerSnippet({ name: NEOAI_ADMIN_SNIPPET, actions: ['neoai:*'] });
-    // Actions are reachable for logged-in users at the ACL layer, but EVERY
-    // handler re-gates below (defense in depth; collections stay
-    // internal-by-default under native ACL anyway). `loggedIn` sets
-    // `permission.skip`, which short-circuits `can()` — so the snippet
-    // registered above is NOT what refuses anyone here; requireAdmin is.
-    this.app.acl.allow('neoai', '*', 'loggedIn');
+    // The snippet that owns this surface. Since Bündel B it is not documentation any more: it is
+    // the GATE, for the actions AND for the collections. Read the note in
+    // `lib/neoaiConfigCollections.ts` before touching either half.
+    //
+    // The action list is DERIVED from the collection list, never hand-kept. `neoai:*` covers the
+    // twenty-three custom actions; it does NOT glob-match `neoai_settings:list`, so without the
+    // per-collection entries, detaching the collections from the strategy would lock `admin` out of
+    // its own console. That exact glob boundary is what made the CRM snippet cover nothing for a
+    // year (project memory `nocobase-acl-snippets-und-strategy` §2, part 1).
+    this.app.acl.registerSnippet({ name: NEOAI_ADMIN_SNIPPET, actions: neoaiSnippetActions() });
 
-    // Ticket 13c027fa: asks the ACL which roles carry NEOAI_ADMIN_SNIPPET, and asks it about the
-    // role the caller is ACTING AS. It used to compare ctx.state.currentUser.roles — the account's
-    // whole membership list — against a hardcoded {root, admin}, so switching to a non-admin role
-    // left a multi-role account fully privileged. See ./lib/roleContext.
+    // ── The blanket grant is GONE (ticket b4f8730e) ─────────────────────────────────────────────
+    //
+    // It used to read `this.app.acl.allow('neoai', '*', 'loggedIn')`, with the honest comment that
+    // `loggedIn` sets `permission.skip` and short-circuits `can()` — "so the snippet is NOT what
+    // refuses anyone here; requireAdmin is". That was true and it was the problem: the whole
+    // surface was reachable at the ACL layer and held together only by 23 handlers each remembering
+    // to call `requireAdmin` on their first line. It held. It held by COUNTING.
+    //
+    // Now the snippet is the gate (project memory `nocobase-acl-snippets-und-strategy` §12: for an
+    // ACTION resource the strategy branch is closed by construction, so `snippetAllowed` is the
+    // only remaining yes-branch), `neoaiGateMiddleware` is the second layer, and `requireAdmin`
+    // survives as the third. One genuinely open action remains, and it is named:
+    this.app.acl.allow('neoai', [...NEOAI_OPEN_ACTIONS], 'loggedIn');
+
+    // The boot guard. If anyone puts the wildcard back — or waves a gated action past the ACL —
+    // this plugin refuses to start rather than serve an open console. A surface that quietly
+    // reopens is worse than a plugin that will not boot; design-studio made the same call for its
+    // token surface, and this is the same mechanism reading the same map.
+    const blanket = blanketNeoaiGrants(this.app.acl);
+    if (blanket.length) {
+      throw new Error(
+        `[neoai] these grants bypass the ACL for the neoai resource and would reopen the console to ` +
+          `every logged-in user: ${blanket.join(', ')}. Only ${NEOAI_OPEN_ACTIONS.join(', ')} may be open. ` +
+          `See src/server/lib/roleContext.ts.`,
+      );
+    }
+
+    // Layer two. `after: 'acl'` because `ctx.state.currentRoles` is written by the ACL middleware —
+    // a `before` middleware would see no roles and refuse everyone (§5). It refuses by DEFAULT:
+    // an action added tomorrow is gated without anyone remembering anything.
+    this.app.resourceManager.use(neoaiGateMiddleware(this.app.acl), {
+      tag: 'neoai-admin-gate',
+      after: 'acl',
+    });
+
+    // Layer three, unchanged. Ticket 13c027fa: asks the ACL which roles carry NEOAI_ADMIN_SNIPPET,
+    // and asks it about the role the caller is ACTING AS. It used to compare
+    // ctx.state.currentUser.roles — the account's whole membership list — against a hardcoded
+    // {root, admin}, so switching to a non-admin role left a multi-role account fully privileged.
+    // See ./lib/roleContext.
     const requireAdmin = (ctx: any) => {
       if (!isAdminCtx(this.app.acl, ctx)) ctx.throw(403, 'NeoAI is admin-only for now');
     };
@@ -98,6 +147,29 @@ export class NeoaiPlugin extends Plugin {
     this.app.resourceManager.define({
       name: 'neoai',
       actions: {
+        /**
+         * "May I open this console?" — the one action that answers instead of refusing.
+         *
+         * Tickets b4f8730e and 7466a838, which are the same defect from both ends. NeoAI's console
+         * is mounted as nested admin routes, not through `pluginSettingsManager`, so NocoBase's
+         * `/admin/settings/**` gate never covered it: every logged-in user could open
+         * `/admin/neoai` — and on this deployment `member` and `sales` have the menu entry, so it
+         * was not even "whoever knows the URL". What they got was not a refusal but a console that
+         * mounted, fired eight requests, collected eight 403s and then sat on "Loading…" forever.
+         *
+         * There is no way for the client to work this out for itself: the answer lives in the role
+         * SNIPPET, which the browser cannot evaluate (it would need the whole snippet registry).
+         * So the server says it, from the same `isAdminCtx` that refuses everything else. The
+         * console reads this ONCE and renders either itself or a named refusal.
+         *
+         * Deliberately open to every logged-in caller (NEOAI_OPEN_ACTIONS): one boolean about the
+         * asker, which they would learn anyway by clicking.
+         */
+        access: async (ctx: any, next: any) => {
+          ctx.body = { console: mayOperateNeoai(this.app.acl, ctx) };
+          await next();
+        },
+
         ping: async (ctx: any, next: any) => {
           requireAdmin(ctx);
           const names = NEOAI_COLLECTIONS.map((c) => c.name);
@@ -474,8 +546,37 @@ export class NeoaiPlugin extends Plugin {
 
     this.registerAutomationBridge();
 
+    // ── The COLLECTION gate (Bündel B) ─────────────────────────────────────────────────────────
+    //
+    // Everything above gates the twenty-three ACTIONS. The thirteen COLLECTIONS behind them were
+    // reachable through the plain collection API by any role whose blanket strategy carries `view`
+    // — measured: five non-admin roles read `neoai_settings` with `gemini_api_key` in clear, three
+    // of them could write it, and one could create a `neoai_workflows` row, which is a definition
+    // the runner executes. See `lib/neoaiConfigCollections.ts` for the full measurement.
+    //
+    // The lever is `acl.strategyResources`, and it must be pulled REPEATEDLY: writing a
+    // `collections` meta row re-attaches the name behind our back, so a single removal at load is
+    // silently undone. Three call sites, deliberately.
+    const detach = (where: string) => {
+      try {
+        const removed = detachNeoaiCollectionsFromStrategy(this.app);
+        if (removed) this.app.logger.info(`[neoai] ${removed} collection(s) detached from acl.strategyResources (${where})`);
+      } catch (err) {
+        // Never take the app down over this — but say so loudly, because a silent failure here is
+        // an open door that looks shut.
+        this.app.logger.error(`[neoai] strategy detachment failed at ${where}: ${err}`);
+      }
+    };
+    detach('load');
+    this.db.on('afterDefineCollection', () => detach('afterDefineCollection'));
+    this.db.on('afterUpdateCollection', () => detach('afterUpdateCollection'));
+
     // Mark runs orphaned by a process restart. 'waiting' runs keep their state.
     this.app.on('afterStart', async () => {
+      // LAST, on purpose: handlers run in registration order, and the boot sweeps above
+      // (`setup()`, `ensureCollections`) write meta rows themselves. The detachment has to have
+      // the final word (project memory §2, part 4).
+      detach('afterStart');
       try {
         const repo = this.db.getRepository('neoai_runs');
         if (!repo) return;

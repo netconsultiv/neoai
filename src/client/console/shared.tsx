@@ -6,7 +6,8 @@
 // small formatters. English UI (owner decision).
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Tag } from 'antd';
+import { Alert, Tag } from 'antd';
+import { useAPIClient } from '@nocobase/client';
 
 export const PAGE_BG = '#f5f5f5';
 
@@ -53,6 +54,99 @@ export function usePoll(fn: () => void | Promise<void>, ms: number, active: bool
       clearInterval(t);
     };
   }, [ms, active]);
+}
+
+// --- access --------------------------------------------------------------------
+//
+// Tickets b4f8730e and 7466a838 — the same defect from its two ends.
+//
+// The console is mounted as nested admin routes, not through `pluginSettingsManager`, so NocoBase's
+// `/admin/settings/**` gate never covered it. Every logged-in user could open `/admin/neoai`; on
+// the measured deployment `member` and `sales` even carry the menu entry, so the reach was not
+// "whoever knows the URL". And what they reached was not a refusal: the shell mounted, every panel
+// fired its load, the server answered 403 to all of them, and the surface then sat on "Loading…"
+// FOREVER — while the workflow list said "No workflows yet", which reads as "there is nothing here"
+// rather than "you may not look".
+//
+// The fix is ONE gate at the shell rather than a `forbidden` branch in each of the eight areas.
+// That is deliberate and it is the cheaper half of the same correctness: a per-panel state would
+// have to be written eight times, and the ninth panel would be written without it. Because the
+// panels never mount, nothing polls, nothing retries, and no global error toast is raised — which
+// is the other half of the rule (project memory `nocobase-acl-snippets-und-strategy` §12: "das
+// Polling nach einem 403 einstellen — eine Verweigerung läuft nicht ab").
+
+export type NeoaiAccess = 'loading' | 'granted' | 'denied' | 'unknown';
+
+/**
+ * Ask the server once whether this caller may operate NeoAI.
+ *
+ * `unknown` is a real third answer, not a tidied-up failure: it means the request itself did not
+ * come back, or came back in a shape this client does not recognise — an older server, a proxy
+ * hiccup. It is treated as "carry on as before", because a console that locks itself out on a
+ * transport error is a worse failure than one that shows a surface whose actions then refuse
+ * individually. Only an explicit `false` closes the door.
+ */
+export function useNeoaiAccess(): NeoaiAccess {
+  const api = useAPIClient();
+  const [state, setState] = useState<NeoaiAccess>('loading');
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const data = await neoaiAction(api, 'access', {});
+        if (!alive) return;
+        // Only a boolean is an answer. Anything else is "this server did not answer the question".
+        setState(data?.console === true ? 'granted' : data?.console === false ? 'denied' : 'unknown');
+      } catch {
+        if (alive) setState('unknown');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [api]);
+  return state;
+}
+
+/** The named refusal. Not an empty list, not a spinner — a sentence that says what happened. */
+export function NoAccessPanel({ area }: { area: string }) {
+  return (
+    <div style={{ minHeight: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, background: '#fff' }}>
+      <div style={{ maxWidth: 520 }}>
+        <Alert
+          type="warning"
+          showIcon
+          message="You do not have access to this area"
+          description={
+            <div style={{ display: 'grid', gap: 8 }}>
+              <div>
+                {area} is restricted to roles that carry the <code>pm.neoai.settings</code> permission.
+                Your current role does not, so nothing here would load.
+              </div>
+              <div style={{ color: '#6b716b', fontSize: 12 }}>
+                If you should have access, switch to a role that has it, or ask an administrator to
+                grant that permission to your role. Nothing is broken and there is nothing to retry.
+              </div>
+            </div>
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The shell gate: show the console, the refusal, or a brief blank while asking.
+ *
+ * The blank is deliberate. Rendering the console first and replacing it a moment later would make
+ * a refused user watch a full sidebar appear and then vanish — and would fire exactly the panel
+ * requests this gate exists to prevent.
+ */
+export function ConsoleAccessGate({ area, children }: { area: string; children: React.ReactNode }) {
+  const access = useNeoaiAccess();
+  if (access === 'loading') return null;
+  if (access === 'denied') return <NoAccessPanel area={area} />;
+  return <>{children}</>;
 }
 
 // --- status/format -------------------------------------------------------------

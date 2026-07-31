@@ -67,13 +67,13 @@ __export(client_exports, {
   default: () => client_default
 });
 module.exports = __toCommonJS(client_exports);
-var import_client10 = require("@nocobase/client");
-var import_client11 = require("@nocobase/plugin-workflow/client");
+var import_client11 = require("@nocobase/client");
+var import_client12 = require("@nocobase/plugin-workflow/client");
 
 // src/client/console/NeoaiConsole.tsx
 var import_react10 = __toESM(require("react"));
 var import_antd10 = require("antd");
-var import_client8 = require("@nocobase/client");
+var import_client9 = require("@nocobase/client");
 
 // src/client/theme.ts
 var NEOHOME_GREEN = "#009900";
@@ -119,6 +119,7 @@ var NEOMODUL_FAVICON_SRC = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZW
 // src/client/console/shared.tsx
 var import_react = __toESM(require("react"));
 var import_antd = require("antd");
+var import_client = require("@nocobase/client");
 var PAGE_BG = "#f5f5f5";
 async function neoaiAction(api, action, values = {}) {
   var _a, _b, _c;
@@ -156,6 +157,43 @@ function usePoll(fn, ms, active) {
       clearInterval(t);
     };
   }, [ms, active]);
+}
+function useNeoaiAccess() {
+  const api = (0, import_client.useAPIClient)();
+  const [state, setState] = (0, import_react.useState)("loading");
+  (0, import_react.useEffect)(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const data = await neoaiAction(api, "access", {});
+        if (!alive) return;
+        setState((data == null ? void 0 : data.console) === true ? "granted" : (data == null ? void 0 : data.console) === false ? "denied" : "unknown");
+      } catch (e) {
+        if (alive) setState("unknown");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [api]);
+  return state;
+}
+function NoAccessPanel({ area }) {
+  return /* @__PURE__ */ import_react.default.createElement("div", { style: { minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center", padding: 32, background: "#fff" } }, /* @__PURE__ */ import_react.default.createElement("div", { style: { maxWidth: 520 } }, /* @__PURE__ */ import_react.default.createElement(
+    import_antd.Alert,
+    {
+      type: "warning",
+      showIcon: true,
+      message: "You do not have access to this area",
+      description: /* @__PURE__ */ import_react.default.createElement("div", { style: { display: "grid", gap: 8 } }, /* @__PURE__ */ import_react.default.createElement("div", null, area, " is restricted to roles that carry the ", /* @__PURE__ */ import_react.default.createElement("code", null, "pm.neoai.settings"), " permission. Your current role does not, so nothing here would load."), /* @__PURE__ */ import_react.default.createElement("div", { style: { color: "#6b716b", fontSize: 12 } }, "If you should have access, switch to a role that has it, or ask an administrator to grant that permission to your role. Nothing is broken and there is nothing to retry."))
+    }
+  )));
+}
+function ConsoleAccessGate({ area, children }) {
+  const access = useNeoaiAccess();
+  if (access === "loading") return null;
+  if (access === "denied") return /* @__PURE__ */ import_react.default.createElement(NoAccessPanel, { area });
+  return /* @__PURE__ */ import_react.default.createElement(import_react.default.Fragment, null, children);
 }
 var RUN_COLORS = {
   queued: "default",
@@ -263,7 +301,7 @@ function ConsoleDrawer(props) {
 // src/client/console/WorkflowsPanel.tsx
 var import_react3 = __toESM(require("react"));
 var import_antd3 = require("antd");
-var import_client = require("@nocobase/client");
+var import_client2 = require("@nocobase/client");
 
 // src/client/console/VersionDiffDrawer.tsx
 var import_react2 = __toESM(require("react"));
@@ -660,7 +698,7 @@ function NodeList(props) {
 }
 function NodeConfigForm({ node, onChange }) {
   var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
-  const api = (0, import_client.useAPIClient)();
+  const api = (0, import_client2.useAPIClient)();
   const cfg = (_a = node.config) != null ? _a : node.config = {};
   const set = (k, v) => {
     cfg[k] = v;
@@ -938,7 +976,7 @@ function TestRunBox({
   cachedOutputs
 }) {
   var _a, _b, _c, _d, _e, _f;
-  const api = (0, import_client.useAPIClient)();
+  const api = (0, import_client2.useAPIClient)();
   const [inputText, setInputText] = (0, import_react3.useState)(() => JSON.stringify(exampleInput != null ? exampleInput : {}, null, 2));
   const [runId, setRunId] = (0, import_react3.useState)(null);
   const [data, setData] = (0, import_react3.useState)({});
@@ -1011,7 +1049,7 @@ function TestRunBox({
   )), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Space, { wrap: true }, /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { type: "primary", onClick: () => start(true) }, "Run draft test"), /* @__PURE__ */ import_react3.default.createElement(import_antd3.Button, { disabled: !currentVersion, title: currentVersion ? "" : "Publish first", onClick: () => start(false) }, "Run published v", currentVersion || "\u2014"), runId ? /* @__PURE__ */ import_react3.default.createElement("span", { style: { fontSize: 12, color: "#8a8f8a" } }, "run #", runId) : null, data.run ? /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: data.run.status }) : null), ((_c = data.steps) != null ? _c : []).length > 0 ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 10, display: "flex", flexDirection: "column", gap: 4 } }, ((_d = data.steps) != null ? _d : []).map((s) => /* @__PURE__ */ import_react3.default.createElement("div", { key: s.id, style: { display: "flex", gap: 8, alignItems: "center", fontSize: 12.5 } }, /* @__PURE__ */ import_react3.default.createElement(StatusTag, { status: s.status }), /* @__PURE__ */ import_react3.default.createElement("span", { style: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, s.title || s.node_id), /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: "#8a8f8a" } }, fmtDuration(s.duration_ms)), /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: "#8a8f8a" } }, fmtCost(s.cost_usd))))) : null, ((_e = data.run) == null ? void 0 : _e.status) === "succeeded" ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 8 } }, /* @__PURE__ */ import_react3.default.createElement(JsonBox, { value: data.run.output, maxHeight: 200 })) : null, ((_f = data.run) == null ? void 0 : _f.status) === "failed" ? /* @__PURE__ */ import_react3.default.createElement("div", { style: { marginTop: 8, color: "#b02a2a", fontSize: 12.5 } }, data.run.error) : null);
 }
 function BatchRunBox({ workflowId }) {
-  const api = (0, import_client.useAPIClient)();
+  const api = (0, import_client2.useAPIClient)();
   const [itemsText, setItemsText] = (0, import_react3.useState)("[\n  {}\n]");
   const [busy, setBusy] = (0, import_react3.useState)(false);
   const start = async () => {
@@ -1053,7 +1091,7 @@ function BatchRunBox({ workflowId }) {
 }
 function WorkflowEditor(props) {
   var _a, _b, _c, _d;
-  const api = (0, import_client.useAPIClient)();
+  const api = (0, import_client2.useAPIClient)();
   const [wf, setWf] = (0, import_react3.useState)(props.row);
   const defRef = (0, import_react3.useRef)(
     props.row.definition_draft && Array.isArray(props.row.definition_draft.nodes) ? JSON.parse(JSON.stringify(props.row.definition_draft)) : { nodes: [] }
@@ -1270,7 +1308,7 @@ function WorkflowEditor(props) {
   );
 }
 function WorkflowsPanel() {
-  const api = (0, import_client.useAPIClient)();
+  const api = (0, import_client2.useAPIClient)();
   const [rows, setRows] = (0, import_react3.useState)([]);
   const [loading, setLoading] = (0, import_react3.useState)(false);
   const [editing, setEditing] = (0, import_react3.useState)(null);
@@ -1406,11 +1444,11 @@ function WorkflowsPanel() {
 // src/client/console/RunsPanel.tsx
 var import_react4 = __toESM(require("react"));
 var import_antd4 = require("antd");
-var import_client2 = require("@nocobase/client");
+var import_client3 = require("@nocobase/client");
 var TERMINAL = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled", "rejected"]);
 function RunDetail({ runId, onClose, onRerun }) {
   var _a, _b, _c;
-  const api = (0, import_client2.useAPIClient)();
+  const api = (0, import_client3.useAPIClient)();
   const [data, setData] = (0, import_react4.useState)({});
   const [comment, setComment] = (0, import_react4.useState)("");
   const [rerunOpen, setRerunOpen] = (0, import_react4.useState)(false);
@@ -1543,7 +1581,7 @@ var STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" }
 ];
 function RunsPanel() {
-  const api = (0, import_client2.useAPIClient)();
+  const api = (0, import_client3.useAPIClient)();
   const [rows, setRows] = (0, import_react4.useState)([]);
   const [openRun, setOpenRun] = (0, import_react4.useState)(null);
   const [statusFilter, setStatusFilter] = (0, import_react4.useState)("all");
@@ -1617,7 +1655,7 @@ function RunsPanel() {
 // src/client/console/ApprovalsPanel.tsx
 var import_react5 = __toESM(require("react"));
 var import_antd5 = require("antd");
-var import_client3 = require("@nocobase/client");
+var import_client4 = require("@nocobase/client");
 var STALE_WARN_MS = 36e5;
 var STALE_CRITICAL_MS = 864e5;
 function StalenessTag({ startedAt }) {
@@ -1629,7 +1667,7 @@ function StalenessTag({ startedAt }) {
   return /* @__PURE__ */ import_react5.default.createElement(import_antd5.Tag, { color }, label, " waiting");
 }
 function ApprovalsPanel() {
-  const api = (0, import_client3.useAPIClient)();
+  const api = (0, import_client4.useAPIClient)();
   const [rows, setRows] = (0, import_react5.useState)([]);
   const [openRun, setOpenRun] = (0, import_react5.useState)(null);
   usePoll(
@@ -1680,9 +1718,9 @@ function ApprovalsPanel() {
 // src/client/console/FunctionsPanel.tsx
 var import_react6 = __toESM(require("react"));
 var import_antd6 = require("antd");
-var import_client4 = require("@nocobase/client");
+var import_client5 = require("@nocobase/client");
 function TestDispatchDrawer({ fn, onClose }) {
-  const api = (0, import_client4.useAPIClient)();
+  const api = (0, import_client5.useAPIClient)();
   const [inputText, setInputText] = (0, import_react6.useState)(() => {
     var _a;
     return JSON.stringify((_a = fn.input_example) != null ? _a : {}, null, 2);
@@ -1718,7 +1756,7 @@ function TestDispatchDrawer({ fn, onClose }) {
   ), /* @__PURE__ */ import_react6.default.createElement(import_antd6.Button, { type: "primary", loading: busy, onClick: dispatch }, "Dispatch"), result ? /* @__PURE__ */ import_react6.default.createElement("div", { style: { marginTop: 14 } }, /* @__PURE__ */ import_react6.default.createElement("div", { style: { fontSize: 11, fontWeight: 700, letterSpacing: ".08em", color: "#8a8f8a", marginBottom: 6 } }, "RESULT"), /* @__PURE__ */ import_react6.default.createElement(JsonBox, { value: result, maxHeight: 320 })) : null));
 }
 function FunctionsPanel() {
-  const api = (0, import_client4.useAPIClient)();
+  const api = (0, import_client5.useAPIClient)();
   const [rows, setRows] = (0, import_react6.useState)([]);
   const [workflows, setWorkflows] = (0, import_react6.useState)([]);
   const [testing, setTesting] = (0, import_react6.useState)(null);
@@ -1824,9 +1862,9 @@ function FunctionsPanel() {
 // src/client/console/McpServersPanel.tsx
 var import_react7 = __toESM(require("react"));
 var import_antd7 = require("antd");
-var import_client5 = require("@nocobase/client");
+var import_client6 = require("@nocobase/client");
 function McpServersPanel() {
-  const api = (0, import_client5.useAPIClient)();
+  const api = (0, import_client6.useAPIClient)();
   const [rows, setRows] = (0, import_react7.useState)([]);
   const [secrets, setSecrets] = (0, import_react7.useState)([]);
   const [creating, setCreating] = (0, import_react7.useState)(false);
@@ -1970,7 +2008,7 @@ function McpServersPanel() {
 // src/client/console/SettingsPanel.tsx
 var import_react8 = __toESM(require("react"));
 var import_antd8 = require("antd");
-var import_client6 = require("@nocobase/client");
+var import_client7 = require("@nocobase/client");
 function Field2({ label, children, hint }) {
   return /* @__PURE__ */ import_react8.default.createElement("div", { style: { marginBottom: 14, maxWidth: 560 } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "#8a8f8a", marginBottom: 4 } }, label), children, hint ? /* @__PURE__ */ import_react8.default.createElement("div", { style: { fontSize: 12, color: "#8a8f8a", marginTop: 4 } }, hint) : null);
 }
@@ -1982,7 +2020,7 @@ function Sparkline({ data }) {
   return /* @__PURE__ */ import_react8.default.createElement("div", { style: { display: "flex", alignItems: "flex-end", gap: 3, height: 60 } }, data.map((d) => /* @__PURE__ */ import_react8.default.createElement("div", { key: d.label, title: `${d.label}: $${d.value.toFixed(2)}`, style: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center" } }, /* @__PURE__ */ import_react8.default.createElement("div", { style: { width: "100%", height: Math.max(2, d.value / max * 52), background: "#009900", borderRadius: "2px 2px 0 0" } }))));
 }
 function SecretsSection() {
-  const api = (0, import_client6.useAPIClient)();
+  const api = (0, import_client7.useAPIClient)();
   const [rows, setRows] = (0, import_react8.useState)([]);
   const [name, setName] = (0, import_react8.useState)("");
   const [value, setValue] = (0, import_react8.useState)("");
@@ -2052,7 +2090,7 @@ function SecretsSection() {
 }
 function SettingsPanel() {
   var _a, _b, _c, _d, _e, _f;
-  const api = (0, import_client6.useAPIClient)();
+  const api = (0, import_client7.useAPIClient)();
   const [s, setS] = (0, import_react8.useState)(null);
   const [key, setKey] = (0, import_react8.useState)("");
   const [pricesText, setPricesText] = (0, import_react8.useState)("");
@@ -2139,7 +2177,7 @@ function SettingsPanel() {
 // src/client/console/MemoryPanel.tsx
 var import_react9 = __toESM(require("react"));
 var import_antd9 = require("antd");
-var import_client7 = require("@nocobase/client");
+var import_client8 = require("@nocobase/client");
 var PENDING_SUFFIX = "__pending";
 function baseKeyOf(key) {
   return key.endsWith(PENDING_SUFFIX) ? key.slice(0, -PENDING_SUFFIX.length) : key;
@@ -2160,7 +2198,7 @@ function stalenessBadge(confirmedAt) {
 }
 function MemoryDetail({ row, confirmedSibling, onClose, onSaved }) {
   var _a, _b;
-  const api = (0, import_client7.useAPIClient)();
+  const api = (0, import_client8.useAPIClient)();
   const isPending = String((_a = row.key) != null ? _a : "").endsWith(PENDING_SUFFIX);
   const [summary, setSummary] = (0, import_react9.useState)(String((_b = row.summary) != null ? _b : ""));
   const [busy, setBusy] = (0, import_react9.useState)(false);
@@ -2195,7 +2233,7 @@ function MemoryDetail({ row, confirmedSibling, onClose, onSaved }) {
 }
 function MemoryPanel() {
   var _a, _b, _c;
-  const api = (0, import_client7.useAPIClient)();
+  const api = (0, import_client8.useAPIClient)();
   const [rows, setRows] = (0, import_react9.useState)([]);
   const [entityType, setEntityType] = (0, import_react9.useState)("");
   const [entityId, setEntityId] = (0, import_react9.useState)("");
@@ -2297,7 +2335,7 @@ var TABS = [
   { key: "settings", label: "Settings", icon: "SettingOutlined" }
 ];
 function SpendAlertBanner() {
-  const api = (0, import_client8.useAPIClient)();
+  const api = (0, import_client9.useAPIClient)();
   const [pct, setPct] = (0, import_react10.useState)(null);
   const [alertPct, setAlertPct] = (0, import_react10.useState)(80);
   usePoll(
@@ -2359,11 +2397,11 @@ function SideItem(props) {
         userSelect: "none"
       }
     },
-    /* @__PURE__ */ import_react10.default.createElement(import_client8.Icon, { type: props.icon }),
+    /* @__PURE__ */ import_react10.default.createElement(import_client9.Icon, { type: props.icon }),
     /* @__PURE__ */ import_react10.default.createElement("span", null, props.label)
   );
 }
-function NeoaiConsolePage() {
+function NeoaiConsoleBody() {
   (0, import_react10.useEffect)(() => {
     ensureInterFont();
   }, []);
@@ -2409,11 +2447,14 @@ function NeoaiConsolePage() {
     /* @__PURE__ */ import_react10.default.createElement("main", { style: { flex: 1, overflow: "auto", minWidth: 0, background: "#fff" } }, /* @__PURE__ */ import_react10.default.createElement(SpendAlertBanner, null), active === "workflows" ? /* @__PURE__ */ import_react10.default.createElement(WorkflowsPanel, null) : null, active === "runs" ? /* @__PURE__ */ import_react10.default.createElement(RunsPanel, null) : null, active === "approvals" ? /* @__PURE__ */ import_react10.default.createElement(ApprovalsPanel, null) : null, active === "functions" ? /* @__PURE__ */ import_react10.default.createElement(FunctionsPanel, null) : null, active === "mcp" ? /* @__PURE__ */ import_react10.default.createElement(McpServersPanel, null) : null, active === "memory" ? /* @__PURE__ */ import_react10.default.createElement(MemoryPanel, null) : null, active === "settings" ? /* @__PURE__ */ import_react10.default.createElement(SettingsPanel, null) : null)
   ));
 }
+function NeoaiConsolePage() {
+  return /* @__PURE__ */ import_react10.default.createElement(ConsoleAccessGate, { area: "The NeoAI console" }, /* @__PURE__ */ import_react10.default.createElement(NeoaiConsoleBody, null));
+}
 
 // src/client/console/KnowledgeConsole.tsx
 var import_react11 = __toESM(require("react"));
 var import_antd11 = require("antd");
-var import_client9 = require("@nocobase/client");
+var import_client10 = require("@nocobase/client");
 var TABS2 = [
   { key: "articles", label: "Articles", icon: "FileTextOutlined" },
   { key: "prompts", label: "AI Prompts", icon: "RobotOutlined" },
@@ -2453,12 +2494,12 @@ function SideItem2(props) {
         userSelect: "none"
       }
     },
-    /* @__PURE__ */ import_react11.default.createElement(import_client9.Icon, { type: props.icon }),
+    /* @__PURE__ */ import_react11.default.createElement(import_client10.Icon, { type: props.icon }),
     /* @__PURE__ */ import_react11.default.createElement("span", null, props.label)
   );
 }
 function LinkedItemsSection({ articleId }) {
-  const api = (0, import_client9.useAPIClient)();
+  const api = (0, import_client10.useAPIClient)();
   const [rows, setRows] = (0, import_react11.useState)([]);
   const [loading, setLoading] = (0, import_react11.useState)(false);
   const [entityType, setEntityType] = (0, import_react11.useState)("");
@@ -2536,7 +2577,7 @@ function LinkedItemsSection({ articleId }) {
 function ArticleEditorDrawer(props) {
   var _a, _b;
   const { editor, onClose, onMutated } = props;
-  const api = (0, import_client9.useAPIClient)();
+  const api = (0, import_client10.useAPIClient)();
   const [saving, setSaving] = (0, import_react11.useState)(false);
   const [deleting, setDeleting] = (0, import_react11.useState)(false);
   const open = !!editor;
@@ -2610,7 +2651,7 @@ function ArticleEditorDrawer(props) {
   ), (record == null ? void 0 : record.id) != null ? /* @__PURE__ */ import_react11.default.createElement(LinkedItemsSection, { articleId: record.id }) : null) : null);
 }
 function ArticlesPanel() {
-  const api = (0, import_client9.useAPIClient)();
+  const api = (0, import_client10.useAPIClient)();
   const [rows, setRows] = (0, import_react11.useState)([]);
   const [loading, setLoading] = (0, import_react11.useState)(false);
   const [searchText, setSearchText] = (0, import_react11.useState)("");
@@ -2673,7 +2714,7 @@ function ArticlesPanel() {
 function PromptEditorDrawer(props) {
   var _a, _b;
   const { editor, onClose, onMutated } = props;
-  const api = (0, import_client9.useAPIClient)();
+  const api = (0, import_client10.useAPIClient)();
   const [saving, setSaving] = (0, import_react11.useState)(false);
   const [deleting, setDeleting] = (0, import_react11.useState)(false);
   const open = !!editor;
@@ -2724,7 +2765,7 @@ function PromptEditorDrawer(props) {
   return /* @__PURE__ */ import_react11.default.createElement(ConsoleDrawer, { open, onClose, title: record ? String(record.title || record.use_case || `Prompt #${record.id}`) : "New prompt" }, open ? /* @__PURE__ */ import_react11.default.createElement("div", { style: { padding: 18, maxWidth: 900 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form, { key: (_b = record == null ? void 0 : record.id) != null ? _b : "new", layout: "vertical", initialValues: { active: true, ...record || {} }, onFinish }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "use_case", label: "Use case key", rules: [{ required: true, whitespace: true, message: "Use case key is required" }], extra: "Lookup key \u2014 e.g. crm.leadQualification consumers resolve prompts by this exact key." }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "e.g. lead-qualification" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "title", label: "Title" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "Prompt title" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "system_prompt", label: "System prompt" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input.TextArea, { rows: 14, style: { fontFamily: MONO, fontSize: 12 }, placeholder: "System prompt text\u2026" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "model_hint", label: "Model hint", extra: "Advisory only \u2014 the actual model comes from plugin-ai's LLM service configuration." }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input, { placeholder: "e.g. gemini-2.5-flash" })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "active", label: "Active", valuePropName: "checked" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Switch, null)), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { name: "notes", label: "Notes" }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Input.TextArea, { rows: 3 })), /* @__PURE__ */ import_react11.default.createElement(import_antd11.Form.Item, { style: { marginTop: 8, marginBottom: 0 } }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Space, null, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { type: "primary", htmlType: "submit", loading: saving }, record ? "Save" : "Create"), record ? /* @__PURE__ */ import_react11.default.createElement(import_antd11.Popconfirm, { title: "Delete this prompt?", okText: "Delete", okButtonProps: { danger: true }, onConfirm: onDelete }, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { danger: true, loading: deleting }, "Delete")) : null, /* @__PURE__ */ import_react11.default.createElement(import_antd11.Button, { onClick: onClose, disabled: saving || deleting }, "Cancel"))))) : null);
 }
 function PromptsPanel() {
-  const api = (0, import_client9.useAPIClient)();
+  const api = (0, import_client10.useAPIClient)();
   const [rows, setRows] = (0, import_react11.useState)([]);
   const [loading, setLoading] = (0, import_react11.useState)(false);
   const [editor, setEditor] = (0, import_react11.useState)(null);
@@ -2763,7 +2804,7 @@ function PromptsPanel() {
   ), /* @__PURE__ */ import_react11.default.createElement(PromptEditorDrawer, { editor, onClose: () => setEditor(null), onMutated: load }));
 }
 function SuggestionsPanel() {
-  const api = (0, import_client9.useAPIClient)();
+  const api = (0, import_client10.useAPIClient)();
   const [rows, setRows] = (0, import_react11.useState)([]);
   const [loading, setLoading] = (0, import_react11.useState)(false);
   const [showAll, setShowAll] = (0, import_react11.useState)(false);
@@ -2887,7 +2928,7 @@ function SuggestionsPanel() {
 }
 var fmtScore = (v) => Number.isFinite(Number(v)) ? String(Math.round(Number(v) * 10) / 10) : "?";
 function RetrievalPanel() {
-  const api = (0, import_client9.useAPIClient)();
+  const api = (0, import_client10.useAPIClient)();
   const [searchText, setSearchText] = (0, import_react11.useState)("");
   const [useCase, setUseCase] = (0, import_react11.useState)("");
   const [limit, setLimit] = (0, import_react11.useState)(8);
@@ -2985,7 +3026,7 @@ function KnowledgeConsolePage() {
 }
 
 // src/client/index.tsx
-var NeoaiRunInstruction = class extends import_client11.Instruction {
+var NeoaiRunInstruction = class extends import_client12.Instruction {
   constructor() {
     super(...arguments);
     this.title = "NeoAI workflow";
@@ -3032,7 +3073,7 @@ var NeoaiRunInstruction = class extends import_client11.Instruction {
     };
   }
 };
-var NeoaiClientPlugin = class extends import_client10.Plugin {
+var NeoaiClientPlugin = class extends import_client11.Plugin {
   /**
    * Automation bridge UI: contribute the "neoai-run" node to NocoBase's
    * plugin-workflow editor as a PLAIN instruction object (no import from

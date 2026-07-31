@@ -11,7 +11,7 @@ import { Alert, ConfigProvider } from 'antd';
 import { Icon, useAPIClient } from '@nocobase/client';
 import { NEOHOME_GREEN, NEOHOME_THEME, ensureInterFont } from '../theme';
 import { NEOMODUL_FAVICON_SRC } from '../logo';
-import { neoaiAction, usePoll } from './shared';
+import { ConsoleAccessGate, neoaiAction, usePoll } from './shared';
 import { WorkflowsPanel } from './WorkflowsPanel';
 import { RunsPanel } from './RunsPanel';
 import { ApprovalsPanel } from './ApprovalsPanel';
@@ -105,7 +105,13 @@ function SideItem(props: { icon: string; label: string; active?: boolean; onClic
   );
 }
 
-export function NeoaiConsolePage() {
+/**
+ * The console proper. Only ever mounted behind `ConsoleAccessGate` — see `NeoaiConsolePage` below
+ * and the long note in `shared.tsx`. Keeping the gate OUTSIDE this component is what guarantees
+ * that a refused caller fires no panel request at all: `SpendAlertBanner` and all seven panels are
+ * children of this function, so if it never runs, none of them poll.
+ */
+function NeoaiConsoleBody() {
   useEffect(() => {
     ensureInterFont();
   }, []);
@@ -163,5 +169,19 @@ export function NeoaiConsolePage() {
         </main>
       </div>
     </ConfigProvider>
+  );
+}
+
+/**
+ * What the router mounts. One access question, asked once, before anything else happens.
+ *
+ * Tickets b4f8730e (the console opened for every logged-in user) and 7466a838 (a 403 read as a
+ * permanent "Loading…"). Both are answered here rather than eight times over in the panels.
+ */
+export function NeoaiConsolePage() {
+  return (
+    <ConsoleAccessGate area="The NeoAI console">
+      <NeoaiConsoleBody />
+    </ConsoleAccessGate>
   );
 }
