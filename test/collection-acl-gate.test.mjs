@@ -40,7 +40,7 @@ const { NEOAI_GATED_COLLECTIONS, neoaiSnippetActions, detachNeoaiCollectionsFrom
 
 /** Source text with `//` and block comments removed — so prose cannot pass for code. */
 function stripComments(source) {
-  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 }
 
 // A stand-in for the ACL that records what was taken out of it. Nothing here needs a database:

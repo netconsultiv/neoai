@@ -29,7 +29,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const srcRoot = process.env.NEOAI_SRC ? resolve(process.env.NEOAI_SRC) : resolve(root, 'src');
 const read = (rel) => readFileSync(resolve(srcRoot, rel), 'utf8');
-const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
 
 const {
   NEOAI_OPEN_ACTIONS,
