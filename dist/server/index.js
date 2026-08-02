@@ -736,6 +736,42 @@ function mockUsage(prompt) {
 }
 var MOCK_IMAGE_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADgQF/e5IkGQAAAABJRU5ErkJggg==";
 
+// src/server/lib/secrets.ts
+var import_node_crypto = __toESM(require("node:crypto"));
+var ALGO = "aes-256-gcm";
+var SALT = "neoai-secrets-vault";
+var IV_LEN = 12;
+var cachedKey = null;
+function deriveKey(env = process.env) {
+  const appKey = String(env.APP_KEY ?? "").trim();
+  if (!appKey) throw new Error("secrets: APP_KEY is not set \u2014 cannot encrypt/decrypt");
+  if (cachedKey && cachedKey.source === appKey) return cachedKey.key;
+  const key = import_node_crypto.default.scryptSync(appKey, SALT, 32);
+  cachedKey = { source: appKey, key };
+  return key;
+}
+function encryptSecret(plain, env = process.env) {
+  const key = deriveKey(env);
+  const iv = import_node_crypto.default.randomBytes(IV_LEN);
+  const cipher = import_node_crypto.default.createCipheriv(ALGO, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(String(plain ?? ""), "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return [iv.toString("base64"), authTag.toString("base64"), ciphertext.toString("base64")].join(":");
+}
+function decryptSecret(stored, env = process.env) {
+  const key = deriveKey(env);
+  const parts = String(stored ?? "").split(":");
+  if (parts.length !== 3) throw new Error("secrets: malformed stored value");
+  const [ivB64, tagB64, dataB64] = parts;
+  const iv = Buffer.from(ivB64, "base64");
+  const authTag = Buffer.from(tagB64, "base64");
+  const ciphertext = Buffer.from(dataB64, "base64");
+  const decipher = import_node_crypto.default.createDecipheriv(ALGO, key, iv);
+  decipher.setAuthTag(authTag);
+  const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return plain.toString("utf8");
+}
+
 // src/server/lib/providers.ts
 var GEMINI_TIMEOUT_MS = 6e4;
 var GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -747,12 +783,28 @@ async function isForceMock(app) {
     return false;
   }
 }
+function readVaultedSetting(app, row, field) {
+  const raw = String(row?.get?.(field) ?? "").trim();
+  if (!raw) return "";
+  if (raw.split(":").length !== 3) {
+    app?.logger?.warn?.(
+      `[neoai] ${field} liegt noch im KLARTEXT in neoai_settings. Der n\xE4chste Speichervorgang in NeoAI \u2192 Settings schreibt ihn in den AES-256-GCM-Tresor zur\xFCck.`
+    );
+    return raw;
+  }
+  try {
+    return decryptSecret(raw).trim();
+  } catch (err) {
+    app?.logger?.warn?.(`[neoai] ${field} sieht verschl\xFCsselt aus, liess sich aber nicht \xF6ffnen: ${err}`);
+    return "";
+  }
+}
 async function resolveGeminiKey(app) {
   const envKey = String(process.env.GEMINI_API_KEY ?? "").trim();
   if (envKey) return envKey;
   try {
     const own = await app.db.getRepository("neoai_settings")?.findOne();
-    const k = String(own?.get?.("gemini_api_key") ?? "").trim();
+    const k = readVaultedSetting(app, own, "gemini_api_key");
     if (k) return k;
   } catch {
   }
@@ -1740,42 +1792,6 @@ function isDue(spec, lastRunAt, now) {
   return !lastRunAt || lastRunAt < todayAt;
 }
 
-// src/server/lib/secrets.ts
-var import_node_crypto = __toESM(require("node:crypto"));
-var ALGO = "aes-256-gcm";
-var SALT = "neoai-secrets-vault";
-var IV_LEN = 12;
-var cachedKey = null;
-function deriveKey(env = process.env) {
-  const appKey = String(env.APP_KEY ?? "").trim();
-  if (!appKey) throw new Error("secrets: APP_KEY is not set \u2014 cannot encrypt/decrypt");
-  if (cachedKey && cachedKey.source === appKey) return cachedKey.key;
-  const key = import_node_crypto.default.scryptSync(appKey, SALT, 32);
-  cachedKey = { source: appKey, key };
-  return key;
-}
-function encryptSecret(plain, env = process.env) {
-  const key = deriveKey(env);
-  const iv = import_node_crypto.default.randomBytes(IV_LEN);
-  const cipher = import_node_crypto.default.createCipheriv(ALGO, key, iv);
-  const ciphertext = Buffer.concat([cipher.update(String(plain ?? ""), "utf8"), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-  return [iv.toString("base64"), authTag.toString("base64"), ciphertext.toString("base64")].join(":");
-}
-function decryptSecret(stored, env = process.env) {
-  const key = deriveKey(env);
-  const parts = String(stored ?? "").split(":");
-  if (parts.length !== 3) throw new Error("secrets: malformed stored value");
-  const [ivB64, tagB64, dataB64] = parts;
-  const iv = Buffer.from(ivB64, "base64");
-  const authTag = Buffer.from(tagB64, "base64");
-  const ciphertext = Buffer.from(dataB64, "base64");
-  const decipher = import_node_crypto.default.createDecipheriv(ALGO, key, iv);
-  decipher.setAuthTag(authTag);
-  const plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
-  return plain.toString("utf8");
-}
-
 // src/server/lib/knowledgeRetrieval.ts
 var TITLE_BOOST = 3;
 var TAG_BOOST = 4;
@@ -2282,7 +2298,19 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
           for (const k of ["default_llm_service", "default_model", "daily_budget_usd", "image_price_usd", "prices", "force_mock", "spend_alert_pct"]) {
             if (p[k] !== void 0) values[k] = p[k];
           }
-          if (typeof p.gemini_api_key === "string") values.gemini_api_key = p.gemini_api_key.trim();
+          if (typeof p.gemini_api_key === "string") {
+            const plain = p.gemini_api_key.trim();
+            if (!plain) {
+              values.gemini_api_key = "";
+            } else {
+              try {
+                values.gemini_api_key = encryptSecret(plain);
+              } catch (err) {
+                ctx.throw(500, `encryption failed (APP_KEY not set?): ${err?.message ?? err}`);
+                return;
+              }
+            }
+          }
           if (row) await repo.update({ filterByTk: row.get("id"), values });
           else await repo.create({ values });
           ctx.body = { ok: true };
