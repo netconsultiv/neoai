@@ -324,7 +324,25 @@ export class NeoaiPlugin extends Plugin {
             if (p[k] !== undefined) values[k] = p[k];
           }
           // Key is write-only: set when a non-empty string arrives, clear on ''.
-          if (typeof p.gemini_api_key === 'string') values.gemini_api_key = p.gemini_api_key.trim();
+          //
+          // ⚠️ BEFUND 5 (BÜNDEL BT): stand hier bis 2026-08-02 als BLANKER varchar-Wert, obwohl
+          // der AES-256-GCM-Tresor dieses Plugins (lib/secrets.ts) zwei Dateien weiter jeden
+          // neoai_secrets-Eintrag verschlüsselt. Jetzt derselbe Weg wie secretsSave: schlägt die
+          // Verschlüsselung fehl, wird der Vorgang ABGEBROCHEN — ein Klartext-Rückfall auf der
+          // SCHREIBseite wäre genau der Zustand, den dieser Commit beendet.
+          if (typeof p.gemini_api_key === 'string') {
+            const plain = p.gemini_api_key.trim();
+            if (!plain) {
+              values.gemini_api_key = '';
+            } else {
+              try {
+                values.gemini_api_key = encryptSecret(plain);
+              } catch (err: any) {
+                ctx.throw(500, `encryption failed (APP_KEY not set?): ${err?.message ?? err}`);
+                return;
+              }
+            }
+          }
           if (row) await repo.update({ filterByTk: row.get('id'), values });
           else await repo.create({ values });
           ctx.body = { ok: true };
