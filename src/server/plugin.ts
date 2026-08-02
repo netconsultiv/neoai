@@ -135,6 +135,59 @@ export class NeoaiPlugin extends Plugin {
       after: 'acl',
     });
 
+    // EIN GEHEIMNIS DARF DAS ANWENDUNGSPROTOKOLL NICHT ÜBERLEBEN (Ticket acb1194f, Punkt 7).
+    //
+    // GEMESSEN, nicht vermutet (2026-08-02, Sandkasten :13030): ein `neoai:secretsSave` mit dem
+    // Kontrollmarker `CH-NEOAI-PLAINTEXT-CCC` legte ihn WÖRTLICH ins Protokoll —
+    //
+    //   [info] response /api/neoai:secretsSave ...
+    //          action={"params":{"values":{"name":"ch-probe","value":"CH-NEOAI-PLAINTEXT-CCC"}}}
+    //
+    // ⚠️ Der Vorwurf ist AUSDRÜCKLICH NICHT „neoai speichert im Klartext". Das tut es nicht: beide
+    // Schreibwege verschlüsseln (lib/secrets.ts, AES-256-GCM) und BRECHEN AB, wenn das misslingt —
+    // in der Datenbank stand zur selben Messung korrekt Geheimtext. Undicht ist allein das
+    // PROTOKOLL: NocoBases eigener Antwort-Logger serialisiert `ctx.action` wörtlich, und er tut
+    // das mit den Werten, BEVOR unser Handler sie verschlüsselt.
+    //
+    // DIESELBE FEHLERKLASSE hat crm am 2026-07-31 geschlossen
+    // (`crm/src/server/plugin.ts`, Marke `crm-config-redact-secrets-from-log`). Hier steht dieselbe
+    // Lösung, und zwar bewusst als KOPIE der Mechanik statt als geteilte Bibliothek: die beiden
+    // Plugins teilen keinen Code, und eine neue gemeinsame Abhängigkeit nur für neun Zeilen
+    // Protokollhygiene wäre der teurere Fehler.
+    //
+    // WARUM NACH `await next()`: der Logger ist VOR dieser Middleware registriert, umschliesst sie
+    // also und liest `ctx.action` auf dem Rückweg. Nach dem Handler zu schwärzen heisst: der
+    // Handler hat die echten Werte gesehen, der Logger sieht sie nicht mehr. Der Schreibvorgang in
+    // die Datenbank bleibt völlig unberührt — geschwärzt wird nur das Objekt im Arbeitsspeicher.
+    //
+    // Die Liste ist nach AKTION geschlüsselt und nicht nach Sammlung, weil `neoai` eine
+    // Aktions-Ressource ist: es gibt keine Sammlung, an der ein Feldname hinge.
+    const NEOAI_SECRET_PARAMS: Record<string, readonly string[]> = {
+      // Der Tresor-Eintrag selbst. `name` ist KEIN Geheimnis und bleibt lesbar — sonst wäre dem
+      // Protokoll nicht mehr zu entnehmen, WELCHER Eintrag geschrieben wurde.
+      secretsSave: ['value'],
+      // Der Gemini-Schlüssel aus den Einstellungen (BEFUND 5, BÜNDEL BT).
+      saveSettings: ['gemini_api_key'],
+    };
+    this.app.resourceManager.use(async (ctx: any, next: any) => {
+      await next();
+      try {
+        if (ctx.action?.resourceName !== 'neoai') return;
+        const secrets = NEOAI_SECRET_PARAMS[ctx.action?.actionName];
+        if (!secrets) return;
+        for (const bag of [ctx.action?.params?.values, ctx.request?.body]) {
+          if (!bag || typeof bag !== 'object') continue;
+          for (const key of secrets) {
+            // Nur schwärzen, was wirklich da ist: ein abwesendes Feld zu „[redacted]" zu machen
+            // liesse das Protokoll einen Schreibvorgang behaupten, den es nie gab.
+            if (bag[key] !== undefined && bag[key] !== null && bag[key] !== '') bag[key] = '[redacted]';
+          }
+        }
+      } catch {
+        // Protokollhygiene darf eine bereits erfolgreiche Anfrage niemals scheitern lassen.
+      }
+    }, { tag: 'neoai-redact-secrets-from-log', after: 'acl' });
+
     // Layer three, unchanged. Ticket 13c027fa: asks the ACL which roles carry NEOAI_ADMIN_SNIPPET,
     // and asks it about the role the caller is ACTING AS. It used to compare
     // ctx.state.currentUser.roles — the account's whole membership list — against a hardcoded
