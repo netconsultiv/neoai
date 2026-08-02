@@ -2129,6 +2129,28 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
       tag: "neoai-admin-gate",
       after: "acl"
     });
+    const NEOAI_SECRET_PARAMS = {
+      // Der Tresor-Eintrag selbst. `name` ist KEIN Geheimnis und bleibt lesbar — sonst wäre dem
+      // Protokoll nicht mehr zu entnehmen, WELCHER Eintrag geschrieben wurde.
+      secretsSave: ["value"],
+      // Der Gemini-Schlüssel aus den Einstellungen (BEFUND 5, BÜNDEL BT).
+      saveSettings: ["gemini_api_key"]
+    };
+    this.app.resourceManager.use(async (ctx, next) => {
+      await next();
+      try {
+        if (ctx.action?.resourceName !== "neoai") return;
+        const secrets = NEOAI_SECRET_PARAMS[ctx.action?.actionName];
+        if (!secrets) return;
+        for (const bag of [ctx.action?.params?.values, ctx.request?.body]) {
+          if (!bag || typeof bag !== "object") continue;
+          for (const key of secrets) {
+            if (bag[key] !== void 0 && bag[key] !== null && bag[key] !== "") bag[key] = "[redacted]";
+          }
+        }
+      } catch {
+      }
+    }, { tag: "neoai-redact-secrets-from-log", after: "acl" });
     const requireAdmin = (ctx) => {
       if (!isAdminCtx(this.app.acl, ctx)) ctx.throw(403, "NeoAI is admin-only for now");
     };
