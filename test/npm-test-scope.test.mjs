@@ -421,3 +421,62 @@ test('each named skip SAYS why — an argument-less skip tells the next reader n
     );
   }
 });
+
+// ---- THE CENSUS ONLY SEES ONE SKIP FORM — SO THAT MUST BE THE ONLY ONE ------
+// MEASURED, not assumed (2026-08-02, BÜNDEL BT, against table-views origin/develop
+// 1edbc58, fresh clone, nothing installed). The census above keys on `t.skip(`,
+// the context-object form. node:test has two further ways to skip a test, and
+// BOTH raise the runtime skip counter while leaving the list above untouched:
+//
+//     test('x', { skip: 'why' }, () => {});   -> 109 tests / 2 skipped / EXIT 0
+//     test.skip('x', () => {});               -> 109 tests / 2 skipped / EXIT 0
+//
+// Both were let through against a declared ceiling of 1, in a repo that already
+// carried the reviewed list — because the numeric ceiling is only enforced on an
+// installed tree and the census never looked for these spellings. Two guards,
+// one blind spot each, lining up exactly.
+//
+// Widening the census to parse them is the worse repair: `{ skip: … }` may be
+// computed (`{ skip: !hasThing && 'why' }`), so a parser would have to decide at
+// read time what only the run knows. The cheaper and stricter rule is a
+// CONVENTION — in this repo a test skips through the context object or not at
+// all — and that IS checkable in the committed source, in every layout, with
+// nothing installed. A skip written any other way is refused here with the
+// spelling that the census can see.
+//
+// Read on the masked source for the same reason as the census: this file names
+// all three forms in its own prose, and a raw grep would report itself.
+const FOREIGN_SKIP_FORMS = [
+  {
+    re: /\b(?:test|it|describe|suite)\s*\.\s*skip\s*\(/g,
+    what: 'the METHOD form (test.skip(…) / it.skip(…) / describe.skip(…))',
+  },
+  {
+    re: /[{,]\s*skip\s*:/g,
+    what: 'the OPTIONS form ({ skip: … } as the second argument of test())',
+  },
+];
+
+test('a test skips through the context object or not at all — no form the census cannot see', () => {
+  const found = [];
+  for (const file of unitSuites) {
+    const src = readFileSync(join(REPO_ROOT, file), 'utf8');
+    const mask = maskOf(src);
+    for (const form of FOREIGN_SKIP_FORMS) {
+      for (const m of src.matchAll(form.re)) {
+        if (mask[m.index] !== 'c') continue;      // prose, string or regex literal is not code
+        found.push(`${file}: ${form.what} — ${src.slice(m.index, src.indexOf('\n', m.index)).trim()}`);
+      }
+    }
+  }
+  assert.deepEqual(
+    found,
+    [],
+    'these skips are written in a form the ALLOWED_SKIPS census above cannot see, so they raise ' +
+      'the runtime skip count with no entry on the reviewed list and no diff to review:\n  ' +
+      found.join('\n  ') +
+      '\n  Rewrite them as the context form, which the census does see:\n' +
+      "      test('…', (t) => { if (<absent>) { t.skip('<why>'); return; } … });\n" +
+      '  and add the test to ALLOWED_SKIPS with its kind and reason in the same diff.',
+  );
+});

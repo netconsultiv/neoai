@@ -19,6 +19,7 @@
 
 import { isSandbox } from './env';
 import { MOCK_IMAGE_DATA_URL, mockFromSchema, mockLlmText, mockUsage } from './mock';
+import { decryptSecret } from './secrets';
 
 export const GEMINI_TIMEOUT_MS = 60_000;
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -53,12 +54,53 @@ export async function isForceMock(app: any): Promise<boolean> {
   }
 }
 
+/**
+ * Ein Feld aus `neoai_settings` lesen, das im TRESOR liegt — mit Rückfall auf Klartext.
+ *
+ * ⚠️ BEFUND 5 (BÜNDEL BT, 2026-08-02, aus BÜNDEL BQ Punkt 10): `gemini_api_key` lag als blankes
+ * `varchar` in der Zeile, während der AES-256-GCM-Tresor dieses Plugins (`lib/secrets.ts`, aus
+ * Bens ausdrücklicher Entscheidung „echte Verschlüsselung, nicht nur Maskierung") zwei Dateien
+ * weiter jeden `neoai_secrets`-Eintrag verschlüsselt. Ein Tresor, an dem der wichtigste Schlüssel
+ * des Plugins vorbeigelegt wird, schützt genau das nicht, wofür er gebaut wurde.
+ *
+ * DER RÜCKFALL IST PFLICHT, NICHT BEQUEMLICHKEIT. Jede laufende Installation hat den Schlüssel
+ * heute im Klartext in der Zeile stehen. Ein Lesepfad, der nur noch entschlüsselt, macht die
+ * Fassung nach diesem Commit zu einem stillen Ausfall aller Gemini-Aufrufe — kein Fehler, nur
+ * „kein Schlüssel konfiguriert". Deshalb: entschlüsseln, wenn es geht; sonst den Wert nehmen, wie
+ * er dasteht, und EINMAL warnen. Der nächste Speichervorgang schreibt ihn verschlüsselt zurück.
+ *
+ * `decryptSecret` wirft bei Formfehler, falschem Schlüssel UND Manipulation (GCM-Auth-Tag). Alle
+ * drei landen hier im selben Zweig, und das ist richtig: unterscheiden liesse sich nur „sieht aus
+ * wie unser Format" von „tut es nicht", und ein manipulierter Wert soll nicht als Klartext
+ * durchgereicht werden — er ist es nicht und entschlüsselt sich nicht, also bleibt er leer.
+ */
+export function readVaultedSetting(app: any, row: any, field: string): string {
+  const raw = String(row?.get?.(field) ?? '').trim();
+  if (!raw) return '';
+  // Unser Speicherformat ist `iv:authTag:ciphertext`, drei base64-Segmente. Ein API-Schlüssel
+  // enthält keine Doppelpunkte, die Form ist also ein tragfähiges Unterscheidungsmerkmal —
+  // und wo sie doch täuscht, fängt der catch-Zweig es auf.
+  if (raw.split(':').length !== 3) {
+    app?.logger?.warn?.(
+      `[neoai] ${field} liegt noch im KLARTEXT in neoai_settings. Der nächste Speichervorgang ` +
+      'in NeoAI → Settings schreibt ihn in den AES-256-GCM-Tresor zurück.',
+    );
+    return raw;
+  }
+  try {
+    return decryptSecret(raw).trim();
+  } catch (err) {
+    app?.logger?.warn?.(`[neoai] ${field} sieht verschlüsselt aus, liess sich aber nicht öffnen: ${err}`);
+    return '';
+  }
+}
+
 export async function resolveGeminiKey(app: any): Promise<string> {
   const envKey = String(process.env.GEMINI_API_KEY ?? '').trim();
   if (envKey) return envKey;
   try {
     const own = await app.db.getRepository('neoai_settings')?.findOne();
-    const k = String(own?.get?.('gemini_api_key') ?? '').trim();
+    const k = readVaultedSetting(app, own, 'gemini_api_key');
     if (k) return k;
   } catch {
     /* settings not provisioned yet */
