@@ -515,7 +515,8 @@ function rolesOfContext(ctx) {
   const list = Array.isArray(raw) && raw.length ? raw : [ctx?.state?.currentRole];
   const names = [];
   for (const entry of list) {
-    const name = typeof entry === "string" ? entry : entry?.name ?? entry?.role;
+    const entryAny = entry;
+    const name = typeof entry === "string" ? entry : entryAny?.name ?? entryAny?.role ?? entryAny?.get?.("name");
     const trimmed = typeof name === "string" ? name.trim() : "";
     if (!trimmed || trimmed === "__union__") continue;
     if (!names.includes(trimmed)) names.push(trimmed);
