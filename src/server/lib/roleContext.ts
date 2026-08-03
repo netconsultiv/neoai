@@ -44,43 +44,87 @@
  *  `aclSnippet` to keep in step. */
 export const NEOAI_ADMIN_SNIPPET = 'pm.neoai.settings';
 
-/**
- * The roles the SERVER resolved as ACTIVE for this request.
- *
- * Mirrors `@nocobase/acl/lib/acl.js:302` exactly —
- *
- *     const roles = ctx.state.currentRoles || [ctx.state.currentRole || 'anonymous'];
- *
- * — so it cannot drift from the derivation the ACL middleware itself ran a moment earlier. The
- * same function, deliberately in the same shape, lives in
- * `pdf-generator/src/server/roleContext.ts` and `design-studio/src/server/operatorAcl.ts`: two
- * plugins answering "which role is this?" differently is how defect 1 above gets reintroduced one
- * plugin at a time.
- *
- * `X-Role` is CLIENT INPUT and is never read here. `setCurrentRole` validates it against the
- * account's real memberships (401 `ROLE_NOT_FOUND_FOR_USER` otherwise) and publishes the verdict
- * on `ctx.state`; only the verdict is read.
- *
- * ROLE-UNION MODE IS NOT A BUG. With `roleMode = onlyUseUnion`, or on the `__union__` pseudo-role,
- * NocoBase deliberately fills `currentRoles` with ALL of the account's roles — there the union IS
- * the active role and the ACL evaluates it identically. Reading `currentRoles` stays correct in
- * both modes, which is precisely why it is the right source and `currentUser.roles` is not.
- * `__union__` itself is dropped: no permission is ever granted on the pseudo-role.
- *
- * Fails CLOSED: nothing resolvable ⇒ empty list ⇒ not an admin.
- */
+// ── ROLLEN-SAMMLER · KANONISCH v1 — ZEICHENGLEICH IN NEUN PLUGIN-REPOS ──────────────────────────
+//
+// Diese Funktion beantwortet die eine Frage "welche Rollen trägt DIESER Aufruf?" und ist in
+// konfigurator, crm, pdf-generator, design-studio, neoai, unified-search, cloudflare,
+// saved-filters und table-views zeichengleich. Sie wird NICHT lokal angepasst.
+//
+// WARUM ZEICHENGLEICH UND NICHT "SINNGEMAESS GLEICH": neun eigene Antworten auf dieselbe Frage
+// sind die Bauform, ueber die die Fehlerklasse aus Ticket 13c027fa ein Plugin nach dem anderen
+// zurueckkommt. Dort las ein Plugin `ctx.state.currentUser.roles` — die MITGLIEDSCHAFTSLISTE des
+// Kontos, die `@nocobase/plugin-acl`'s `setCurrentRole` auf JEDER Anfrage schreibt, unabhaengig von
+// `X-Role` — statt der aktiven Rolle. Rollenumschaltung wirkte damit gar nicht: gemessen bekam ein
+// Konto mit `member,root,admin,pdf_operator,architect` unter `X-Role: member` weiterhin 200,
+// waehrend ein Konto, das NUR `architect` haelt, 403 bekam. Der Ein-Rollen-Vergleich ist der Beleg,
+// dass Konto-MITGLIEDSCHAFT gewertet wurde und nicht die Rolle.
+//
+// DIE QUELLE: `ctx.state.currentRoles`, mit `[ctx.state.currentRole]` nur als Rueckfall. Das
+// spiegelt `@nocobase/acl/lib/acl.js:302` — `const roles = ctx.state.currentRoles || [roleName]` —
+// wortgleich, kann also nie von der Ableitung abweichen, die die ACL-Schicht einen Moment vorher
+// selbst gefahren hat. `currentUser.roles` ist wer man IST, `currentRoles` ist als wen man
+// HANDELT; Autorisierung ist das Zweite. `X-Role` ist Client-Eingabe und wird hier nie gelesen.
+//
+// EINE EINZIGE BEWUSSTE ABWEICHUNG VON acl.js:302, und sie gehoert benannt statt verschwiegen:
+// dort ist `roleName` selbst `ctx.state.currentRole || 'anonymous'`, die ACL faellt also auf die
+// REGISTRIERTE Rolle `anonymous` zurueck. Hier nicht. Diese Funktion versorgt Privilegien-Tore,
+// und ein Aufrufer, dessen Rolle der Server nicht aufloesen konnte, darf nicht mit einem
+// Rollennamen weitergereicht werden, dem eine Installation etwas zugeteilt haben kann. Die Folge
+// ist strikt ENGER — leere Liste statt `['anonymous']`, also nie MEHR Rechte, hoechstens ein
+// ehrliches Nein. Wer eine Ressource absichtlich fuer Anonyme oeffnet, tut das ueber die ACL
+// (`acl.allow`) oder eine ausdrueckliche Entscheidung in der Fachschicht — nicht dadurch, dass
+// dieser Sammler einen Namen erfindet, den der Server nicht bestaetigt hat. crm trug den
+// Rueckfall bis 2026-08-03 als einziges der neun Repos; gemessen hing dort kein Aufrufer daran
+// (`decideCrmAccess` erreicht den Rollen-Zweig erst nach `if (!q.authenticated) return {…false}`).
+//
+// `__union__` WIRD VERWORFEN — gemessen, nicht vermutet. Unter `roleMode = onlyUseUnion` setzt
+// NocoBase `currentRole` auf das Pseudo `__union__` und `currentRoles` auf ALLE Rollen des Kontos;
+// die Union IST dort die aktive Rolle, `currentRoles` bleibt also in beiden Modi die richtige
+// Quelle. Das Pseudo selbst ist serverseitig NIE eine registrierte ACL-Rolle: `getCanByRole()`
+// schlaegt mit `this.roles.get(role)` nach und liefert `null` fuer jeden unbekannten Namen, und
+// `__union__` kommt im Serverbaum nur in `helper.js` als Variablen-Marker vor. Es stehenzulassen
+// kann daher nie etwas GEWAEHREN — aber es kann jeden Verbraucher irrefuehren, der die Liste fuer
+// etwas anderes als eine `can()`-Abfrage nutzt (Stufen-Zuordnung, Eigentum, Namensvergleich,
+// Protokoll). Verwerfen ist strikt enger und verliert nachweislich keine Berechtigung.
+//
+// KEINE KLEINSCHREIBUNG hier: die ACL vergleicht Rollennamen zeichengenau (`this.roles.get(role)`),
+// eine Rolle namens `Admin` waere durch Kleinschreibung unauffindbar. Fachschichten, die gegen
+// eine eigene Tabelle von Rollennamen vergleichen (design-studio, konfigurator), normalisieren
+// darueber — nie hier drin.
+//
+// SCHEITERT GESCHLOSSEN: kein State, keine Rollen, nichts aufloesbar ⇒ leere Liste ⇒ nicht
+// privilegiert. Ein Aufrufer, dessen Rollen nicht bestimmbar sind, ist kein Administrator.
+//
+// ⚠️ AENDERUNGEN NUR IN ALLEN NEUN REPOS GLEICHZEITIG. Der Waechter
+// `test/role-collector-canonical.test.mjs` zaehlt in jedem Repo die Fundstellen dieses Blocks und
+// vergleicht sie zeichenweise gegen die dort hinterlegte Pruefsumme; `./sandbox.sh role-collector`
+// im neobase-Superprojekt vergleicht diese Pruefsumme ueber alle neun Repos hinweg. Ein einzelnes
+// Repo anzupassen macht beide rot.
 export function rolesOfContext(ctx: any): string[] {
   const raw = ctx?.state?.currentRoles;
+  // `|| [Einzahl]` und nicht "beide verschmelzen": der Rueckfall greift nur, wenn die Mehrzahl
+  // fehlt oder leer ist — die eine Gestalt, die `setCurrentRole` auf seinem fruehen Ausstieg fuer
+  // `X-Role: anonymous` hinterlaesst. Verschmelzen waere auf jeder Gestalt, die jene Schicht
+  // erzeugt, gleichwertig (sie setzt `currentRole` nie auf eine in `currentRoles` fehlende Rolle) —
+  // aber "enger oder gleich dem, was die ACL gewertet hat" ist die Eigenschaft, die zaehlt, nicht
+  // "heute gleichwertig".
   const list: any[] = Array.isArray(raw) && raw.length ? raw : [ctx?.state?.currentRole];
   const names: string[] = [];
   for (const entry of list) {
-    const name = typeof entry === 'string' ? entry : (entry as any)?.name ?? (entry as any)?.role;
+    // Eine Rolle kommt als blanker Name, als Zeile/Modell mit `name`/`role`, oder als
+    // Sequelize-Modell, das nur ueber `get('name')` herausrueckt. Alle drei Gestalten sind auf
+    // diesem Stapel gesehen worden; eine Rolle, welche die ACL gewertet hat, hier fallen zu
+    // lassen waere eine falsche Ablehnung, keine sichere.
+    const entryAny = entry as any;
+    const name =
+      typeof entry === 'string' ? entry : entryAny?.name ?? entryAny?.role ?? entryAny?.get?.('name');
     const trimmed = typeof name === 'string' ? name.trim() : '';
     if (!trimmed || trimmed === '__union__') continue;
     if (!names.includes(trimmed)) names.push(trimmed);
   }
   return names;
 }
+// ── ENDE ROLLEN-SAMMLER · KANONISCH v1 ─────────────────────────────────────────────────────────
 
 /** The action this request is really asking for, as the ACL spells it. Falls back to the wildcard
  *  the snippet is registered with, so a call made outside an action context is still answerable
