@@ -51,6 +51,7 @@ import { isDue, parseSchedule } from './lib/schedule';
 import { decryptSecret, encryptSecret } from './lib/secrets';
 import { resolveTemplates, truncateJson } from './lib/template';
 import { search as searchKnowledge, planApproveSuggestion, planRejectSuggestion } from './lib/knowledgeRetrieval';
+import { collectDeclaredOptionLists, healFieldDefinitions } from './lib/schema-heal';
 import { ensureSeedWorkflows } from './seed';
 
 /** Count budget-relevant nodes for the confirm-gate estimate. */
@@ -641,6 +642,19 @@ export class NeoaiPlugin extends Plugin {
     detach('load');
     this.db.on('afterDefineCollection', () => detach('afterDefineCollection'));
     this.db.on('afterUpdateCollection', () => detach('afterUpdateCollection'));
+
+    // Eingefrorene Felddefinitionen beim Start nachziehen (dritte Achse).
+    //
+    // BEWUSST ALS EIGENER, FRUEHERER HANDLER und nicht im Sweep darunter: die
+    // `afterStart`-Handler laufen in Registrierungsreihenfolge, und
+    // `detach('afterStart')` muss das LETZTE Wort behalten (siehe die
+    // Begruendung dort). Dieser Sweep schreibt `fields`-Zeilen und laedt sie neu
+    // — beides kann NocoBase dazu bringen, einen Sammlungsnamen hinter unserem
+    // Ruecken wieder an `acl.strategyResources` zu haengen. Er gehoert deshalb
+    // VOR die Ablösung, nicht dahinter.
+    this.app.on('afterStart', async () => {
+      await this.healFieldDefinitionsOnBoot();
+    });
 
     // Mark runs orphaned by a process restart. 'waiting' runs keep their state.
     this.app.on('afterStart', async () => {
@@ -1525,6 +1539,51 @@ export class NeoaiPlugin extends Plugin {
 
   // ---------------------------------------------------------------------------
   // Idempotent provisioning (CRM ensureCollection/ensureField pattern)
+
+  /**
+   * Der Sweep, der etwas repariert, das VORHANDEN ist.
+   *
+   * `ensureField()` weiter unten ist idempotent auf EXISTENZ: findet es die
+   * `fields`-Zeile, fasst es sie nie wieder an. NocoBase liest Felddefinitionen
+   * zur Laufzeit aus genau dieser Tabelle, nicht aus dem Buendel — eine
+   * geaenderte Auswahlliste erreicht eine bestehende Installation also NIE von
+   * selbst, auch nicht nach beliebig vielen Neustarts. Bei @neomodul/crm
+   * gemessen (crm #164/#166) und dort mit demselben Sweep geschlossen.
+   *
+   * WARUM HIER UND NICHT IN setup(): setup() laeuft nur in install() und
+   * afterEnable(), und `pm enable` gegen ein bereits aktiviertes Plugin ist ein
+   * No-op. Eine Reparatur, die nur dort haengt, liefe ausgerechnet auf den
+   * Installationen nicht, die den Rueckstand tragen.
+   *
+   * Zuschnitt, gemessene Sprengweite und die Begruendung des asymmetrischen
+   * Vergleichs stehen in lib/schema-heal.ts — dort, wo die Entscheidung faellt.
+   * Auf einer gesunden Installation liest dieser Sweep 6 Zeilen und schreibt
+   * nichts (gemessen 2026-08-05: 6 deklarierte Auswahllisten, 6 identisch).
+   */
+  private async healFieldDefinitionsOnBoot() {
+    try {
+      const entries = collectDeclaredOptionLists([
+        { owner: 'core', collections: NEOAI_COLLECTIONS, extraFields: NEOAI_EXTRA_FIELDS },
+      ]);
+      const report = await healFieldDefinitions(entries, {
+        fieldsRepo: this.db.getRepository('fields'),
+        logger: this.app.logger,
+        // Damit ein LAUFENDER Prozess die korrigierte Definition sofort
+        // ausliefert und nicht erst der naechste. Bewusst ohne Tabellen-Sync:
+        // eine Auswahlliste hat keine Spaltenform.
+        reloadField: (row: any) => row.load(),
+      });
+      if (report.healed.length) {
+        this.app.logger.info(
+          `[neoai] boot definition heal corrected ${report.healed.length} stale option list(s): ${report.healed.join(', ')}`,
+        );
+      }
+    } catch (err: any) {
+      // healFieldDefinitions schluckt bereits alles; hier zu landen heisst, dass
+      // das Inventar selbst geworfen hat. Auch das darf den Start nicht anhalten.
+      this.app.logger.warn(`[neoai] boot definition heal failed (non-fatal): ${err?.stack || err}`);
+    }
+  }
 
   private async setup() {
     for (const values of NEOAI_COLLECTIONS) {

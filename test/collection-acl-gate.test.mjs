@@ -121,11 +121,22 @@ test('the detachment is wired to load, afterStart AND the collection events', ()
 });
 
 test('the afterStart detachment runs AFTER the boot sweeps that write meta rows', () => {
-  const plugin = read('server/plugin.ts');
+  // COMMENTS STRIPPED FIRST, like the `acl.allow` census further down, and for the
+  // same measured reason: on 2026-08-05 the boot definition sweep landed with an
+  // explanatory comment that NAMES `detach('afterStart')` — it explains why the
+  // sweep is registered before it — and this guard, reading raw text, found the
+  // prose instead of the statement and turned red on correct code. A guard that
+  // cannot tell code from prose forces the deletion of exactly the comments that
+  // carry the reason ([[kommentar-entferner-in-waechtern]]).
+  const plugin = stripComments(read('server/plugin.ts'));
   const afterStartAt = plugin.indexOf("this.app.on('afterStart'");
   const detachAt = plugin.indexOf("detach('afterStart')");
   assert.ok(afterStartAt > -1 && detachAt > afterStartAt,
     'the detachment must sit inside the afterStart handler, so it has the last word');
+  // And it must be the LAST afterStart handler to touch the strategy: any sweep
+  // registered after it would re-append the collection names behind its back.
+  assert.ok(plugin.indexOf("this.app.on('afterStart'", detachAt) === -1,
+    'no afterStart handler may be registered after the one that detaches');
 });
 
 // ── 3. The snippet must still open the door for whoever holds it ───────────────────────────────

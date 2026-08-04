@@ -1926,6 +1926,104 @@ function planRejectSuggestion(row, reviewedBy, now = /* @__PURE__ */ new Date())
   return { ok: true, suggestionUpdate: { status: "rejected", reviewed_by: reviewedBy, reviewed_at: now } };
 }
 
+// src/server/lib/schema-heal.ts
+function isDuplicateSchemaError(err) {
+  const code = String(
+    err?.original?.code ?? err?.parent?.code ?? err?.cause?.code ?? err?.code ?? ""
+  );
+  if (code === "42701" || code === "42P07" || code === "23505") return true;
+  const message = String(err?.message ?? "");
+  return /already exists|duplicate key|duplicate column|SequelizeUniqueConstraintError/i.test(message);
+}
+function collectDeclaredOptionLists(sources) {
+  const entries = [];
+  const push = (owner, collection, field) => {
+    const options = field?.uiSchema?.enum;
+    if (!collection || !field?.name || !Array.isArray(options)) return;
+    entries.push({ owner, collection, name: field.name, options });
+  };
+  for (const source of sources ?? []) {
+    const owner = source?.owner ?? "unknown";
+    for (const def of source?.collections ?? []) {
+      for (const field of def?.fields ?? []) push(owner, def?.name, field);
+    }
+    for (const entry of source?.extraFields ?? []) push(owner, entry?.collection, entry?.field);
+  }
+  return entries;
+}
+function optionListsAgree(declared, stored) {
+  if (!Array.isArray(declared) || !Array.isArray(stored)) return false;
+  if (declared.length !== stored.length) return false;
+  for (let i = 0; i < declared.length; i += 1) {
+    const want = declared[i];
+    const have = stored[i];
+    if (want === null || typeof want !== "object") {
+      if (want !== have) return false;
+      continue;
+    }
+    if (have === null || typeof have !== "object") return false;
+    for (const key of Object.keys(want)) {
+      if (JSON.stringify(want[key]) !== JSON.stringify(have[key])) return false;
+    }
+  }
+  return true;
+}
+function storedUiSchema(row) {
+  return row?.get?.("uiSchema") ?? row?.uiSchema ?? row?.get?.("options")?.uiSchema ?? row?.options?.uiSchema;
+}
+async function healFieldDefinitions(entries, deps) {
+  const report = { checked: 0, healed: [], unprovisioned: [], raced: [], failed: [] };
+  if (!Array.isArray(entries) || !entries.length) return report;
+  if (!deps?.fieldsRepo) {
+    deps?.logger?.warn?.("[neoai] boot definition heal skipped: the fields repository is unavailable");
+    return report;
+  }
+  for (const entry of entries) {
+    const collection = entry?.collection;
+    const name = entry?.name;
+    if (!collection || !name || !Array.isArray(entry?.options)) {
+      deps.logger.warn(
+        `[neoai] boot definition heal: skipping a malformed entry from "${entry?.owner ?? "unknown"}"`
+      );
+      report.failed.push(`${collection ?? "?"}.${name ?? "?"}`);
+      continue;
+    }
+    const label = `${collection}.${name}`;
+    report.checked += 1;
+    try {
+      const row = await deps.fieldsRepo.findOne({ filter: { collectionName: collection, name } });
+      if (!row) {
+        report.unprovisioned.push(label);
+        continue;
+      }
+      const ui = storedUiSchema(row);
+      if (optionListsAgree(entry.options, ui?.enum)) continue;
+      await deps.fieldsRepo.update({
+        filter: { collectionName: collection, name },
+        values: { uiSchema: { ...ui && typeof ui === "object" ? ui : {}, enum: entry.options } }
+      });
+      if (deps.reloadField) {
+        const fresh = await deps.fieldsRepo.findOne({ filter: { collectionName: collection, name } });
+        if (fresh) await deps.reloadField(fresh);
+      }
+      report.healed.push(label);
+      deps.logger.info(
+        `[neoai] boot definition heal: ${entry.owner}/${label} option list was stale (${Array.isArray(ui?.enum) ? ui.enum.length : "?"} -> ${entry.options.length} values), rewritten from the declaration`
+      );
+    } catch (err) {
+      if (isDuplicateSchemaError(err)) {
+        report.raced.push(label);
+        continue;
+      }
+      report.failed.push(label);
+      deps.logger.warn(
+        `[neoai] boot definition heal: ${entry.owner}/${label} failed (continuing, boot is not blocked): ${err?.stack || err}`
+      );
+    }
+  }
+  return report;
+}
+
 // src/server/seed.ts
 var OVERPASS_VEGETATION = `[out:json][timeout:25];(node["natural"="tree"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["natural"="wood"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["landuse"="forest"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["natural"="water"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}}););out tags center 100;`;
 var OVERPASS_TRANSPORT = `[out:json][timeout:25];(way["highway"]["maxwidth"](around:400,{{nodes.geo.lat}},{{nodes.geo.lon}});way["highway"]["maxheight"](around:400,{{nodes.geo.lat}},{{nodes.geo.lon}});way["highway"]["maxweight"](around:400,{{nodes.geo.lat}},{{nodes.geo.lon}});way["highway"~"^(primary|secondary|tertiary|residential|unclassified|service|track)$"](around:200,{{nodes.geo.lat}},{{nodes.geo.lon}}););out tags center 120;`;
@@ -2555,6 +2653,9 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     detach("load");
     this.db.on("afterDefineCollection", () => detach("afterDefineCollection"));
     this.db.on("afterUpdateCollection", () => detach("afterUpdateCollection"));
+    this.app.on("afterStart", async () => {
+      await this.healFieldDefinitionsOnBoot();
+    });
     this.app.on("afterStart", async () => {
       detach("afterStart");
       try {
@@ -3328,6 +3429,48 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
   }
   // ---------------------------------------------------------------------------
   // Idempotent provisioning (CRM ensureCollection/ensureField pattern)
+  /**
+   * Der Sweep, der etwas repariert, das VORHANDEN ist.
+   *
+   * `ensureField()` weiter unten ist idempotent auf EXISTENZ: findet es die
+   * `fields`-Zeile, fasst es sie nie wieder an. NocoBase liest Felddefinitionen
+   * zur Laufzeit aus genau dieser Tabelle, nicht aus dem Buendel — eine
+   * geaenderte Auswahlliste erreicht eine bestehende Installation also NIE von
+   * selbst, auch nicht nach beliebig vielen Neustarts. Bei @neomodul/crm
+   * gemessen (crm #164/#166) und dort mit demselben Sweep geschlossen.
+   *
+   * WARUM HIER UND NICHT IN setup(): setup() laeuft nur in install() und
+   * afterEnable(), und `pm enable` gegen ein bereits aktiviertes Plugin ist ein
+   * No-op. Eine Reparatur, die nur dort haengt, liefe ausgerechnet auf den
+   * Installationen nicht, die den Rueckstand tragen.
+   *
+   * Zuschnitt, gemessene Sprengweite und die Begruendung des asymmetrischen
+   * Vergleichs stehen in lib/schema-heal.ts — dort, wo die Entscheidung faellt.
+   * Auf einer gesunden Installation liest dieser Sweep 6 Zeilen und schreibt
+   * nichts (gemessen 2026-08-05: 6 deklarierte Auswahllisten, 6 identisch).
+   */
+  async healFieldDefinitionsOnBoot() {
+    try {
+      const entries = collectDeclaredOptionLists([
+        { owner: "core", collections: NEOAI_COLLECTIONS, extraFields: NEOAI_EXTRA_FIELDS }
+      ]);
+      const report = await healFieldDefinitions(entries, {
+        fieldsRepo: this.db.getRepository("fields"),
+        logger: this.app.logger,
+        // Damit ein LAUFENDER Prozess die korrigierte Definition sofort
+        // ausliefert und nicht erst der naechste. Bewusst ohne Tabellen-Sync:
+        // eine Auswahlliste hat keine Spaltenform.
+        reloadField: (row) => row.load()
+      });
+      if (report.healed.length) {
+        this.app.logger.info(
+          `[neoai] boot definition heal corrected ${report.healed.length} stale option list(s): ${report.healed.join(", ")}`
+        );
+      }
+    } catch (err) {
+      this.app.logger.warn(`[neoai] boot definition heal failed (non-fatal): ${err?.stack || err}`);
+    }
+  }
   async setup() {
     for (const values of NEOAI_COLLECTIONS) {
       try {
