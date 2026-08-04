@@ -11,7 +11,11 @@
     "build": "node build-server.js && node build-client.js",
     "test": "node scripts/run-unit-tests.mjs --experimental-strip-types \"test/*.test.mjs\" \"test/*/*.test.mjs\" && node scripts/check-build.mjs",
     "test:unit": "node scripts/run-unit-tests.mjs --experimental-strip-types \"test/*.test.mjs\" \"test/*/*.test.mjs\"",
-    "test:build": "node scripts/check-build.mjs"
+    "test:build": "node scripts/check-build.mjs",
+    "merge-gate": "node scripts/merge-gate.mjs"
+  },
+  "neobaseMergeGate": {
+    "maxSkippedPercent": 0
   },
   "peerDependencies": {
     "@nocobase/client": "2.x",
