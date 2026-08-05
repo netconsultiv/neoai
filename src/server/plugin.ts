@@ -51,7 +51,13 @@ import { isDue, parseSchedule } from './lib/schedule';
 import { decryptSecret, encryptSecret } from './lib/secrets';
 import { resolveTemplates, truncateJson } from './lib/template';
 import { search as searchKnowledge, planApproveSuggestion, planRejectSuggestion } from './lib/knowledgeRetrieval';
-import { collectDeclaredOptionLists, healFieldDefinitions } from './lib/schema-heal';
+import {
+  collectDeclaredFields,
+  collectDeclaredOptionLists,
+  healExtraFields,
+  healFieldDefinitions,
+  healModuleCollections,
+} from './lib/schema-heal';
 import { ensureSeedWorkflows } from './seed';
 
 /** Count budget-relevant nodes for the confirm-gate estimate. */
@@ -643,16 +649,22 @@ export class NeoaiPlugin extends Plugin {
     this.db.on('afterDefineCollection', () => detach('afterDefineCollection'));
     this.db.on('afterUpdateCollection', () => detach('afterUpdateCollection'));
 
-    // Eingefrorene Felddefinitionen beim Start nachziehen (dritte Achse).
+    // Die drei Schema-Sweeps beim Start, in der einzig moeglichen Reihenfolge:
+    // SAMMLUNG -> FELD -> DEFINITION. Ein Feld kann sich nur an eine bestehende
+    // Sammlung haengen, und die Frage „steht in der Zeile noch, was der
+    // Quelltext sagt?" ist erst stellbar, wenn die Zeile existiert.
     //
     // BEWUSST ALS EIGENER, FRUEHERER HANDLER und nicht im Sweep darunter: die
     // `afterStart`-Handler laufen in Registrierungsreihenfolge, und
     // `detach('afterStart')` muss das LETZTE Wort behalten (siehe die
-    // Begruendung dort). Dieser Sweep schreibt `fields`-Zeilen und laedt sie neu
-    // — beides kann NocoBase dazu bringen, einen Sammlungsnamen hinter unserem
-    // Ruecken wieder an `acl.strategyResources` zu haengen. Er gehoert deshalb
-    // VOR die Ablösung, nicht dahinter.
+    // Begruendung dort). Alle drei Sweeps schreiben `collections`- bzw.
+    // `fields`-Zeilen und laden sie neu — jedes davon kann NocoBase dazu
+    // bringen, einen Sammlungsnamen hinter unserem Ruecken wieder an
+    // `acl.strategyResources` zu haengen. Sie gehoeren deshalb VOR die
+    // Abloesung, nicht dahinter.
     this.app.on('afterStart', async () => {
+      await this.healModuleCollectionsOnBoot();
+      await this.healExtraFieldsOnBoot();
       await this.healFieldDefinitionsOnBoot();
     });
 
@@ -1560,6 +1572,91 @@ export class NeoaiPlugin extends Plugin {
    * Auf einer gesunden Installation liest dieser Sweep 6 Zeilen und schreibt
    * nichts (gemessen 2026-08-05: 6 deklarierte Auswahllisten, 6 identisch).
    */
+  /**
+   * ACHSE 1 — jede deklarierte Sammlung, die auf DIESER Installation fehlt.
+   *
+   * `setup()` haengt nur an `install()`/`afterEnable()`, und `pm enable` gegen
+   * ein bereits aktiviertes Plugin ist ein No-op. Eine Sammlung, die eine neue
+   * Auslieferung mitbringt, erreicht eine bestehende Installation also nie von
+   * selbst; ein Neustart heilt nichts. Bei crm gemessen (`crm_ops_incidents`,
+   * 2026-07-31): Tabelle fehlte nach Neubau und Neustart, waehrend der
+   * schreibende Codepfad anstandslos lief und still scheiterte.
+   *
+   * Gemessen fuer DIESES Plugin (2026-08-05, laufender Sandkasten): 13 von 13
+   * deklarierten Sammlungen vorhanden, 0 fehlend. Der Sweep ist also eine
+   * Zusicherung fuer die naechste Sammlung, keine Reparatur — und ein gesunder
+   * Boot macht 13 indizierte Lesevorgaenge und schreibt nichts.
+   *
+   * SCHWEIGEN IST TEIL DES ZUSCHNITTS: ein gesunder Boot schreibt keine Zeile.
+   * Nur so ist „der zweite Neustart heilt nichts mehr" an einer NULL ablesbar
+   * statt an einem Text, den man auslegen muss. Dass der Sweep ueberhaupt lief,
+   * belegt im selben Fenster die Ablösungszeile dieses Plugins
+   * (`… detached from acl.strategyResources (afterStart)`). Die ANZAHL des
+   * Geprueften druckt der Waechter in `npm test`
+   * ([[waechter-brauchen-einen-zwangspunkt]]) — dort, wo sie belegen kann, dass
+   * nicht ueber einer leeren Auswahl gruen gemeldet wurde.
+   */
+  private async healModuleCollectionsOnBoot() {
+    try {
+      const report = await healModuleCollections(NEOAI_COLLECTIONS, {
+        collectionsRepo: this.db.getRepository('collections'),
+        ensureCollection: (def: any) => this.ensureCollection(def),
+        logger: this.app.logger,
+      });
+      if (report.added.length) {
+        this.app.logger.info(
+          `[neoai] boot collection heal provisioned ${report.added.length} of ${report.checked} ` +
+            `declared collection(s): ${report.added.join(', ')}`,
+        );
+      }
+    } catch (err: any) {
+      // healModuleCollections schluckt bereits alles; hier zu landen heisst,
+      // dass das Inventar selbst geworfen hat. Auch das haelt den Start nicht an
+      // — eine NeoAI, die mit einer fehlenden Tabelle startet, ist besser als
+      // eine, die gar nicht startet.
+      this.app.logger.warn(`[neoai] boot collection heal failed (non-fatal): ${err?.stack || err}`);
+    }
+  }
+
+  /**
+   * ACHSE 2 — jedes deklarierte Feld, das auf DIESER Installation fehlt.
+   *
+   * Der Zwilling von healModuleCollectionsOnBoot und aus demselben Grund da.
+   * Laeuft NACH ihm: ein Feld kann sich nur an eine bestehende Sammlung haengen.
+   *
+   * Das Inventar kommt aus dem ECHTEN Register (`collectDeclaredFields`) und
+   * deckt BEIDE Haelften des Vertrags ab — die inline an einer Sammlung
+   * deklarierten Felder UND `NEOAI_EXTRA_FIELDS`. Warum weiter als crms Vorlage:
+   * `ensureCollection()` fasst eine bestehende `collections`-Zeile nicht mehr
+   * an, ein nachtraeglich inline eingetragenes Feld erreicht eine bestehende
+   * Installation also durch nichts. collections.ts haelt dafuer nur eine
+   * Hausregel — Prosa, kein Mechanismus. Die Begruendung und die Messung stehen
+   * in lib/schema-heal.ts, dort faellt die Entscheidung.
+   *
+   * Gemessen (2026-08-05): 114 deklarierte Feldnamen, 114 gespeicherte Zeilen,
+   * 0 fehlend.
+   */
+  private async healExtraFieldsOnBoot() {
+    try {
+      const entries = collectDeclaredFields([
+        { owner: 'core', collections: NEOAI_COLLECTIONS, extraFields: NEOAI_EXTRA_FIELDS },
+      ]);
+      const report = await healExtraFields(entries, {
+        fieldsRepo: this.db.getRepository('fields'),
+        ensureField: (collection: string, field: any) => this.ensureField(collection, field),
+        logger: this.app.logger,
+      });
+      if (report.added.length) {
+        this.app.logger.info(
+          `[neoai] boot schema heal provisioned ${report.added.length} of ${report.checked} ` +
+            `declared field(s): ${report.added.join(', ')}`,
+        );
+      }
+    } catch (err: any) {
+      this.app.logger.warn(`[neoai] boot schema heal failed (non-fatal): ${err?.stack || err}`);
+    }
+  }
+
   private async healFieldDefinitionsOnBoot() {
     try {
       const entries = collectDeclaredOptionLists([

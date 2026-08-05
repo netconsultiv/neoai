@@ -1,5 +1,20 @@
 // src/server/lib/schema-heal.ts
 // -----------------------------------------------------------------------------
+// Die drei Achsen der NocoBase-Bereitstellungsfalle, in der Reihenfolge, in der
+// sie beim Start abgearbeitet werden muessen:
+//
+//   1. die SAMMLUNG (`collections`-Zeile + Tabelle)  -> healModuleCollections
+//   2. das FELD      (`fields`-Zeile + Spalte)       -> healExtraFields
+//   3. die DEFINITION des Feldes (`uiSchema.enum`)   -> healFieldDefinitions
+//
+// Die Reihenfolge ist zwingend und keine Geschmacksfrage: ein Feld kann sich nur
+// an eine bestehende Sammlung haengen, und die Frage „steht in der Zeile noch,
+// was der Quelltext sagt?" ist erst stellbar, wenn die Zeile existiert.
+//
+// Achse 3 kam zuerst (2026-08-05, neoai #20), weil sie die einzige mit gemessen
+// kundensichtbarer Fehlwirkung war. Die Achsen 1+2 sind am 2026-08-05 nachgezogen
+// worden — mit einer Messung VORWEG statt einer Vermutung, siehe direkt darunter.
+//
 // DIE DRITTE ACHSE: die FELDDEFINITION, nicht ihre Existenz.
 //
 // Portiert aus @neomodul/crm (PR crm#166, `a2fb9d68`), wo die Falle gemessen und
@@ -31,9 +46,15 @@
 // `('fields')` — den Collection-Manager-Pfad, genau wie crm. Gegenprobe an der
 // laufenden Installation:
 //
-//   select count(*) from fields where "collectionName" like 'neoai\_%';  -> 245
+//   select count(*) from fields where "collectionName" like 'neoai\_%';  -> 114
 //   GET /api/collections/neoai_runs/fields:list -> liefert 17 Felder, `status`
 //     mit der gespeicherten Auswahlliste
+//
+// (Diese Zeile nannte bis 2026-08-05 „245". Am selben Sandkasten nachgemessen —
+// mit `like 'neoai\_%'` und mit `~ '^neoai_'`, beide 114, bei 1389 Feldzeilen
+// insgesamt. Die 245 liess sich nicht reproduzieren; der Befund selbst — dieses
+// Plugin liegt auf dem Collection-Manager-Pfad und hat eine persistierte Kopie —
+// haengt an der Existenz der Zeilen, nicht an ihrer Anzahl.)
 //
 // Zum Vergleich die Gegenprobe, die zeigt, dass die Falle NICHT jedes Plugin
 // trifft: @neomodul/pdf-generator definiert seine Sammlungen ueber NocoBases
@@ -277,4 +298,252 @@ export async function healFieldDefinitions(
     }
   }
   return report;
+}
+
+// =============================================================================
+// DIE ERSTE UND ZWEITE ACHSE: was FEHLT — die Sammlung und das Feld.
+// =============================================================================
+//
+// Alles darueber repariert etwas, das VORHANDEN und FALSCH ist. Diese Haelfte
+// holt nach, was gar nicht erst entstanden ist.
+//
+// DER BEFUND (Restpunkt aus neoai #20, aufgeschrieben 2026-08-05)
+// ---------------------------------------------------------------
+// `setup()` haengt in diesem Plugin ausschliesslich an `install()` und
+// `afterEnable()`. Beide feuern auf einem gewoehnlichen Deploy nicht: `pm enable`
+// gegen ein bereits aktiviertes Plugin ist ein No-op (bei crm gemessen: 3,9 s
+// Nichts gegen 21,4 s echten Lauf), und `load()` fasst die Bereitstellung nicht
+// an. Eine neue Sammlung oder ein neues Feld erreicht eine BESTEHENDE
+// Installation damit nie von selbst, und ein Neustart heilt nichts.
+//
+// Die Fehlerwirkung ist nicht „ein Feld fehlt in einer Maske", sondern:
+// Servercode, der auf das Feld verzweigt, laeuft gegen eine Spalte, die es auf
+// dieser Installation nicht gibt. Bei crm war die schlimmere Variante die
+// fehlende SAMMLUNG (`crm_ops_incidents`, 2026-07-31): der schreibende Codepfad
+// lief anstandslos und scheiterte still — ausgerechnet die Betriebsmeldung, die
+// einen Fehler haette sichtbar machen sollen.
+//
+// ERST GEMESSEN, DANN GEBAUT (2026-08-05, laufender Sandkasten)
+// -------------------------------------------------------------
+// Das deklarierte Inventar dieses Plugins gegen die laufende Installation:
+//
+//   deklariert 13 Sammlungen / 114 Feldnamen (118 Eintraege, 4 doppelt
+//     deklariert: inline UND in NEOAI_EXTRA_FIELDS)
+//   gespeichert 13 Sammlungen / 114 Feldzeilen
+//   FEHLEND: 0 Sammlungen, 0 Felder
+//
+// Der Rueckstand ist also HEUTE null — der Sweep ist eine Zusicherung fuer das
+// naechste Feld, keine Reparatur eines bestehenden Schadens. Genau diese Messung
+// ist auch der Grund, warum der Zuschnitt vertretbar ist: ein gesunder Boot
+// macht 13 + 114 indizierte Lesevorgaenge und schreibt NICHTS.
+//
+// Und die Gegenprobe, warum hier trotzdem ein Sweep steht und nicht — wie bei
+// @neomodul/pdf-generator — nur ein Waechter: pdf-generator ist STRUKTURELL immun
+// (NocoBases eigenes `db.collection()` aus `load()`, 0 Zeilen in `fields`, taucht
+// in `collections:list` gar nicht auf). Dieses Plugin liegt auf dem
+// Collection-Manager-Pfad; seine 0 ist ein Zustand, keine Eigenschaft, und ein
+// Zustand laesst sich nicht festnageln.
+//
+// WARUM DIE FELDACHSE HIER WEITER GESCHNITTEN IST ALS BEI crm
+// ------------------------------------------------------------
+// crms Sweep sieht nur die `extraFields`-Haelfte an, weil dort inline deklarierte
+// Felder mit ihrer Sammlung entstehen. Das stimmt auch hier — aber nur fuer die
+// ERSTE Erzeugung: `ensureCollection()` fasst eine bereits bestehende
+// `collections`-Zeile nicht mehr an, ein NACHTRAEGLICH inline eingetragenes Feld
+// erreicht eine bestehende Installation also durch nichts. collections.ts haelt
+// dafuer die Hausregel „spaetere Zusaetze gehen ueber NEOAI_EXTRA_FIELDS" —
+// Prosa, kein Mechanismus, und still verletzbar.
+//
+// Deshalb deckt `collectDeclaredFields()` BEIDE Haelften ab. Das ist messbar
+// folgenlos (siehe die 114 = 114 oben) und macht die Hausregel zur Bequemlichkeit
+// statt zur Bedingung. Die 4 doppelt deklarierten Felder werden dabei
+// zusammengefasst, damit ein Boot sie nicht zweimal nachschlaegt.
+//
+// SICHERHEIT — dieselben drei Regeln wie Achse 3:
+//   1. Der Sweep kann den Start nie anhalten (er schluckt alles).
+//   2. Er tut nichts, wenn nichts zu tun ist: die Metadatenzeile IST der
+//      Bereitstellungsnachweis, ein `findOne` je Eintrag ist die ganze Pruefung.
+//   3. Er vertraegt gleichzeitig startende Arbeiter (isDuplicateSchemaError):
+//      wer das INSERT/ALTER-Rennen verliert, hat Erfolg, nicht Fehlschlag.
+
+export type ExtraFieldEntry = {
+  /** 'core' oder der Name des besitzenden Moduls — nur fuer Log/Report-Etiketten. */
+  owner: string;
+  collection: string;
+  field: any;
+};
+
+export type SchemaHealDeps = {
+  /** Repository der Collection-Manager-Tabelle `fields`. */
+  fieldsRepo: any;
+  /** Stellt EIN Feld bereit: Metadatenzeile anlegen, laden, Tabelle syncen. */
+  ensureField: (collection: string, field: any) => Promise<void>;
+  logger: { info: (msg: string) => void; warn: (msg: string) => void };
+};
+
+export type SchemaHealReport = {
+  /** Eintraege, die angesehen wurden (ein missgebildeter Eintrag wird nicht geprueft). */
+  checked: number;
+  /** "sammlung.feld" je Feld, das dieser Sweep tatsaechlich bereitgestellt hat. */
+  added: string[];
+  /** Felder, die ein gleichzeitig startender Arbeiter zuerst bereitgestellt hat. */
+  raced: string[];
+  /** Echt fehlgeschlagen — protokolliert, nie geworfen. */
+  failed: string[];
+};
+
+export type CollectionHealDeps = {
+  /** Repository der Collection-Manager-Tabelle `collections`. */
+  collectionsRepo: any;
+  /** Stellt EINE Sammlung bereit: Metadatenzeile anlegen, laden, Tabelle syncen. */
+  ensureCollection: (def: any) => Promise<void>;
+  logger: { info: (msg: string) => void; warn: (msg: string) => void };
+};
+
+export type CollectionHealReport = {
+  /** Sammlungen, die angesehen wurden. */
+  checked: number;
+  /** Namen der Sammlungen, die dieser Sweep tatsaechlich angelegt hat. */
+  added: string[];
+  /** Ein gleichzeitig startender Arbeiter hat zuerst geschrieben. */
+  raced: string[];
+  /** Echt fehlgeschlagen — protokolliert, nie geworfen. */
+  failed: string[];
+};
+
+/**
+ * ACHSE 1 — jede deklarierte Sammlung anlegen, die noch keine Metadatenzeile hat.
+ *
+ * Laeuft VOR dem Feld-Sweep: ein Feld kann sich nur an eine bestehende Sammlung
+ * haengen. Wirft nie.
+ *
+ * Faesst eine BESTEHENDE Zeile bewusst nicht an. Das ist die Aufgabe von
+ * `setup()`/`ensureCollection` (Titelfeld-Abgleich) und gehoert nicht in einen
+ * Sweep, der auf jedem Start jedes Arbeiters laeuft.
+ */
+export async function healModuleCollections(
+  defs: any[],
+  deps: CollectionHealDeps,
+): Promise<CollectionHealReport> {
+  const report: CollectionHealReport = { checked: 0, added: [], raced: [], failed: [] };
+  if (!Array.isArray(defs) || !defs.length) return report;
+  if (!deps?.collectionsRepo) {
+    deps?.logger?.warn?.('[neoai] boot collection heal skipped: the collections repository is unavailable');
+    return report;
+  }
+
+  for (const def of defs) {
+    const name = def?.name;
+    if (!name) {
+      // Ein missgebildeter Registereintrag ist ein Codefehler, keine
+      // Laufzeitbedingung — laut sagen, aber nie den Start daran aufhaengen.
+      deps.logger.warn('[neoai] boot collection heal: skipping a collection definition without a name');
+      report.failed.push('?');
+      continue;
+    }
+    report.checked += 1;
+    try {
+      if (await deps.collectionsRepo.findOne({ filter: { name } })) continue; // gesunder Boot
+      await deps.ensureCollection(def);
+      report.added.push(name);
+    } catch (err: any) {
+      if (isDuplicateSchemaError(err)) {
+        report.raced.push(name);
+        continue;
+      }
+      report.failed.push(name);
+      deps.logger.warn(
+        `[neoai] boot collection heal: "${name}" failed (continuing, boot is not blocked): ${err?.stack || err}`,
+      );
+    }
+  }
+  return report;
+}
+
+/**
+ * ACHSE 2 — jedes deklarierte Feld bereitstellen, das noch keine Metadatenzeile
+ * hat. Wirft nie.
+ *
+ * Fasst ein bereits bereitgestelltes Feld bewusst NICHT erneut an: das waere ein
+ * `alter`-Sync je Feld je Start je Arbeiter — genau der gleichzeitige
+ * ALTER-Sturm, den Regel 3 im Dateikopf vermeidet. Was an einer BESTEHENDEN
+ * Zeile veraltet sein kann, ist Achse 3 und wird dort behandelt.
+ */
+export async function healExtraFields(
+  entries: ExtraFieldEntry[],
+  deps: SchemaHealDeps,
+): Promise<SchemaHealReport> {
+  const report: SchemaHealReport = { checked: 0, added: [], raced: [], failed: [] };
+  if (!Array.isArray(entries) || !entries.length) return report;
+  if (!deps?.fieldsRepo) {
+    deps?.logger?.warn?.('[neoai] boot schema heal skipped: the fields repository is unavailable');
+    return report;
+  }
+
+  for (const entry of entries) {
+    const collection = entry?.collection;
+    const name = entry?.field?.name;
+    if (!collection || !name) {
+      deps.logger.warn(
+        `[neoai] boot schema heal: skipping a malformed field entry from "${entry?.owner ?? 'unknown'}"`,
+      );
+      report.failed.push(`${collection ?? '?'}.${name ?? '?'}`);
+      continue;
+    }
+    const label = `${collection}.${name}`;
+    report.checked += 1;
+    try {
+      const existing = await deps.fieldsRepo.findOne({ filter: { collectionName: collection, name } });
+      if (existing) continue; // gesunder Boot: kein Schreibvorgang, kein Sync, keine Zeile
+      await deps.ensureField(collection, entry.field);
+      report.added.push(label);
+    } catch (err: any) {
+      if (isDuplicateSchemaError(err)) {
+        report.raced.push(label);
+        deps.logger.info(`[neoai] boot schema heal: ${label} was provisioned concurrently by another worker`);
+        continue;
+      }
+      report.failed.push(label);
+      deps.logger.warn(
+        `[neoai] boot schema heal: ${entry.owner}/${label} failed (continuing, boot is not blocked): ${err?.stack || err}`,
+      );
+    }
+  }
+  return report;
+}
+
+/**
+ * Das Inventar fuer Achse 2, aus dem ECHTEN Register: jedes Feld, das dieses
+ * Plugin deklariert — inline an einer Sammlung UND ueber `extraFields`.
+ *
+ * Selbstpflegend by construction, aus demselben Grund wie
+ * `collectDeclaredOptionLists`: ein morgen hinzugefuegtes Feld ist abgedeckt,
+ * ohne dass jemand daran denken muss, es hier einzutragen. Eine handgepflegte
+ * Teilmenge veraltet und meldet danach Vollstaendigkeit, die sie nicht hat
+ * ([[waechter-brauchen-einen-zwangspunkt]]).
+ *
+ * ZUSAMMENGEFASST auf "sammlung.feld": 4 Felder dieses Plugins sind heute
+ * doppelt deklariert (inline und in NEOAI_EXTRA_FIELDS). Ohne die Zusammen-
+ * fassung schlaegt ein gesunder Boot sie zweimal nach, und ein Bericht zaehlte
+ * sie doppelt. Die ERSTE Deklaration gewinnt — sie ist die, mit der die Sammlung
+ * ohnehin erzeugt wuerde.
+ */
+export function collectDeclaredFields(sources: DeclaredFieldSource[]): ExtraFieldEntry[] {
+  const seen = new Set<string>();
+  const entries: ExtraFieldEntry[] = [];
+  const push = (owner: string, collection: any, field: any) => {
+    if (!collection || !field?.name) return;
+    const label = `${collection}.${field.name}`;
+    if (seen.has(label)) return;
+    seen.add(label);
+    entries.push({ owner, collection, field });
+  };
+  for (const source of sources ?? []) {
+    const owner = source?.owner ?? 'unknown';
+    for (const def of source?.collections ?? []) {
+      for (const field of def?.fields ?? []) push(owner, def?.name, field);
+    }
+    for (const entry of source?.extraFields ?? []) push(owner, entry?.collection, entry?.field);
+  }
+  return entries;
 }
