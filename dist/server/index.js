@@ -45,7 +45,11 @@ var require_package = __commonJS({
         build: "node build-server.js && node build-client.js",
         test: 'node scripts/run-unit-tests.mjs --experimental-strip-types "test/*.test.mjs" "test/*/*.test.mjs" && node scripts/check-build.mjs',
         "test:unit": 'node scripts/run-unit-tests.mjs --experimental-strip-types "test/*.test.mjs" "test/*/*.test.mjs"',
-        "test:build": "node scripts/check-build.mjs"
+        "test:build": "node scripts/check-build.mjs",
+        "merge-gate": "node scripts/merge-gate.mjs"
+      },
+      neobaseMergeGate: {
+        maxSkippedPercent: 0
       },
       peerDependencies: {
         "@nocobase/client": "2.x",
@@ -2023,6 +2027,95 @@ async function healFieldDefinitions(entries, deps) {
   }
   return report;
 }
+async function healModuleCollections(defs, deps) {
+  const report = { checked: 0, added: [], raced: [], failed: [] };
+  if (!Array.isArray(defs) || !defs.length) return report;
+  if (!deps?.collectionsRepo) {
+    deps?.logger?.warn?.("[neoai] boot collection heal skipped: the collections repository is unavailable");
+    return report;
+  }
+  for (const def of defs) {
+    const name = def?.name;
+    if (!name) {
+      deps.logger.warn("[neoai] boot collection heal: skipping a collection definition without a name");
+      report.failed.push("?");
+      continue;
+    }
+    report.checked += 1;
+    try {
+      if (await deps.collectionsRepo.findOne({ filter: { name } })) continue;
+      await deps.ensureCollection(def);
+      report.added.push(name);
+    } catch (err) {
+      if (isDuplicateSchemaError(err)) {
+        report.raced.push(name);
+        continue;
+      }
+      report.failed.push(name);
+      deps.logger.warn(
+        `[neoai] boot collection heal: "${name}" failed (continuing, boot is not blocked): ${err?.stack || err}`
+      );
+    }
+  }
+  return report;
+}
+async function healExtraFields(entries, deps) {
+  const report = { checked: 0, added: [], raced: [], failed: [] };
+  if (!Array.isArray(entries) || !entries.length) return report;
+  if (!deps?.fieldsRepo) {
+    deps?.logger?.warn?.("[neoai] boot schema heal skipped: the fields repository is unavailable");
+    return report;
+  }
+  for (const entry of entries) {
+    const collection = entry?.collection;
+    const name = entry?.field?.name;
+    if (!collection || !name) {
+      deps.logger.warn(
+        `[neoai] boot schema heal: skipping a malformed field entry from "${entry?.owner ?? "unknown"}"`
+      );
+      report.failed.push(`${collection ?? "?"}.${name ?? "?"}`);
+      continue;
+    }
+    const label = `${collection}.${name}`;
+    report.checked += 1;
+    try {
+      const existing = await deps.fieldsRepo.findOne({ filter: { collectionName: collection, name } });
+      if (existing) continue;
+      await deps.ensureField(collection, entry.field);
+      report.added.push(label);
+    } catch (err) {
+      if (isDuplicateSchemaError(err)) {
+        report.raced.push(label);
+        deps.logger.info(`[neoai] boot schema heal: ${label} was provisioned concurrently by another worker`);
+        continue;
+      }
+      report.failed.push(label);
+      deps.logger.warn(
+        `[neoai] boot schema heal: ${entry.owner}/${label} failed (continuing, boot is not blocked): ${err?.stack || err}`
+      );
+    }
+  }
+  return report;
+}
+function collectDeclaredFields(sources) {
+  const seen = /* @__PURE__ */ new Set();
+  const entries = [];
+  const push = (owner, collection, field) => {
+    if (!collection || !field?.name) return;
+    const label = `${collection}.${field.name}`;
+    if (seen.has(label)) return;
+    seen.add(label);
+    entries.push({ owner, collection, field });
+  };
+  for (const source of sources ?? []) {
+    const owner = source?.owner ?? "unknown";
+    for (const def of source?.collections ?? []) {
+      for (const field of def?.fields ?? []) push(owner, def?.name, field);
+    }
+    for (const entry of source?.extraFields ?? []) push(owner, entry?.collection, entry?.field);
+  }
+  return entries;
+}
 
 // src/server/seed.ts
 var OVERPASS_VEGETATION = `[out:json][timeout:25];(node["natural"="tree"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["natural"="wood"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["landuse"="forest"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}});way["natural"="water"](around:250,{{nodes.geo.lat}},{{nodes.geo.lon}}););out tags center 100;`;
@@ -2654,6 +2747,8 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
     this.db.on("afterDefineCollection", () => detach("afterDefineCollection"));
     this.db.on("afterUpdateCollection", () => detach("afterUpdateCollection"));
     this.app.on("afterStart", async () => {
+      await this.healModuleCollectionsOnBoot();
+      await this.healExtraFieldsOnBoot();
       await this.healFieldDefinitionsOnBoot();
     });
     this.app.on("afterStart", async () => {
@@ -3449,6 +3544,83 @@ var NeoaiPlugin = class _NeoaiPlugin extends import_server.Plugin {
    * Auf einer gesunden Installation liest dieser Sweep 6 Zeilen und schreibt
    * nichts (gemessen 2026-08-05: 6 deklarierte Auswahllisten, 6 identisch).
    */
+  /**
+   * ACHSE 1 — jede deklarierte Sammlung, die auf DIESER Installation fehlt.
+   *
+   * `setup()` haengt nur an `install()`/`afterEnable()`, und `pm enable` gegen
+   * ein bereits aktiviertes Plugin ist ein No-op. Eine Sammlung, die eine neue
+   * Auslieferung mitbringt, erreicht eine bestehende Installation also nie von
+   * selbst; ein Neustart heilt nichts. Bei crm gemessen (`crm_ops_incidents`,
+   * 2026-07-31): Tabelle fehlte nach Neubau und Neustart, waehrend der
+   * schreibende Codepfad anstandslos lief und still scheiterte.
+   *
+   * Gemessen fuer DIESES Plugin (2026-08-05, laufender Sandkasten): 13 von 13
+   * deklarierten Sammlungen vorhanden, 0 fehlend. Der Sweep ist also eine
+   * Zusicherung fuer die naechste Sammlung, keine Reparatur — und ein gesunder
+   * Boot macht 13 indizierte Lesevorgaenge und schreibt nichts.
+   *
+   * SCHWEIGEN IST TEIL DES ZUSCHNITTS: ein gesunder Boot schreibt keine Zeile.
+   * Nur so ist „der zweite Neustart heilt nichts mehr" an einer NULL ablesbar
+   * statt an einem Text, den man auslegen muss. Dass der Sweep ueberhaupt lief,
+   * belegt im selben Fenster die Ablösungszeile dieses Plugins
+   * (`… detached from acl.strategyResources (afterStart)`). Die ANZAHL des
+   * Geprueften druckt der Waechter in `npm test`
+   * ([[waechter-brauchen-einen-zwangspunkt]]) — dort, wo sie belegen kann, dass
+   * nicht ueber einer leeren Auswahl gruen gemeldet wurde.
+   */
+  async healModuleCollectionsOnBoot() {
+    try {
+      const report = await healModuleCollections(NEOAI_COLLECTIONS, {
+        collectionsRepo: this.db.getRepository("collections"),
+        ensureCollection: (def) => this.ensureCollection(def),
+        logger: this.app.logger
+      });
+      if (report.added.length) {
+        this.app.logger.info(
+          `[neoai] boot collection heal provisioned ${report.added.length} of ${report.checked} declared collection(s): ${report.added.join(", ")}`
+        );
+      }
+    } catch (err) {
+      this.app.logger.warn(`[neoai] boot collection heal failed (non-fatal): ${err?.stack || err}`);
+    }
+  }
+  /**
+   * ACHSE 2 — jedes deklarierte Feld, das auf DIESER Installation fehlt.
+   *
+   * Der Zwilling von healModuleCollectionsOnBoot und aus demselben Grund da.
+   * Laeuft NACH ihm: ein Feld kann sich nur an eine bestehende Sammlung haengen.
+   *
+   * Das Inventar kommt aus dem ECHTEN Register (`collectDeclaredFields`) und
+   * deckt BEIDE Haelften des Vertrags ab — die inline an einer Sammlung
+   * deklarierten Felder UND `NEOAI_EXTRA_FIELDS`. Warum weiter als crms Vorlage:
+   * `ensureCollection()` fasst eine bestehende `collections`-Zeile nicht mehr
+   * an, ein nachtraeglich inline eingetragenes Feld erreicht eine bestehende
+   * Installation also durch nichts. collections.ts haelt dafuer nur eine
+   * Hausregel — Prosa, kein Mechanismus. Die Begruendung und die Messung stehen
+   * in lib/schema-heal.ts, dort faellt die Entscheidung.
+   *
+   * Gemessen (2026-08-05): 114 deklarierte Feldnamen, 114 gespeicherte Zeilen,
+   * 0 fehlend.
+   */
+  async healExtraFieldsOnBoot() {
+    try {
+      const entries = collectDeclaredFields([
+        { owner: "core", collections: NEOAI_COLLECTIONS, extraFields: NEOAI_EXTRA_FIELDS }
+      ]);
+      const report = await healExtraFields(entries, {
+        fieldsRepo: this.db.getRepository("fields"),
+        ensureField: (collection, field) => this.ensureField(collection, field),
+        logger: this.app.logger
+      });
+      if (report.added.length) {
+        this.app.logger.info(
+          `[neoai] boot schema heal provisioned ${report.added.length} of ${report.checked} declared field(s): ${report.added.join(", ")}`
+        );
+      }
+    } catch (err) {
+      this.app.logger.warn(`[neoai] boot schema heal failed (non-fatal): ${err?.stack || err}`);
+    }
+  }
   async healFieldDefinitionsOnBoot() {
     try {
       const entries = collectDeclaredOptionLists([
