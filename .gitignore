@@ -4,3 +4,7 @@ node_modules/
 # dist/ is COMMITTED (leaf-plugin convention: NeoBase copies the prebuilt
 # bundle straight into the image — only @neomodul/konfigurator builds from
 # source there).
+
+# NEOB-18 local verification artifacts (screenshots + playwright helpers)
+.artifacts/
+.claude/

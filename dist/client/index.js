@@ -305,25 +305,24 @@ var NEOMODUL_FAVICON_SRC = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjU2IiBoZW
 
 // src/client/console/tokens.ts
 var NM = {
-  /** Page ground behind the console content. */
+  /** Page ground behind the console content (branding: --nm-surface-app). Not
+   *  part of the six-role bar contract, but flips with branding in Dark. */
   surfaceApp: "var(--nm-surface-app, #f7f8f4)",
-  /** Card / bar ground (the bottom bar and the "Mehr" sheet sit on this). */
-  surfaceCard: "var(--nm-surface-card, #ffffff)",
-  /** Standard hairline. */
-  line: "var(--nm-line, #e7e7e3)",
-  /** The shell chrome divider — the bottom bar's top border (matches the old
-   *  sidebar's #ececea rule for a byte-identical light default). */
-  lineChrome: "var(--nm-line-subtle, #ececea)",
-  /** Primary ink. */
+  /** Bar-/Sheet-Fläche — the bottom bar and the "Mehr" sheet sit on this. */
+  surfaceCard: "var(--nm-surface-card, #fcfcfa)",
+  /** Bar-/Sheet-Hairline — the bar's top border and the sheet's close-bar rule. */
+  lineSubtle: "var(--nm-line-subtle, #ececec)",
+  /** Primary ink — normal "Mehr"-sheet row text (branding: --nm-ink). */
   ink: "var(--nm-ink, #1b1e21)",
-  /** Secondary/meta ink — the inactive bottom-bar slot. */
-  inkMuted: "var(--nm-ink-muted, #595959)",
-  /** Brand green as a fill/accent. */
-  brand: "var(--nm-brand-primary, #009900)",
-  /** Brand green as TEXT on the light card (active bottom-bar slot). A plain
-   *  #009900 is only ~2.4:1 on white; the darker default clears AA, and branding
-   *  substitutes its own dark-mode brand ink via the same variable. */
-  brandInk: "var(--nm-brand-primary, #007a00)"
+  /** Inaktiv-Ink — the inactive bottom-bar slot. */
+  inkMuted: "var(--nm-ink-muted, #676b64)",
+  /** Section-Header-Ink — the "Mehr"-sheet group titles. */
+  inkSubtle: "var(--nm-ink-subtle, #8a908a)",
+  /** Aktive-Zeile-Füllung — the active row's fill inside the "Mehr" sheet. */
+  navActive: "var(--nm-nav-active, #eef4ec)",
+  /** Aktiv-Ink / grünes Highlight — the active bottom-bar slot and the active
+   *  "Mehr"-sheet row's ink. */
+  brand: "var(--nm-brand-primary, #009900)"
 };
 var BRAND_GRAPHITE = "#191A19";
 
@@ -393,11 +392,13 @@ function BottomNav(props) {
   const overflowAreas = overflow.filter((it) => it.key !== SETTINGS_KEY);
   const settingsItem = ordered.find((it) => it.key === SETTINGS_KEY);
   const settingsInOverflow = overflow.some((it) => it.key === SETTINGS_KEY);
-  const rest = [
-    ...overflowAreas,
-    ...crossLinks.map((l) => ({ key: `href:${l.href}`, label: l.label, icon: l.icon })),
-    ...settingsInOverflow && settingsItem ? [settingsItem] : []
-  ];
+  const moreGroups = [];
+  if (overflowAreas.length) moreGroups.push({ title: "Sections", items: overflowAreas.map((it) => ({ key: it.key, label: it.label, icon: it.icon })) });
+  if (crossLinks.length) moreGroups.push({ title: "System", items: crossLinks.map((l) => ({ key: `href:${l.href}`, label: l.label, icon: l.icon })) });
+  if (settingsInOverflow && settingsItem) moreGroups.push({ title: "", items: [{ key: settingsItem.key, label: settingsItem.label, icon: settingsItem.icon }] });
+  const headerCount = moreGroups.filter((g) => g.title).length;
+  const rowCount = moreGroups.reduce((n, g) => n + g.items.length, 0);
+  const sheetRows = rowCount + headerCount;
   const moreActive = moreOpen || overflowAreas.some((it) => it.key === activeKey);
   const Slot = (p) => /* @__PURE__ */ import_react2.default.createElement(
     "button",
@@ -414,14 +415,17 @@ function BottomNav(props) {
         flexDirection: "column",
         alignItems: "center",
         gap: 2,
-        padding: "6px 2px",
-        color: p.active ? NM.brandInk : NM.inkMuted,
+        padding: "7px 2px",
+        // Active = brand green ink + a 2px green top rule; at rest = muted ink. Same active
+        // affordance as the catalog console bottom bar (NEOB-12).
+        color: p.active ? NM.brand : NM.inkMuted,
         fontWeight: p.active ? 600 : 400,
         fontSize: 11,
-        cursor: "pointer"
+        cursor: "pointer",
+        borderTop: `2px solid ${p.active ? NM.brand : "transparent"}`
       }
     },
-    /* @__PURE__ */ import_react2.default.createElement("span", { style: { fontSize: 16, lineHeight: 1 } }, ico(p.icon)),
+    /* @__PURE__ */ import_react2.default.createElement("span", { style: { fontSize: 16, lineHeight: 1, opacity: p.active ? 1 : 0.85 } }, ico(p.icon)),
     /* @__PURE__ */ import_react2.default.createElement("span", { style: { maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, p.label)
   );
   return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement(
@@ -437,7 +441,7 @@ function BottomNav(props) {
         zIndex: 950,
         display: "flex",
         background: NM.surfaceCard,
-        borderTop: `1px solid ${NM.lineChrome}`,
+        borderTop: `1px solid ${NM.lineSubtle}`,
         boxShadow: "0 -2px 8px rgba(0,0,0,0.04)"
       }
     },
@@ -450,26 +454,47 @@ function BottomNav(props) {
       onClose: () => setMoreOpen(false),
       getContainer: false,
       placement: "bottom",
-      height: `min(${rest.length * 44 + 64}px, 88vh)`,
+      height: `min(${sheetRows * 44 + 72}px, 88vh)`,
       closable: false,
+      styles: { content: { background: NM.surfaceCard }, body: { background: NM.surfaceCard, padding: "10px 0 64px" } },
       rootStyle: { position: "fixed" }
     },
-    /* @__PURE__ */ import_react2.default.createElement(
-      import_antd2.Menu,
-      {
-        mode: "inline",
-        items: rest.map((it) => ({ key: it.key, label: it.label, icon: ico(it.icon) })),
-        selectedKeys: activeKey ? [activeKey] : [],
-        onClick: (e) => {
-          var _a;
-          setMoreOpen(false);
-          const key = String((_a = e.key) != null ? _a : "");
-          if (key.startsWith("href:")) window.location.href = key.slice(5);
-          else onSelect(key);
+    /* @__PURE__ */ import_react2.default.createElement("div", { style: { padding: "2px 16px 8px", fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: NM.inkSubtle } }, "NeoAI"),
+    moreGroups.map((group) => /* @__PURE__ */ import_react2.default.createElement("div", { key: group.title || "__orphan", style: { marginBottom: 6 } }, group.title ? /* @__PURE__ */ import_react2.default.createElement("div", { style: { padding: "10px 16px 4px", fontSize: 9.5, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", color: NM.inkSubtle } }, group.title) : null, group.items.map((row) => {
+      const on = row.key === activeKey;
+      return /* @__PURE__ */ import_react2.default.createElement(
+        "button",
+        {
+          key: row.key,
+          type: "button",
+          "data-testid": `neoai-more-${row.key}`,
+          onClick: () => {
+            setMoreOpen(false);
+            activate(row.key);
+          },
+          "aria-current": on ? "page" : void 0,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            width: "100%",
+            textAlign: "left",
+            padding: "11px 16px",
+            border: "none",
+            cursor: "pointer",
+            // Active row = muted-green fill + 2px green left rule + green ink — the reference
+            // "grünes Active-Highlighting" (catalog NEOB-12 / CRM bar).
+            borderLeft: `2px solid ${on ? NM.brand : "transparent"}`,
+            background: on ? NM.navActive : "transparent",
+            color: on ? NM.brand : NM.ink,
+            fontSize: 14,
+            fontWeight: on ? 600 : 500
+          }
         },
-        style: { borderInlineEnd: "none", paddingBottom: 56 }
-      }
-    ),
+        /* @__PURE__ */ import_react2.default.createElement("span", { style: { fontSize: 16, lineHeight: 1, opacity: on ? 1 : 0.7 } }, ico(row.icon)),
+        /* @__PURE__ */ import_react2.default.createElement("span", { style: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, row.label)
+      );
+    }))),
     /* @__PURE__ */ import_react2.default.createElement(
       "div",
       {
@@ -482,7 +507,7 @@ function BottomNav(props) {
           display: "flex",
           justifyContent: "flex-end",
           background: NM.surfaceCard,
-          borderTop: `1px solid ${NM.lineChrome}`,
+          borderTop: `1px solid ${NM.lineSubtle}`,
           boxShadow: "0 -2px 8px rgba(0,0,0,0.04)"
         }
       },
