@@ -1,17 +1,22 @@
 // src/client/console/NeoaiConsole.tsx
 // -----------------------------------------------------------------------------
-// The NeoAI console shell: brand sidebar (Konfigurator ConsoleShell look) with
-// the three areas (AI Workflows / Runs / Settings) plus cross-links to
-// NocoBase's own workflow admin ("Automation", scoping Q2/Q9) and the admin
-// home. One component serves every sub-path — the active tab is derived from
-// the pathname (CatalogPage pattern), navigation is plain href assignment.
+// The NeoAI console: the CRM navigation pattern (NEOB-7/NEOB-13) — an adaptive
+// bottom bar as the single console navigation on every viewport, Priority+
+// overflow into a "Mehr" sheet, cross-links (Automation / Admin) and Settings
+// living in that sheet. One component serves every sub-path; the active area is
+// derived from the pathname and navigation is plain route assignment, so every
+// registered /neoai/<key> route keeps working (deep links, back button).
+//
+// The former fixed left sidebar was replaced here: the bottom bar (shell.tsx)
+// is the sole navigation, themed centrally via the @neomodul/branding `--nm-*`
+// contract with a graceful default when branding is absent.
 
 import React, { useEffect, useState } from 'react';
 import { Alert, ConfigProvider } from 'antd';
-import { Icon, useAPIClient } from '@nocobase/client';
-import { NEOHOME_GREEN, NEOHOME_THEME, ensureInterFont } from '../theme';
-import { NEOMODUL_FAVICON_SRC } from '../logo';
+import { useAPIClient } from '@nocobase/client';
+import { NEOHOME_THEME, ensureInterFont } from '../theme';
 import { ConsoleAccessGate, neoaiAction, usePoll } from './shared';
+import { ConsoleShell, NavItem, CrossLink } from './shell';
 import { WorkflowsPanel } from './WorkflowsPanel';
 import { RunsPanel } from './RunsPanel';
 import { ApprovalsPanel } from './ApprovalsPanel';
@@ -20,6 +25,13 @@ import { McpServersPanel } from './McpServersPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { MemoryPanel } from './MemoryPanel';
 
+// ONE logical order (NEOB-13 product decision), by click-frequency + sachliche
+// Gruppen, following the CRM's logic:
+//   · Daily operations (highest frequency): AI Workflows, Runs, Approvals
+//   · Capabilities the workflows reference:  Functions, MCP Servers, Memory
+//   · Config (lowest, always last):          Settings
+// Settings stays LAST so it is the last bar slot and the first area to fall into
+// "Mehr" as the viewport narrows — the CRM's settings-handling rule.
 const TABS: Array<{ key: string; label: string; icon: string }> = [
   { key: 'workflows', label: 'AI Workflows', icon: 'PartitionOutlined' },
   { key: 'runs', label: 'Runs', icon: 'PlayCircleOutlined' },
@@ -29,6 +41,11 @@ const TABS: Array<{ key: string; label: string; icon: string }> = [
   { key: 'memory', label: 'Memory', icon: 'DatabaseOutlined' },
   { key: 'settings', label: 'Settings', icon: 'SettingOutlined' },
 ];
+
+// The leading (highest-priority) slots — the daily-operations trio. This only
+// signals the bar opt-in and the count shown before the first width measurement;
+// the bar then adapts its slot count to the real width. See shell.tsx.
+const BOTTOM_KEYS = ['workflows', 'runs', 'approvals'];
 
 /** Proactive spend alert (item 15) — forward-looking; the hard block is still checkBudget's job. */
 function SpendAlertBanner() {
@@ -68,10 +85,12 @@ function SpendAlertBanner() {
   );
 }
 
-const CROSS_LINKS: Array<{ label: string; icon: string; href: string; hint?: string }> = [
+// Cross-links leave the NeoAI console; they live only in the "Mehr" sheet,
+// mirroring the CRM's cross-console entries (never a primary bar slot).
+const CROSS_LINKS: CrossLink[] = [
   // NocoBase plugin-workflow admin — the business-automation layer stays there,
-  // but is reachable from the NeoAI menu (one automation hub).
-  { label: 'Automation', icon: 'DeploymentUnitOutlined', href: '/admin/settings/workflow', hint: 'NocoBase workflows' },
+  // but is reachable from the NeoAI navigation (one automation hub).
+  { label: 'Automation', icon: 'DeploymentUnitOutlined', href: '/admin/settings/workflow' },
   { label: 'Admin', icon: 'HomeOutlined', href: '/admin' },
 ];
 
@@ -79,30 +98,6 @@ function activeTabFromPath(pathname: string): string {
   const m = pathname.match(/neoai\/?([a-z-]*)/i);
   const key = (m?.[1] ?? '').toLowerCase();
   return TABS.some((t) => t.key === key) ? key : 'workflows';
-}
-
-function SideItem(props: { icon: string; label: string; active?: boolean; onClick: () => void; muted?: boolean }) {
-  return (
-    <div
-      onClick={props.onClick}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '9px 12px',
-        borderRadius: 9,
-        cursor: 'pointer',
-        fontWeight: props.active ? 600 : 500,
-        color: props.active ? NEOHOME_GREEN : props.muted ? '#8a8f8a' : '#3c4043',
-        background: props.active ? '#eaf7ea' : 'transparent',
-        fontSize: 13.5,
-        userSelect: 'none',
-      }}
-    >
-      <Icon type={props.icon as any} />
-      <span>{props.label}</span>
-    </div>
-  );
 }
 
 /**
@@ -121,44 +116,22 @@ function NeoaiConsoleBody() {
   const active = activeTabFromPath(pathname);
   const go = (href: string) => window.location.assign(href);
 
+  const items: NavItem[] = TABS.map((t) => ({ key: t.key, label: t.label, icon: t.icon }));
+  // Area keys navigate to their /neoai/<key> route; cross-links carry an
+  // absolute href and are dispatched by the shell directly.
+  const onSelect = (key: string) => go(`${prefix}/neoai/${key}`);
+
   return (
     <ConfigProvider theme={NEOHOME_THEME as any} getPopupContainer={(n) => (n?.parentElement as HTMLElement) ?? document.body}>
-      <div
-        style={{
-          display: 'flex',
-          height: embedded ? 'calc(100vh - 46px)' : '100vh',
-          background: '#fff',
-          fontFamily: "'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif",
-          color: '#1b1e21',
-        }}
-      >
-        <aside
-          style={{
-            width: 216,
-            borderRight: '1px solid #ececea',
-            padding: '14px 10px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-            flexShrink: 0,
-          }}
+      <div style={{ fontFamily: "'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif", color: '#1b1e21' }}>
+        <ConsoleShell
+          items={items}
+          bottomKeys={BOTTOM_KEYS}
+          crossLinks={CROSS_LINKS}
+          activeKey={active}
+          onSelect={onSelect}
+          banner={<SpendAlertBanner />}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '2px 8px 12px' }}>
-            <img src={NEOMODUL_FAVICON_SRC} alt="Neomodul" style={{ width: 26, height: 26, borderRadius: 7 }} />
-            <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: '-.01em' }}>NeoAI</span>
-          </div>
-          {TABS.map((t) => (
-            <SideItem key={t.key} icon={t.icon} label={t.label} active={active === t.key} onClick={() => go(`${prefix}/neoai/${t.key}`)} />
-          ))}
-          <div style={{ borderTop: '1px solid #ececea', margin: '10px 4px' }} />
-          {CROSS_LINKS.map((l) => (
-            <SideItem key={l.href} icon={l.icon} label={l.label} muted onClick={() => go(l.href)} />
-          ))}
-          <div style={{ flex: 1 }} />
-          <div style={{ fontSize: 10.5, color: '#b0b4ba', padding: '0 8px 4px' }}>Admin-only · tree workflows · Gemini via plugin-ai</div>
-        </aside>
-        <main style={{ flex: 1, overflow: 'auto', minWidth: 0, background: '#fff' }}>
-          <SpendAlertBanner />
           {active === 'workflows' ? <WorkflowsPanel /> : null}
           {active === 'runs' ? <RunsPanel /> : null}
           {active === 'approvals' ? <ApprovalsPanel /> : null}
@@ -166,7 +139,7 @@ function NeoaiConsoleBody() {
           {active === 'mcp' ? <McpServersPanel /> : null}
           {active === 'memory' ? <MemoryPanel /> : null}
           {active === 'settings' ? <SettingsPanel /> : null}
-        </main>
+        </ConsoleShell>
       </div>
     </ConfigProvider>
   );
